@@ -25,6 +25,16 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r scripts/requirements.txt
+      - name: Icônes des récompenses (en cache)
+        uses: actions/cache@v4
+        with:
+          path: |
+            site/icons
+            work/client.jar
+          key: icons-v1-${{ hashFiles('site/catalog.json') }}
+          restore-keys: icons-v1-
+      - name: Extraction des icônes manquantes
+        run: python scripts/icons.py
       - name: Lecture du serveur en SFTP
         env:
           SFTP_HOST: ${{ secrets.SFTP_HOST }}

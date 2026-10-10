@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Pixelify+Sans:wght@400;600&display=swap">
 <style>
 /* Suménium Saison 7 : ciel d'été → prairie, bordure en herbe pixelisée, tournesol en accent, cristal bleu pour les chiffres */
 :root{
@@ -29,6 +29,7 @@
   --leaf-soft:#1c3320; --leaf-ink:#8fd27a; --purple:#c99bf2; --purple-soft:#2c1f3a;
   --warn:#f39a85; --warn-soft:#3b221d; color-scheme:dark}}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);margin:0}
 
 /* En-tête : ciel, logo, compteur de bordure */
@@ -158,6 +159,22 @@ table.tbl{width:100%;border-collapse:collapse;font-size:.95rem}
 .statlist button[aria-pressed="true"]{background:var(--sun-soft);color:var(--sun-ink);font-weight:700}
 .statview{min-width:0}
 @media (max-width:760px){.explorer{grid-template-columns:1fr}.statlist{max-height:40vh}}
+
+/* Récompenses : cases d'inventaire + infobulle façon Minecraft */
+.loot{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}
+.loot .lbl{font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-right:2px}
+.slot{position:relative;width:40px;height:40px;padding:3px;border:0;cursor:help;background:#8b8b8b;box-shadow:inset 2px 2px 0 #373737,inset -2px -2px 0 #fff;image-rendering:pixelated}
+.slot img,.slot .head{display:block;width:34px;height:34px;object-fit:cover;object-position:top;image-rendering:pixelated}
+.slot .head{background-size:800%;background-position:14.2857% 14.2857%;background-repeat:no-repeat}
+.slot .ph{display:grid;place-items:center;width:34px;height:34px;font:600 .62rem/1 "Pixelify Sans",monospace;color:#fff;text-align:center;overflow:hidden;word-break:break-all}
+.slot.glint::after{content:"";position:absolute;inset:3px;background:linear-gradient(115deg,transparent 30%,rgba(190,120,255,.45) 50%,transparent 70%);mix-blend-mode:screen;pointer-events:none}
+.slot .cnt{position:absolute;right:2px;bottom:0;font:600 .9rem/1 "Pixelify Sans",monospace;color:#fff;text-shadow:2px 2px 0 #3f3f3f}
+.slot.trophy{background:#c9a227;box-shadow:inset 2px 2px 0 #7a5c00,inset -2px -2px 0 #ffe9a0}
+.xpchip{font:600 .85rem "Pixelify Sans",monospace;color:#7efc20;background:#1d2a12;border-radius:6px;padding:4px 8px;text-shadow:1px 1px 0 #2a3f12}
+#tip{position:fixed;z-index:50;max-width:320px;pointer-events:none;background:rgba(16,0,16,.95);border:2px solid #2b0f5c;outline:2px solid rgba(16,0,16,.95);box-shadow:inset 0 0 0 1px #5000ff55;padding:6px 9px;font:400 15px/1.35 "Pixelify Sans",monospace;color:#fff;text-shadow:2px 2px 0 #3f3f3f}
+#tip .nm{margin-bottom:2px}
+#tip .ln{white-space:pre-wrap}
+.rank-scroll{max-height:440px;overflow-y:auto;padding-right:4px}
 </style>
 </head>
 <body>
@@ -187,6 +204,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:.95rem}
     <a href="#carte" data-tab="carte">Carte</a>
   </div>
 </nav>
+<div id="tip" hidden></div>
 <main class="wrap">
   <div class="updated"><span class="dot" id="dot"></span><span id="updated">Chargement des données…</span></div>
   <div class="banner" id="err" hidden></div>
@@ -313,9 +331,10 @@ function item(e){
     const have=new Set(r.pc||[]);
     parts.push(`<div class="crit">${e.req.map(g=>`<span class="${g.some(c=>have.has(c))?"y":""}">${esc(g.map(crit).join(" ou "))}</span>`).join("")}</div>`);
   }
+  const loot=lootHtml(e);
   const det=parts.length?`<details><summary>${n>1?`Comment le faire · ${n} étapes`:"Détails"}</summary>${parts.join("")}</details>`:"";
   const pts=hasData()?`+${fmtB(r.b)}`:"?";
-  return `<li class="adv ${r.done?"done":""}"><div class="row"><span class="pts">${pts}</span><div><div class="t">${esc(e.title)}</div><div class="d">${esc(String(e.desc).replace(/\\n/g," "))}</div>${extra}${det}</div><div class="meta"><span class="chip">${esc(e.tab)}</span><span class="chip ${esc(e.tier)}">${TIERS[e.tier]||esc(e.tier)}</span>${r.done?'<span class="chip ok">Obtenu</span>':""}</div></div></li>`;
+  return `<li class="adv ${r.done?"done":""}"><div class="row"><span class="pts">${pts}</span><div><div class="t">${esc(e.title)}</div><div class="d">${esc(String(e.desc).replace(/\\n/g," "))}</div>${extra}${loot}${det}</div><div class="meta"><span class="chip">${esc(e.tab)}</span><span class="chip ${esc(e.tier)}">${TIERS[e.tier]||esc(e.tier)}</span>${r.done?'<span class="chip ok">Obtenu</span>':""}</div></div></li>`;
 }
 
 function render(){
@@ -377,20 +396,67 @@ async function loadData(){
   }catch(e){DATA={adv:{},error:"données illisibles"};}
   render();
 }
+
+// ---------- Récompenses ----------
+const MCCOL={black:"#000000",dark_blue:"#0000AA",dark_green:"#00AA00",dark_aqua:"#00AAAA",dark_red:"#AA0000",dark_purple:"#AA00AA",gold:"#FFAA00",gray:"#AAAAAA",dark_gray:"#555555",blue:"#5555FF",green:"#55FF55",aqua:"#55FFFF",red:"#FF5555",light_purple:"#FF55FF",yellow:"#FFFF55",white:"#FFFFFF"};
+const col=c=>c?(MCCOL[c]||c):null;
+const ROM=["","I","II","III","IV","V","VI","VII","VIII","IX","X"];
+const iname=id=>id.replace(/_/g," ").replace(/\b\w/g,m=>m.toUpperCase());
+function slot(it,ci,kind,j){
+  const pic=it.skin?`<span class="head" style="background-image:url('${esc(it.skin)}')"></span>`
+    :`<img src="icons/${esc(it.id)}.png" alt="" loading="lazy" onerror="this.outerHTML='<span class=&quot;ph&quot;>${esc(iname(it.id).slice(0,10))}</span>'">`;
+  return `<button class="slot${it.glint?" glint":""}${kind==="tr"?" trophy":""}" data-c="${ci}" data-k="${kind}" data-j="${j}" aria-label="${esc((it.name&&it.name.t)||iname(it.id))}">${pic}${it.n>1?`<span class="cnt">${it.n}</span>`:""}</button>`;
+}
+function lootHtml(e){
+  const b=(DATA&&DATA.bac)||{};const on=k=>b[k]===undefined||b[k]===null||b[k]!==0;
+  const ci=CAT.indexOf(e);let h="";
+  if(on("reward")&&e.rw&&e.rw.length)h+=`<span class="lbl">Récompense</span>`+e.rw.map((it,j)=>slot(it,ci,"rw",j)).join("");
+  if(on("trophy")&&e.tr&&e.tr.length)h+=`<span class="lbl">Trophée</span>`+e.tr.map((it,j)=>slot(it,ci,"tr",j)).join("");
+  if(on("exp")&&e.xp)h+=`<span class="xpchip">+${fmt(e.xp)} XP</span>`;
+  return h?`<div class="loot">${h}</div>`:"";
+}
+function tipHtml(it){
+  const nm=it.name||{t:iname(it.id)+(it.potion?` (${it.potion})`:""),c:it.id==="enchanted_book"?"yellow":(it.glint?"aqua":"white")};
+  const line=(t,c,ital,bold)=>`<div class="ln" style="color:${col(c)||"#fff"};${ital?"font-style:italic;":""}${bold?"font-weight:600;":""}">${esc(t)}</div>`;
+  let h=`<div class="nm">${line(nm.t,nm.c||"white",nm.i===undefined&&!!it.name,nm.b)}</div>`;
+  (it.ench||[]).forEach(([n,l])=>h+=line(`${n} ${ROM[l]||l}`,"gray"));
+  if(it.potion&&!it.name)h+=line(it.potion,"blue");
+  (it.lore||[]).forEach(l=>h+=line(l.t||" ",l.c||"dark_purple",l.i!==0,l.b));
+  if(it.unbreakable)h+=line("Unbreakable","blue");
+  if(it.n>1)h+=line(`× ${it.n}`,"dark_gray");
+  return h;
+}
+let tipFor=null;
+function showTip(btn,x,y){
+  const e=CAT[+btn.dataset.c],it=e&&e[btn.dataset.k]&&e[btn.dataset.k][+btn.dataset.j];if(!it)return;
+  const t=$("tip");t.innerHTML=tipHtml(it);t.hidden=false;tipFor=btn;
+  const r=btn.getBoundingClientRect();x=x??r.right;y=y??r.top;
+  const w=t.offsetWidth,hh=t.offsetHeight;
+  let L=x+14,T=y-hh-8;if(L+w>innerWidth-8)L=Math.max(8,x-w-14);if(T<8)T=Math.min(innerHeight-hh-8,y+20);
+  t.style.left=L+"px";t.style.top=T+"px";
+}
+function hideTip(){$("tip").hidden=true;tipFor=null}
+document.addEventListener("mouseover",e=>{const b=e.target.closest(".slot");if(b)showTip(b,e.clientX,e.clientY)});
+document.addEventListener("mousemove",e=>{const b=e.target.closest(".slot");if(b)showTip(b,e.clientX,e.clientY);else if(tipFor)hideTip()});
+document.addEventListener("focusin",e=>{const b=e.target.closest(".slot");if(b)showTip(b)});
+document.addEventListener("focusout",e=>{if(e.target.closest(".slot"))hideTip()});
+document.addEventListener("click",e=>{const b=e.target.closest(".slot");if(b){if(tipFor===b)hideTip();else showTip(b)}else if(tipFor)hideTip()});
+window.addEventListener("scroll",()=>{if(tipFor)hideTip()},{passive:true});
+
 // ---------- Classements ----------
 let STATS=null, mapReady=false, statSel=null;
 const okName=n=>/^[A-Za-z0-9_]{2,16}$/.test(n);
 const teamOf=n=>(STATS&&STATS.playerTeams&&STATS.playerTeams[n])||"";
 function rankList(rows,fmtv,limit){
-  rows=(rows||[]).filter(r=>okName(r[0])).slice(0,limit||10);
+  rows=(rows||[]).filter(r=>okName(r[0])).slice(0,limit||1000);
   if(!rows.length)return '<p class="empty">Pas encore de données.</p>';
   const max=Math.max(...rows.map(r=>Math.abs(r[1])),1);
-  return '<ol class="rank">'+rows.map((r,i)=>{const t=teamOf(r[0]);
-    return `<li><span class="pos">${i+1}</span><span class="who">${esc(r[0])}${t?`<small>${esc(t)}</small>`:""}</span><span class="val">${fmtv(r[1])}</span><span class="bar2"><s style="width:${Math.max(2,Math.round(Math.abs(r[1])/max*100))}%"></s></span></li>`}).join("")+'</ol>';
+  return '<div class="rank-scroll"><ol class="rank">'+rows.map((r,i)=>{const t=teamOf(r[0]);
+    return `<li><span class="pos">${i+1}</span><span class="who">${esc(r[0])}${t?`<small>${esc(t)}</small>`:""}</span><span class="val">${fmtv(r[1])}</span><span class="bar2"><s style="width:${Math.max(2,Math.round(Math.abs(r[1])/max*100))}%"></s></span></li>`}).join("")+'</ol></div>';
 }
 function renderClassement(){
   if(!STATS){$("tabBoards").innerHTML='<p class="empty">Les classements arrivent à la prochaine mise à jour du serveur.</p>';return}
-  $("tabBoards").innerHTML=STATS.tab.map(t=>`<div class="board"><h3>${esc(t.label)}<small>Top 10</small></h3>${rankList(t.rows,fmt,10)}</div>`).join("");
+  $("tabBoards").innerHTML=STATS.tab.map(t=>`<div class="board"><h3>${esc(t.label)}<small>${fmt(t.rows.filter(r=>okName(r[0])).length)} joueurs</small></h3>${rankList(t.rows,fmt)}</div>`).join("");
   const rows=(STATS.teams||[]).map((t,i)=>`<tr><td>${i+1}</td><td><b>${esc(t.team)}</b></td><td>${fmt(t.members)}</td><td>${fmt(t.bac_advancements)}</td><td>${fmt(t.bac_advfirst)}</td><td>${fmt(t.Morts)}</td></tr>`).join("");
   document.querySelector("#teamTable tbody").innerHTML=rows||'<tr><td colspan="6" class="empty">Aucune faction trouvée.</td></tr>';
 }
@@ -414,7 +480,7 @@ function renderStatView(){
   const x=statSel&&STATS.stats[statSel];
   if(!x){$("statView").innerHTML='<p class="empty">Choisis une statistique.</p>';return}
   const cat=STATS.categories.find(c=>c.stats.includes(statSel));
-  $("statView").innerHTML=`<h3>${esc(x.l)}<small>${esc(cat?cat.label:"")}</small></h3><p class="empty">Total du serveur : <b>${fmtUnit(x.u)(x.t)}</b></p>${rankList(x.r,fmtUnit(x.u),15)}`;
+  $("statView").innerHTML=`<h3>${esc(x.l)}<small>${esc(cat?cat.label:"")}</small></h3><p class="empty">Total du serveur : <b>${fmtUnit(x.u)(x.t)}</b></p>${rankList(x.r,fmtUnit(x.u))}`;
 }
 function setupStats(){
   if(!STATS)return;
@@ -435,10 +501,10 @@ function renderEco(){
   $("ecoSub").textContent=`Argent en circulation : ${money(e.total)} · ${fmt(rich.length)} joueur${rich.length>1?"s":""} avec un solde · ${fmt(tx)} échanges enregistrés`;
   const shopRows=(e.shops||[]);
   $("ecoBoards").innerHTML=
-    `<div class="board"><h3>Baltop<small>Top 15</small></h3>${rankList(rich,money,15)}</div>`+
-    `<div class="board"><h3>Plus gros dépensiers<small>Envoyé</small></h3>${rankList(e.sent,money,10)}</div>`+
-    `<div class="board"><h3>Plus gros encaissements<small>Reçu</small></h3>${rankList(e.received,money,10)}</div>`+
-    `<div class="board"><h3>Magasins<small>${fmt(e.adminShops)} du serveur</small></h3>${rankList(shopRows,fmt,10)}</div>`;
+    `<div class="board"><h3>Baltop<small>${fmt(rich.length)} joueurs</small></h3>${rankList(rich,money)}</div>`+
+    `<div class="board"><h3>Plus gros dépensiers<small>Envoyé</small></h3>${rankList(e.sent,money)}</div>`+
+    `<div class="board"><h3>Plus gros encaissements<small>Reçu</small></h3>${rankList(e.received,money)}</div>`+
+    `<div class="board"><h3>Magasins<small>${fmt(e.adminShops)} du serveur</small></h3>${rankList(shopRows,fmt)}</div>`;
 }
 async function loadStats(){
   try{const r=await fetch("stats.json?t="+Date.now());if(r.ok)STATS=await r.json();}catch(e){}

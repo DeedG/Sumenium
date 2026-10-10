@@ -4,7 +4,10 @@
     python tools/build_catalog.py --bacap <dossier BACAP> --ed <dossier ED> --wb <dossier WB-Addon>
 Chaque dossier est celui qui contient "data/" (datapack décompressé).
 """
-import argparse, glob, json, os, re
+import argparse, glob, json, os, re, sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import rewards  # noqa: E402
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--bacap", required=True)
@@ -30,10 +33,12 @@ def adv_json(full):
 # 2) Lien avancement -> nom du tag fanpack (via les fonctions de récompense BACAP / ED)
 macro = re.compile(r'advancement_made_macro \{adv_id:"([^"]+)",reward_id:"([^"]+)"')
 links = []  # (adv complet, tag complet)
+reward_src = {}  # adv complet -> (dossier des fonctions de récompense, reward_id)
 for pack, rew, fan in [(a.bacap, "bacap_rewards", "bacap_fanpacks"), (a.ed, "bacaped_rewards", "bacaped_fanpacks")]:
     for f in glob.glob(os.path.join(pack, "data", rew, "function", "**", "*.mcfunction"), recursive=True):
         for m in macro.finditer(open(f, encoding="utf-8").read()):
             links.append((m.group(1), fan + ":" + m.group(2)))
+            reward_src.setdefault(m.group(1), (os.path.join(pack, "data", rew, "function"), m.group(2)))
 
 # 3) Tag fanpack -> fonction de récompense du WB-Addon -> infos (adv_id WB, palier, type...)
 def wb_reward(func):
@@ -68,6 +73,16 @@ for full, tag in links:
     e = cat.setdefault(r["id"], dict(r, adv=[]))
     if full not in e["adv"]:
         e["adv"].append(full)
+    if "rw" not in e and full in reward_src:
+        fdir, rid = reward_src[full]
+        items, _ = rewards.parse_function(os.path.join(fdir, "reward", rid + ".mcfunction"))
+        trophy, _ = rewards.parse_function(os.path.join(fdir, "trophy", rid + ".mcfunction"))
+        _, xp = rewards.parse_function(os.path.join(fdir, "exp", rid + ".mcfunction"))
+        e["rw"] = items
+        if trophy:
+            e["tr"] = trophy
+        if xp:
+            e["xp"] = xp
     j = adv_json(full)
     if j and "req" not in e:
         crit = list(j.get("criteria", {}).keys())
@@ -85,6 +100,8 @@ for e in cat.values():
     e["parent"] = title_by_full.get(e.pop("parent", None) or "")
     e.setdefault("req", [])
     e.setdefault("hidden", False)
+    if not e.get("rw"):
+        e.pop("rw", None)
     out.append(e)
 out.sort(key=lambda e: (e["tab"] or "", e["title"] or ""))
 json.dump(out, open(a.out, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))

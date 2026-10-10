@@ -1,5 +1,6 @@
 site/data.json
 site/stats.json
+site/icons/
 homelab/.env
 homelab/data/
 __pycache__/

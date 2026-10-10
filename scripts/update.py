@@ -223,6 +223,7 @@ def main():
         "updated": datetime.now(timezone.utc).isoformat(),
         "checked": datetime.now(timezone.utc).isoformat(),
         "worldSize": world_size,
+        "bac": {k: scores.get("bac_settings", {}).get(k) for k in ("reward", "trophy", "exp")},
         "border": border,
         "mode": "tiers" if reward_mode == 1 else "individual",
         "multiplier": mult_int / 100,

@@ -8,7 +8,7 @@ Sources lues en SFTP (lecture seule) :
 """
 import json, os, posixpath, re, stat
 
-TOP = 15  # joueurs gardés par statistique
+TOP = 200  # joueurs gardés par statistique (tous, en pratique)
 
 # Objectifs du tableau (Tab) en jeu
 TAB = [
