@@ -1,0 +1,201 @@
+"""Récupère les données du serveur en SFTP et écrit site/data.json.
+
+Variables d'environnement (secrets GitHub) :
+  SFTP_HOST, SFTP_PORT (défaut 22), SFTP_USER, SFTP_PASSWORD
+  SFTP_ROOT  dossier du serveur sur le SFTP (défaut : dossier d'arrivée)
+  PAGES_URL  adresse du site, pour garder les dernières données si le SFTP ne répond pas
+"""
+import io, json, os, posixpath, stat, sys, urllib.request
+from datetime import datetime, timezone
+
+import nbtlib
+import paramiko
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SITE = os.path.join(HERE, "..", "site")
+OUT = os.path.join(SITE, "data.json")
+
+
+def log(*a):
+    print(*a, flush=True)
+
+
+def keep_previous(reason):
+    """Le SFTP n'a pas répondu : on republie les données précédentes, marquées comme anciennes."""
+    prev = None
+    url = os.environ.get("PAGES_URL")
+    if url:
+        try:
+            with urllib.request.urlopen(url.rstrip("/") + "/data.json", timeout=20) as r:
+                prev = json.load(r)
+        except Exception as e:  # premier déploiement, site absent...
+            log("Pas de données précédentes :", e)
+    data = prev or {}
+    data["error"] = reason
+    data["checked"] = datetime.now(timezone.utc).isoformat()
+    json.dump(data, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    log("Données précédentes conservées :", reason)
+
+
+def connect():
+    host = os.environ["SFTP_HOST"]
+    port = int(os.environ.get("SFTP_PORT") or 22)
+    t = paramiko.Transport((host, port))
+    t.connect(username=os.environ["SFTP_USER"], password=os.environ["SFTP_PASSWORD"])
+    return paramiko.SFTPClient.from_transport(t)
+
+
+def read(sftp, path):
+    buf = io.BytesIO()
+    sftp.getfo(path, buf)
+    return buf.getvalue()
+
+
+def load_nbt(sftp, path):
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix=".dat", delete=False) as f:
+        f.write(read(sftp, path))
+    try:
+        return nbtlib.load(f.name)
+    finally:
+        os.unlink(f.name)
+
+
+def main():
+    sftp = connect()
+    root = os.environ.get("SFTP_ROOT") or "."
+    j = lambda *p: posixpath.join(root, *p)
+
+    level = "world"
+    try:
+        for line in read(sftp, j("server.properties")).decode("utf-8", "replace").splitlines():
+            if line.startswith("level-name="):
+                level = line.split("=", 1)[1].strip() or "world"
+    except IOError:
+        log("server.properties introuvable, monde supposé : world")
+    w = lambda *p: j(level, *p)
+
+    # Scoreboard : succès déjà consommés, valeurs, réglages, équipes
+    sb = load_nbt(sftp, w("data/minecraft/scoreboard.dat"))["data"]
+    scores = {}
+    for p in sb["PlayerScores"]:
+        scores.setdefault(str(p["Objective"]), {})[str(p["Name"])] = int(p.get("Score", 0))
+    teams = {}
+    for t in sb.get("Teams", []):
+        name = str(t["Name"])
+        if name.startswith(("bac_", "afkDis")):
+            continue
+        for pl in t.get("Players", []):
+            teams[str(pl)] = name
+
+    wb = scores.get("wb", {})
+    cfg = scores.get("wb_config", {})
+    tier_blocks = {k.lstrip("#"): v for k, v in scores.get("wb_tier_blocks", {}).items()}
+    adv_blocks = scores.get("wb_adv_blocks", {})
+
+    # Stockage du WB-Addon : taille du monde et multiplicateur
+    st = load_nbt(sftp, w("data/bacap_wb_addon/command_storage.dat"))["data"]["contents"]
+    world_size = int(st.get("world_size", {}).get("world", {}).get("size", 0))
+    mult_int = int(st.get("settings", {}).get("mult_int", 100))
+
+    # Pseudos
+    names = {}
+    try:
+        for e in json.loads(read(sftp, j("usercache.json"))):
+            names[e["uuid"]] = e["name"]
+    except IOError:
+        pass
+
+    # Progression de chaque joueur
+    adv_dir = None
+    for cand in (w("players/advancements"), w("advancements")):
+        try:
+            sftp.listdir(cand)
+            adv_dir = cand
+            break
+        except IOError:
+            continue
+    players = {}
+    if adv_dir:
+        for f in sftp.listdir_attr(adv_dir):
+            if f.filename.endswith(".json") and stat.S_ISREG(f.st_mode):
+                uuid = f.filename[:-5]
+                try:
+                    players[names.get(uuid, uuid[:8])] = json.loads(read(sftp, posixpath.join(adv_dir, f.filename)))
+                except Exception as e:
+                    log("Fichier illisible", f.filename, e)
+    sftp.close()
+
+    catalog = json.load(open(os.path.join(SITE, "catalog.json"), encoding="utf-8"))
+    reward_mode = cfg.get("reward_mode", 0)
+
+    def blocks(e):
+        # Même calcul que bacap_wb_addon:math/border_calculator
+        if e["tier"] == "custom" and e.get("custom") is not None:
+            base = e["custom"]
+        else:
+            v = tier_blocks.get(e["tier"], 0) if reward_mode == 1 else adv_blocks.get(e["id"], 0)
+            base = (v // 100) * mult_int + ((v % 100) * mult_int) // 100
+        return round(base / 100, 2)
+
+    out = {}
+    for e in catalog:
+        rec = {"b": blocks(e)}
+        reqs = e.get("req") or []
+        if wb.get(e["id"], 0) >= 1:
+            rec["done"] = 1
+            # Premier joueur à l'avoir terminé, d'après les dates enregistrées
+            first = None
+            for who, data in players.items():
+                for full in e["adv"]:
+                    a = data.get(full)
+                    if a and a.get("done") and a.get("criteria"):
+                        at = max(a["criteria"].values())
+                        if first is None or at < first[0]:
+                            first = (at, who)
+            if first:
+                rec["at"], rec["by"] = first
+                if first[1] in teams:
+                    rec["team"] = teams[first[1]]
+        elif reqs:
+            # Meilleure progression parmi les joueurs (groupes de critères remplis)
+            best = None
+            for who, data in players.items():
+                for full in e["adv"]:
+                    a = data.get(full)
+                    if not a or not a.get("criteria"):
+                        continue
+                    have = set(a["criteria"])
+                    n = sum(1 for g in reqs if have.intersection(g))
+                    if n and (best is None or n > best[0]):
+                        best = (n, who, sorted(have))
+            if best:
+                rec["p"] = best[0]
+                rec["pw"] = best[1]
+                if best[1] in teams:
+                    rec["team"] = teams[best[1]]
+                if len(reqs) > 1:
+                    rec["pc"] = best[2]
+        out[e["id"]] = rec
+
+    data = {
+        "updated": datetime.now(timezone.utc).isoformat(),
+        "checked": datetime.now(timezone.utc).isoformat(),
+        "worldSize": world_size,
+        "mode": "tiers" if reward_mode == 1 else "individual",
+        "multiplier": mult_int / 100,
+        "players": len(players),
+        "adv": out,
+    }
+    json.dump(data, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    done = sum(1 for r in out.values() if r.get("done"))
+    log(f"OK : monde {world_size}, {done}/{len(out)} succès obtenus, {len(players)} joueurs")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyError as e:
+        keep_previous(f"Réglage manquant : {e}")
+    except Exception as e:
+        keep_previous(f"{type(e).__name__}: {e}")

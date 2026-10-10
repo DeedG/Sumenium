@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suménium · Bordure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Tableau de bord : en-tête avec la taille du monde, barre de filtres collante, liste dense triable */
+:root{
+  --bg:#f3f2ee; --surface:#fff; --fg:#22232a; --muted:#666873; --line:#dddcd5;
+  --gold:#a8730b; --gold-soft:#f6ead0; --done:#3f7d4a; --done-soft:#e3efe2; --warn:#a23c2a; --warn-soft:#f7e2dc;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif; --body:"Source Sans 3",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{--bg:#17181c;--surface:#202127;--fg:#e8e7e2;--muted:#9c9da6;--line:#33343c;--gold:#e5b44a;--gold-soft:#3a2f17;--done:#7cc488;--done-soft:#1f3123;--warn:#f08a74;--warn-soft:#3b221d;color-scheme:dark}}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:16px/1.45 var(--body);margin:0}
+.wrap{max-width:1040px;margin:0 auto;padding-inline:16px;padding-block:24px 56px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px}
+h1{font:700 2.2rem/1 var(--display);margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;font-size:.95rem}
+.size{text-align:right}
+.size b{display:block;font:700 3.2rem/1 var(--display);color:var(--gold);font-variant-numeric:tabular-nums}
+.size span{color:var(--muted);font-size:.85rem}
+.banner{background:var(--warn-soft);color:var(--warn);border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:.92rem}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+.stat b{display:block;font:500 1.45rem/1.15 var(--mono);font-variant-numeric:tabular-nums}
+.stat span{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.bar{position:sticky;top:0;z-index:2;background:var(--bg);padding-block:10px;display:flex;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--line)}
+.bar input,.bar select{font:inherit;font-size:.95rem;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:7px 10px;min-width:0}
+.bar input[type=search]{flex:1 1 220px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:5px;overflow:hidden}
+.seg button{font:inherit;font-size:.9rem;background:var(--surface);color:var(--fg);border:0;padding:7px 11px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--gold-soft);color:var(--gold);font-weight:600}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:.9rem;color:var(--muted);padding:0 4px}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+.count{font-size:.85rem;color:var(--muted);margin:10px 0 4px}
+ul{list-style:none;margin:0;padding:0}
+li.adv{border-bottom:1px solid var(--line);padding:10px 4px}
+.row{display:grid;grid-template-columns:minmax(4.5rem,max-content) 1fr auto;gap:12px;align-items:baseline}
+.row>div{min-width:0}
+.pts{font:500 1rem var(--mono);font-variant-numeric:tabular-nums;color:var(--gold);text-align:right}
+li.done .pts{color:var(--done)}
+.t{font-weight:600}
+.d{color:var(--muted);font-size:.92rem}
+.meta{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.chip{font-size:.75rem;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--muted);white-space:nowrap}
+.chip.ok{background:var(--done-soft);color:var(--done);border-color:transparent}
+.chip.end{background:var(--gold-soft);color:var(--gold);border-color:transparent}
+.prog{display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--muted);margin-top:4px}
+.prog i{flex:0 0 120px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.prog i>s{display:block;height:100%;background:var(--gold)}
+details{margin-top:6px;font-size:.9rem}
+summary{cursor:pointer;color:var(--muted)}
+.crit{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:6px}
+.crit span{font-size:.8rem;padding:1px 7px;border-radius:4px;background:var(--surface);border:1px solid var(--line)}
+.crit span.y{background:var(--done-soft);color:var(--done);border-color:transparent}
+.more{display:block;margin:16px auto 0;font:inherit;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:5px;padding:8px 16px;cursor:pointer}
+footer{margin-top:28px;color:var(--muted);font-size:.85rem}
+@media (max-width:600px){.bar{position:static}.row{grid-template-columns:minmax(4rem,max-content) 1fr}.meta{grid-column:2;justify-content:flex-start}.size{text-align:left}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Suménium · Bordure du monde</h1>
+      <p class="sub" id="updated">Chargement des données…</p>
+    </div>
+    <div class="size"><b id="size">–</b><span id="sizeSub">blocs depuis le centre</span></div>
+  </header>
+  <div class="banner" id="err" hidden></div>
+  <div class="stats">
+    <div class="stat"><b id="sRem">–</b><span>Succès restants</span></div>
+    <div class="stat"><b id="sDone">–</b><span>Déjà obtenus</span></div>
+    <div class="stat"><b id="sBlocks">–</b><span>Blocs encore à gagner</span></div>
+    <div class="stat"><b id="sMode">–</b><span>Mode de récompense</span></div>
+  </div>
+  <div class="bar">
+    <input id="q" type="search" placeholder="Chercher un succès, une description, un critère…" aria-label="Recherche">
+    <select id="tab" aria-label="Catégorie"><option value="">Toutes les catégories</option></select>
+    <select id="tier" aria-label="Type"><option value="">Tous les types</option></select>
+    <select id="min" aria-label="Blocs minimum">
+      <option value="0">Tous les gains</option><option value="1">≥ 1 bloc</option><option value="5">≥ 5 blocs</option><option value="10">≥ 10 blocs</option><option value="25">≥ 25 blocs</option><option value="100">≥ 100 blocs</option>
+    </select>
+    <select id="sort" aria-label="Tri">
+      <option value="blocks">Tri : blocs gagnés</option><option value="prog">Tri : presque finis</option><option value="recent">Tri : obtenus récemment</option><option value="az">Tri : A → Z</option>
+    </select>
+    <div class="seg" role="group" aria-label="État">
+      <button id="fRem" aria-pressed="true">Restants</button><button id="fDone" aria-pressed="false">Obtenus</button><button id="fAll" aria-pressed="false">Tous</button>
+    </div>
+    <label class="chk"><input type="checkbox" id="secret"> Succès secrets</label>
+  </div>
+  <p class="count" id="count"></p>
+  <ul id="list"></ul>
+  <button class="more" id="more" hidden>Afficher plus</button>
+  <footer>
+    Chaque succès agrandit la bordure une seule fois, pour le premier joueur qui l'obtient. Le gain s'ajoute au diamètre (la moitié de chaque côté). La progression affichée est celle du joueur le plus avancé.
+    Les données viennent du serveur toutes les 10 minutes environ ; Minecraft les enregistre toutes les 5 minutes.
+  </footer>
+</div>
+<script>
+const TIERS={task:"Tâche",goal:"Objectif",challenge:"Défi",super_challenge:"Super défi",milestone:"Palier",hidden:"Caché",root:"Racine",custom:"Fin de partie"};
+const $=id=>document.getElementById(id);
+const fmt=n=>Number(n).toLocaleString("fr-FR",{maximumFractionDigits:2});
+const fmtB=n=>n>=10000?Number(n).toLocaleString("fr-FR",{notation:"compact",maximumFractionDigits:1}):fmt(n);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const crit=c=>c.replace(/^[a-z_]+:/,"").replace(/[_/]/g," ");
+let CAT=[],DATA=null,st={q:"",tab:"",tier:"",min:0,sort:"blocks",f:"rem",secret:false,limit:150};
+
+function ago(iso){
+  const m=Math.round((Date.now()-new Date(iso))/60000);
+  if(m<1)return"à l'instant"; if(m<60)return`il y a ${m} min`;
+  const h=Math.round(m/60); return h<48?`il y a ${h} h`:new Date(iso).toLocaleString("fr-FR");
+}
+function fdate(s){ // "2026-10-10 01:09:48 +0200"
+  const m=/^(\S+) (\S+) ([+-]\d\d)(\d\d)$/.exec(s); const d=m?new Date(`${m[1]}T${m[2]}${m[3]}:${m[4]}`):new Date(s); return isNaN(d)?s:d.toLocaleString("fr-FR",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+}
+function rec(e){return (DATA&&DATA.adv[e.id])||{b:0}}
+
+function header(){
+  if(!DATA)return;
+  $("size").textContent=fmt(DATA.worldSize??0);
+  $("sizeSub").textContent=`blocs depuis le centre · ${fmt((DATA.worldSize??0)*2)} de large`;
+  $("updated").textContent=DATA.updated?`Données du serveur ${ago(DATA.updated)}`:"Pas encore de données du serveur";
+  $("err").hidden=!DATA.error;
+  if(DATA.error)$("err").textContent=`Dernière lecture du serveur impossible (${DATA.error}). Les chiffres affichés sont les derniers connus.`;
+  const rem=CAT.filter(e=>!rec(e).done);
+  $("sRem").textContent=fmt(rem.length);
+  $("sDone").textContent=fmt(CAT.length-rem.length);
+  $("sBlocks").textContent="+"+fmt(rem.filter(e=>e.tier!=="custom").reduce((a,e)=>a+rec(e).b,0));
+  $("sMode").textContent=(DATA.mode==="tiers"?"Paliers":"Individuel")+" ×"+fmt(DATA.multiplier??1);
+}
+
+function item(e){
+  const r=rec(e),n=e.req.length;
+  let extra="";
+  if(r.done){
+    extra=`<div class="prog">Obtenu${r.by?` par <b>${esc(r.by)}</b>${r.team?` (${esc(r.team)})`:""}`:""}${r.at?` · ${fdate(r.at)}`:""}</div>`;
+  }else if(r.p){
+    extra=`<div class="prog"><i><s style="width:${Math.round(r.p/n*100)}%"></s></i>${r.p}/${n} · ${esc(r.pw)}${r.team?` (${esc(r.team)})`:""}</div>`;
+  }
+  let det="";
+  const parts=[];
+  if(e.parent)parts.push(`<div>Se débloque après : <b>${esc(e.parent)}</b></div>`);
+  if(n>1){
+    const have=new Set(r.pc||[]);
+    parts.push(`<div class="crit">${e.req.map(g=>`<span class="${g.some(c=>have.has(c))?"y":""}">${esc(g.map(crit).join(" ou "))}</span>`).join("")}</div>`);
+  }
+  if(parts.length)det=`<details><summary>${n>1?`Comment le faire · ${n} étapes`:"Détails"}</summary>${parts.join("")}</details>`;
+  return `<li class="adv ${r.done?"done":""}"><div class="row"><span class="pts">+${fmtB(r.b)}</span><div><div class="t">${esc(e.title)}</div><div class="d">${esc(String(e.desc).replace(/\\n/g," "))}</div>${extra}${det}</div><div class="meta"><span class="chip">${esc(e.tab)}</span><span class="chip ${e.tier==="custom"?"end":""}">${TIERS[e.tier]||esc(e.tier)}</span>${r.done?'<span class="chip ok">Obtenu</span>':""}</div></div></li>`;
+}
+
+function render(){
+  header();
+  const q=st.q.toLowerCase();
+  let rows=CAT.filter(e=>{
+    const r=rec(e);
+    if(st.f==="rem"&&r.done)return false;
+    if(st.f==="done"&&!r.done)return false;
+    if(!st.secret&&e.hidden&&!r.done)return false;
+    if(st.tab&&e.tab!==st.tab)return false;
+    if(st.tier&&e.tier!==st.tier)return false;
+    if(r.b<st.min)return false;
+    if(q&&!(e.title+" "+e.desc+" "+e.req.flat().join(" ")).toLowerCase().includes(q))return false;
+    return true;
+  });
+  const by={
+    blocks:(a,b)=>(a.tier==="custom")-(b.tier==="custom")||rec(b).b-rec(a).b,
+    prog:(a,b)=>((rec(b).p||0)/Math.max(b.req.length,1))-((rec(a).p||0)/Math.max(a.req.length,1))||rec(b).b-rec(a).b,
+    recent:(a,b)=>String(rec(b).at||"").localeCompare(String(rec(a).at||"")),
+    az:()=>0
+  }[st.sort];
+  rows.sort((a,b)=>by(a,b)||a.title.localeCompare(b.title));
+  $("count").textContent=`${fmt(rows.length)} succès`;
+  $("list").innerHTML=rows.slice(0,st.limit).map(item).join("")||'<li class="adv"><div class="d">Aucun succès ne correspond à ces filtres.</div></li>';
+  $("more").hidden=rows.length<=st.limit;
+  $("more").textContent=`Afficher plus (${fmt(rows.length-st.limit)} restants)`;
+}
+
+function set(k,v){st[k]=v;st.limit=150;render()}
+function seg(ids,vals){ids.forEach((id,i)=>$(id).onclick=()=>{ids.forEach(j=>$(j).setAttribute("aria-pressed",j===id));set("f",vals[i])})}
+seg(["fRem","fDone","fAll"],["rem","done","all"]);
+$("q").oninput=e=>set("q",e.target.value);
+$("tab").onchange=e=>set("tab",e.target.value);
+$("tier").onchange=e=>set("tier",e.target.value);
+$("min").onchange=e=>set("min",+e.target.value);
+$("sort").onchange=e=>set("sort",e.target.value);
+$("secret").onchange=e=>set("secret",e.target.checked);
+$("more").onclick=()=>{st.limit+=300;render()};
+
+async function loadData(){
+  try{const r=await fetch("data.json?t="+Date.now());if(r.ok)DATA=await r.json();}catch(e){}
+  if(!DATA)DATA={adv:{},error:"données introuvables"};
+  render();
+}
+(async()=>{
+  CAT=await (await fetch("catalog.json")).json();
+  [...new Set(CAT.map(e=>e.tab))].sort().forEach(t=>$("tab").add(new Option(t,t)));
+  Object.entries(TIERS).forEach(([k,v])=>{if(CAT.some(e=>e.tier===k))$("tier").add(new Option(v,k))});
+  await loadData();
+  setInterval(loadData,120000);
+})();
+</script>
+</body>
+</html>
