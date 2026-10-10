@@ -5,7 +5,7 @@ Variables d'environnement (secrets GitHub) :
   SFTP_ROOT  dossier du serveur sur le SFTP (défaut : dossier d'arrivée)
   PAGES_URL  adresse du site, pour garder les dernières données si le SFTP ne répond pas
 """
-import io, json, os, posixpath, stat, sys, urllib.request
+import io, json, os, posixpath, re, stat, sys, urllib.request
 from datetime import datetime, timezone
 
 import nbtlib
@@ -38,10 +38,19 @@ def keep_previous(reason):
 
 
 def connect():
-    host = os.environ["SFTP_HOST"]
-    port = int(os.environ.get("SFTP_PORT") or 22)
+    # Accepte aussi "sftp://hote:port" ou "hote:port" collés depuis le panel
+    host = os.environ["SFTP_HOST"].strip()
+    host = re.sub(r"^[a-z]+://", "", host).split("/")[0]
+    if "@" in host:
+        host = host.split("@", 1)[1]
+    port = (os.environ.get("SFTP_PORT") or "").strip()
+    if ":" in host:
+        host, p = host.rsplit(":", 1)
+        port = port or p
+    port = int(port or 22)
+    log(f"Connexion SFTP à {host[:3]}… port {port}")
     t = paramiko.Transport((host, port))
-    t.connect(username=os.environ["SFTP_USER"], password=os.environ["SFTP_PASSWORD"])
+    t.connect(username=os.environ["SFTP_USER"].strip(), password=os.environ["SFTP_PASSWORD"])
     return paramiko.SFTPClient.from_transport(t)
 
 
@@ -198,4 +207,15 @@ if __name__ == "__main__":
     except KeyError as e:
         keep_previous(f"Réglage manquant : {e}")
     except Exception as e:
-        keep_previous(f"{type(e).__name__}: {e}")
+        import socket
+        if isinstance(e, socket.gaierror):
+            msg = "adresse SFTP introuvable, vérifie le secret SFTP_HOST"
+        elif isinstance(e, paramiko.AuthenticationException):
+            msg = "identifiant ou mot de passe SFTP refusé, vérifie SFTP_USER et SFTP_PASSWORD"
+        elif isinstance(e, (socket.timeout, TimeoutError, ConnectionRefusedError, paramiko.SSHException)):
+            msg = f"le serveur SFTP ne répond pas, vérifie SFTP_HOST et SFTP_PORT ({e})"
+        elif isinstance(e, FileNotFoundError) or (isinstance(e, IOError) and getattr(e, "errno", None) == 2):
+            msg = f"fichier introuvable sur le serveur, vérifie SFTP_ROOT ({e})"
+        else:
+            msg = f"{type(e).__name__}: {e}"
+        keep_previous(msg)
