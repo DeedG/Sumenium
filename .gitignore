@@ -2,3 +2,4 @@ site/data.json
 homelab/.env
 homelab/data/
 __pycache__/
+work/
