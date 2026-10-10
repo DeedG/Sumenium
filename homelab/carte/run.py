@@ -236,6 +236,8 @@ def render():
            "-v", MC_VERSION, "-r", "-g", "-s", "--markers"]
     log("BlueMap :", " ".join(cmd[3:]))
     t = time.time()
+    # Le script anti-spoil doit être en place avant le rendu (qui peut durer des heures)
+    shutil.copy("/app/anti-spoil.js", f"{WEB}/anti-spoil.js")
     res = subprocess.run(cmd, cwd=BM)
     shutil.copy("/app/anti-spoil.js", f"{WEB}/anti-spoil.js")
     log(f"BlueMap terminé (code {res.returncode}) en {int((time.time() - t) / 60)} min")
