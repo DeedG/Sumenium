@@ -60,7 +60,7 @@ body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);margin:0}
 .stat span{font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .stat.sun b{color:var(--sun-ink)} .stat.leaf b{color:var(--leaf-ink)}
 
-.bar{position:sticky;top:0;z-index:2;background:var(--bg);padding-block:10px;display:flex;flex-wrap:wrap;gap:8px;border-bottom:2px solid var(--line)}
+.bar{position:static;z-index:2;background:var(--bg);padding-block:10px;display:flex;flex-wrap:wrap;gap:8px;border-bottom:2px solid var(--line)}
 .bar input,.bar select{font:inherit;font-size:.95rem;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 11px;min-width:0}
 .bar input[type=search]{flex:1 1 230px}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
@@ -114,6 +114,50 @@ footer{margin-top:32px;color:var(--muted);font-size:.86rem;max-width:75ch}
   .stat b{font-size:1.3rem}
 }
 @media (prefers-reduced-motion:no-preference){li.adv{transition:border-color .15s}li.adv:hover{border-color:var(--grass)}}
+
+/* Navigation par onglets */
+.tabs{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:2px solid var(--line)}
+.tabs-in{max-width:1080px;margin:0 auto;padding-inline:16px;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.tabs a{font:600 1rem var(--display);color:var(--muted);text-decoration:none;padding:12px 14px;border-bottom:3px solid transparent;white-space:nowrap}
+.tabs a:hover{color:var(--fg)}
+.tabs a[aria-current="page"]{color:var(--fg);border-bottom-color:var(--sun)}
+.panel[hidden]{display:none}
+.panel h2.ttl{font:600 1.5rem/1.2 var(--display);margin:4px 0 4px}
+.panel p.sub2{color:var(--muted);margin:0 0 16px}
+/* Classements */
+.boards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:24px}
+.board{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;min-width:0}
+.board h3{font:600 1.15rem/1.2 var(--display);margin:0 0 10px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.board h3 small{font:600 .78rem var(--body);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.rank{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.rank li{display:grid;grid-template-columns:2rem 1fr auto;gap:8px;align-items:center;padding:6px 8px;border-radius:10px;font-size:.95rem}
+.rank li:nth-child(1){background:var(--sun-soft)}
+.rank li:nth-child(2),.rank li:nth-child(3){background:var(--bg)}
+.rank .pos{font:700 .95rem var(--display);color:var(--muted);text-align:center}
+.rank li:nth-child(1) .pos{color:var(--sun-ink)}
+.rank .who{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.rank .who small{font-weight:600;color:var(--muted);margin-left:6px}
+.rank .val{font:600 1rem var(--display);font-variant-numeric:tabular-nums}
+.rank .bar2{grid-column:2/4;height:4px;border-radius:2px;background:var(--crystal-soft);overflow:hidden;margin-top:-2px}
+.rank .bar2 s{display:block;height:100%;background:var(--crystal)}
+.empty{color:var(--muted);font-size:.92rem;padding:8px 0}
+.tbl-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:16px}
+table.tbl{width:100%;border-collapse:collapse;font-size:.95rem}
+.tbl th,.tbl td{padding:10px 14px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+.tbl th:first-child,.tbl td:first-child,.tbl th:nth-child(2),.tbl td:nth-child(2){text-align:left}
+.tbl th{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.tbl tr:last-child td{border-bottom:0}
+/* Explorateur de statistiques */
+.explorer{display:grid;grid-template-columns:minmax(240px,320px) 1fr;gap:14px;align-items:start}
+.picker{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;display:grid;gap:8px;min-width:0}
+.picker select,.picker input{font:inherit;font-size:.95rem;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0;width:100%}
+.statlist{max-height:60vh;overflow-y:auto;display:grid;gap:2px}
+.statlist button{font:inherit;font-size:.92rem;text-align:left;background:transparent;color:var(--fg);border:0;border-radius:8px;padding:7px 9px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.statlist button span{color:var(--muted);font-size:.8rem}
+.statlist button:hover{background:var(--bg)}
+.statlist button[aria-pressed="true"]{background:var(--sun-soft);color:var(--sun-ink);font-weight:700}
+.statview{min-width:0}
+@media (max-width:760px){.explorer{grid-template-columns:1fr}.statlist{max-height:40vh}}
 </style>
 </head>
 <body>
@@ -123,7 +167,7 @@ footer{margin-top:32px;color:var(--muted);font-size:.86rem;max-width:75ch}
       <img src="logo.png" alt="Logo Suménium Saison 7" width="84" height="84">
       <div>
         <h1>Suménium <span class="season">SAISON 7</span></h1>
-        <p>Bordure du monde et succès à débloquer</p>
+        <p>Classements, succès, statistiques et carte du serveur</p>
       </div>
     </div>
     <div class="border-card">
@@ -134,28 +178,32 @@ footer{margin-top:32px;color:var(--muted);font-size:.86rem;max-width:75ch}
   </div>
   <div class="grass" aria-hidden="true"></div>
 </header>
+<nav class="tabs" aria-label="Sections">
+  <div class="tabs-in">
+    <a href="#classement" data-tab="classement">Classement</a>
+    <a href="#succes" data-tab="succes">Succès &amp; bordure</a>
+    <a href="#stats" data-tab="stats">Statistiques</a>
+    <a href="#economie" data-tab="economie">Économie</a>
+    <a href="#carte" data-tab="carte">Carte</a>
+  </div>
+</nav>
 <main class="wrap">
   <div class="updated"><span class="dot" id="dot"></span><span id="updated">Chargement des données…</span></div>
   <div class="banner" id="err" hidden></div>
+  <section class="panel" id="p-classement" hidden>
+    <h2 class="ttl">Classement</h2>
+    <p class="sub2">Les trois compteurs du tableau en jeu (touche Tab), puis le total par faction.</p>
+    <div class="boards" id="tabBoards"><p class="empty">Chargement…</p></div>
+    <h2 class="ttl">Factions</h2>
+    <div class="tbl-wrap"><table class="tbl" id="teamTable"><thead><tr><th>#</th><th>Faction</th><th>Membres</th><th>Succès</th><th>Premiers succès</th><th>Morts</th></tr></thead><tbody></tbody></table></div>
+  </section>
+  <section class="panel" id="p-succes" hidden>
   <div class="stats">
     <div class="stat sun"><b id="sRem">–</b><span>Succès restants</span></div>
     <div class="stat leaf"><b id="sDone">–</b><span>Déjà obtenus</span></div>
     <div class="stat sun"><b id="sBlocks">–</b><span>Blocs encore à gagner</span></div>
     <div class="stat"><b id="sMode">–</b><span>Mode de récompense</span></div>
   </div>
-  <section class="mapbox" id="mapbox">
-    <div class="maphead">
-      <div>
-        <h2>Carte du monde</h2>
-        <p>Overworld uniquement, en 3D. La bordure est tracée en jaune ; au-delà, la carte est masquée sauf si tu choisis de la voir.</p>
-      </div>
-      <div class="mapactions">
-        <label class="chk"><input type="checkbox" id="spoil"> Voir toute la carte (spoil)</label>
-        <a id="mapfull" target="_blank" rel="noopener">Plein écran</a>
-      </div>
-    </div>
-    <iframe id="mapframe" title="Carte de l'Overworld de Suménium" loading="lazy" allow="fullscreen"></iframe>
-  </section>
   <div class="bar">
     <input id="q" type="search" placeholder="Chercher un succès, une description, une étape…" aria-label="Recherche">
     <select id="tab" aria-label="Catégorie"><option value="">Toutes les catégories</option></select>
@@ -178,6 +226,39 @@ footer{margin-top:32px;color:var(--muted);font-size:.86rem;max-width:75ch}
     Chaque succès agrandit la bordure une seule fois, pour le premier joueur qui l'obtient. Le gain s'ajoute au diamètre, donc la moitié de chaque côté. La progression affichée est celle du joueur le plus avancé.
     Les données sont relues sur le serveur toutes les 10 minutes environ, et Minecraft les enregistre toutes les 5 minutes.
   </footer>
+  </section>
+  <section class="panel" id="p-stats" hidden>
+    <h2 class="ttl">Statistiques</h2>
+    <p class="sub2">Toutes les statistiques Minecraft des joueurs, avec le classement de chacune.</p>
+    <div class="explorer">
+      <div class="picker">
+        <select id="statCat" aria-label="Catégorie de statistiques"></select>
+        <input id="statQ" type="search" placeholder="Chercher une statistique…" aria-label="Chercher une statistique">
+        <div class="statlist" id="statList"></div>
+      </div>
+      <div class="statview board" id="statView"><p class="empty">Choisis une statistique.</p></div>
+    </div>
+  </section>
+  <section class="panel" id="p-economie" hidden>
+    <h2 class="ttl">Économie</h2>
+    <p class="sub2" id="ecoSub">Soldes et échanges du serveur.</p>
+    <div class="boards" id="ecoBoards"><p class="empty">Chargement…</p></div>
+  </section>
+  <section class="panel" id="p-carte" hidden>
+  <section class="mapbox" id="mapbox">
+    <div class="maphead">
+      <div>
+        <h2>Carte du monde</h2>
+        <p>Overworld uniquement, en 3D. La bordure est tracée en jaune ; au-delà, la carte est masquée sauf si tu choisis de la voir.</p>
+      </div>
+      <div class="mapactions">
+        <label class="chk"><input type="checkbox" id="spoil"> Voir toute la carte (spoil)</label>
+        <a id="mapfull" target="_blank" rel="noopener">Plein écran</a>
+      </div>
+    </div>
+    <iframe id="mapframe" title="Carte de l'Overworld de Suménium" loading="lazy" allow="fullscreen"></iframe>
+  </section>
+  </section>
 </main>
 <script>
 const TIERS={task:"Tâche",goal:"Objectif",challenge:"Défi",super_challenge:"Super défi",milestone:"Palier",hidden:"Caché",root:"Racine",custom:"Fin de partie"};
@@ -296,13 +377,91 @@ async function loadData(){
   }catch(e){DATA={adv:{},error:"données illisibles"};}
   render();
 }
+// ---------- Classements ----------
+let STATS=null, mapReady=false, statSel=null;
+const okName=n=>/^[A-Za-z0-9_]{2,16}$/.test(n);
+const teamOf=n=>(STATS&&STATS.playerTeams&&STATS.playerTeams[n])||"";
+function rankList(rows,fmtv,limit){
+  rows=(rows||[]).filter(r=>okName(r[0])).slice(0,limit||10);
+  if(!rows.length)return '<p class="empty">Pas encore de données.</p>';
+  const max=Math.max(...rows.map(r=>Math.abs(r[1])),1);
+  return '<ol class="rank">'+rows.map((r,i)=>{const t=teamOf(r[0]);
+    return `<li><span class="pos">${i+1}</span><span class="who">${esc(r[0])}${t?`<small>${esc(t)}</small>`:""}</span><span class="val">${fmtv(r[1])}</span><span class="bar2"><s style="width:${Math.max(2,Math.round(Math.abs(r[1])/max*100))}%"></s></span></li>`}).join("")+'</ol>';
+}
+function renderClassement(){
+  if(!STATS){$("tabBoards").innerHTML='<p class="empty">Les classements arrivent à la prochaine mise à jour du serveur.</p>';return}
+  $("tabBoards").innerHTML=STATS.tab.map(t=>`<div class="board"><h3>${esc(t.label)}<small>Top 10</small></h3>${rankList(t.rows,fmt,10)}</div>`).join("");
+  const rows=(STATS.teams||[]).map((t,i)=>`<tr><td>${i+1}</td><td><b>${esc(t.team)}</b></td><td>${fmt(t.members)}</td><td>${fmt(t.bac_advancements)}</td><td>${fmt(t.bac_advfirst)}</td><td>${fmt(t.Morts)}</td></tr>`).join("");
+  document.querySelector("#teamTable tbody").innerHTML=rows||'<tr><td colspan="6" class="empty">Aucune faction trouvée.</td></tr>';
+}
+function fmtUnit(u){
+  if(u==="time")return v=>{const h=v/72000;return h>=1?fmt(Math.round(h*10)/10)+" h":fmt(Math.round(v/1200))+" min"};
+  if(u==="cm")return v=>v>=100000?fmt(Math.round(v/1000)/100)+" km":fmt(Math.round(v/100))+" m";
+  if(u==="dmg")return v=>fmt(Math.round(v/20))+" ❤";
+  return fmt;
+}
+function renderStatList(){
+  if(!STATS)return;
+  const cat=STATS.categories.find(c=>c.id===$("statCat").value)||STATS.categories[0];
+  if(!cat){$("statList").innerHTML='<p class="empty">Pas encore de données.</p>';return}
+  const q=$("statQ").value.toLowerCase();
+  const ids=cat.stats.filter(id=>!q||STATS.stats[id].l.toLowerCase().includes(q)).sort((a,b)=>STATS.stats[b].t-STATS.stats[a].t);
+  $("statList").innerHTML=ids.map(id=>{const x=STATS.stats[id];return `<button data-id="${esc(id)}" aria-pressed="${id===statSel}">${esc(x.l)}<span>${fmtUnit(x.u)(x.t)}</span></button>`}).join("")||'<p class="empty">Aucune statistique.</p>';
+  if(!statSel||!cat.stats.includes(statSel)){statSel=ids[0]||null;renderStatView();renderStatListSel()}
+}
+function renderStatListSel(){document.querySelectorAll("#statList button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.id===statSel))}
+function renderStatView(){
+  const x=statSel&&STATS.stats[statSel];
+  if(!x){$("statView").innerHTML='<p class="empty">Choisis une statistique.</p>';return}
+  const cat=STATS.categories.find(c=>c.stats.includes(statSel));
+  $("statView").innerHTML=`<h3>${esc(x.l)}<small>${esc(cat?cat.label:"")}</small></h3><p class="empty">Total du serveur : <b>${fmtUnit(x.u)(x.t)}</b></p>${rankList(x.r,fmtUnit(x.u),15)}`;
+}
+function setupStats(){
+  if(!STATS)return;
+  const sel=$("statCat"),cur=sel.value;
+  sel.innerHTML=STATS.categories.map(c=>`<option value="${esc(c.id)}">${esc(c.label)} (${c.stats.length})</option>`).join("");
+  if(cur)sel.value=cur;
+  renderStatList();
+}
+$("statCat").onchange=()=>{statSel=null;renderStatList()};
+$("statQ").oninput=()=>renderStatList();
+$("statList").onclick=e=>{const b=e.target.closest("button");if(!b)return;statSel=b.dataset.id;renderStatListSel();renderStatView()};
+function money(v){const e=STATS.economy;const n=fmt(Math.round(v*100)/100);return e.before?e.symbol+n:n+" "+e.symbol}
+function renderEco(){
+  const e=STATS&&STATS.economy;
+  if(!e){$("ecoBoards").innerHTML='<p class="empty">Pas encore de données économiques.</p>';return}
+  const rich=e.baltop.filter(r=>r[1]>0);
+  const tx=Object.entries(e.transactions||{}).filter(([k])=>!k.startsWith("ADMIN")).reduce((a,[,v])=>a+v,0);
+  $("ecoSub").textContent=`Argent en circulation : ${money(e.total)} · ${fmt(rich.length)} joueur${rich.length>1?"s":""} avec un solde · ${fmt(tx)} échanges enregistrés`;
+  const shopRows=(e.shops||[]);
+  $("ecoBoards").innerHTML=
+    `<div class="board"><h3>Baltop<small>Top 15</small></h3>${rankList(rich,money,15)}</div>`+
+    `<div class="board"><h3>Plus gros dépensiers<small>Envoyé</small></h3>${rankList(e.sent,money,10)}</div>`+
+    `<div class="board"><h3>Plus gros encaissements<small>Reçu</small></h3>${rankList(e.received,money,10)}</div>`+
+    `<div class="board"><h3>Magasins<small>${fmt(e.adminShops)} du serveur</small></h3>${rankList(shopRows,fmt,10)}</div>`;
+}
+async function loadStats(){
+  try{const r=await fetch("stats.json?t="+Date.now());if(r.ok)STATS=await r.json();}catch(e){}
+  renderClassement();setupStats();renderEco();
+}
+
+// ---------- Onglets ----------
+const TABS=["classement","succes","stats","economie","carte"];
+function route(){
+  let t=location.hash.replace("#","");if(!TABS.includes(t))t="classement";
+  TABS.forEach(x=>{$("p-"+x).hidden=x!==t});
+  document.querySelectorAll(".tabs a").forEach(a=>a.setAttribute("aria-current",a.dataset.tab===t?"page":"false"));
+  if(t==="carte"&&!mapReady){mapReady=true;setupMap()}
+}
+window.addEventListener("hashchange",()=>{route();window.scrollTo({top:0})});
+
 (async()=>{
+  route();
   CAT=await (await fetch("catalog.json")).json();
   [...new Set(CAT.map(e=>e.tab))].sort().forEach(t=>$("tab").add(new Option(t,t)));
   Object.entries(TIERS).forEach(([k,v])=>{if(CAT.some(e=>e.tier===k))$("tier").add(new Option(v,k))});
-  setupMap();
-  await loadData();
-  setInterval(loadData,120000);
+  await Promise.all([loadData(),loadStats()]);
+  setInterval(()=>{loadData();loadStats()},120000);
 })();
 </script>
 </body>

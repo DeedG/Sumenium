@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 import nbtlib
 import paramiko
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 SITE = os.path.join(HERE, "..", "site")
 OUT = os.path.join(SITE, "data.json")
@@ -155,6 +157,14 @@ def main():
                     players[names.get(uuid, uuid[:8])] = json.loads(read(sftp, posixpath.join(adv_dir, f.filename)))
                 except Exception as e:
                     log("Fichier illisible", f.filename, e)
+    # Classements (tableau en jeu, statistiques, économie) : site/stats.json
+    try:
+        import stats as stats_mod
+        extra = stats_mod.build(sftp, read, j, w, names, teams, scores, log)
+        extra["updated"] = datetime.now(timezone.utc).isoformat()
+        json.dump(extra, open(os.path.join(SITE, "stats.json"), "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    except Exception as e:
+        notice("warning", f"Classements non mis à jour : {type(e).__name__}: {e}")
     sftp.close()
 
     catalog = json.load(open(os.path.join(SITE, "catalog.json"), encoding="utf-8"))

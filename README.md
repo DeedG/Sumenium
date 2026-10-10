@@ -28,6 +28,14 @@ Toutes les 10 minutes, GitHub Actions lit le serveur en SFTP, calcule les donné
 
 Minecraft n'écrit ces fichiers sur le disque qu'à la sauvegarde automatique (toutes les 5 minutes), d'où un décalage de 5 à 15 minutes avec le jeu.
 
+## Classements
+
+Le même passage écrit `site/stats.json` (script `scripts/stats.py`) :
+
+- **Classement** : les trois compteurs du Tab en jeu (`bac_advancements`, `bac_advfirst`, `Morts`) et leur total par faction ;
+- **Statistiques** : toutes les statistiques Minecraft (`<monde>/players/stats/`) avec un classement par statistique, plus les causes de mort du mod Player Stats (`stats/player_data/`) ;
+- **Économie** : baltop, magasins et échanges de Savs Common Economy (`config/savs-common-economy/` et `logs/economy.log`).
+
 ## Carte du monde
 
 La carte 3D est hébergée sur le homelab et intégrée au site : voir [homelab/README.md](homelab/README.md). Son adresse est réglée dans `site/index.html` (`MAP_URL`).
