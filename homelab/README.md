@@ -21,7 +21,7 @@ git clone https://github.com/DeedG/Sumenium.git
 cd Sumenium/homelab
 cp .env.example .env && chmod 600 .env
 nano .env                          # remplir SFTP_HOST, SFTP_PORT, SFTP_USER, SFTP_PASSWORD
-mkdir -p data && sudo chown 1000:1000 data
+mkdir -p data/web && sudo chown -R 1000:1000 data
 docker compose up -d --build
 docker compose logs -f carte       # suivre la copie puis le rendu (Ctrl+C pour quitter)
 ```
