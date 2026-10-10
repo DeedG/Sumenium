@@ -1,0 +1,73 @@
+name: Rendu de la carte
+
+on:
+  schedule:
+    - cron: "37 * * * *"     # toutes les heures
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write             # pour relancer la publication du site à la fin
+
+concurrency:
+  group: map
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r scripts/requirements.txt
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Reprise du rendu précédent
+        uses: actions/cache/restore@v4
+        with:
+          path: work
+          key: map-work-${{ github.run_id }}
+          restore-keys: map-work-
+
+      - name: Téléchargement des régions de l'Overworld
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_PORT: ${{ secrets.SFTP_PORT }}
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+          SFTP_PASSWORD: ${{ secrets.SFTP_PASSWORD }}
+          SFTP_ROOT: ${{ secrets.SFTP_ROOT }}
+        run: python scripts/fetch_map.py
+
+      - name: Rendu BlueMap
+        run: |
+          mkdir -p work/bin
+          [ -f work/bin/bluemap-5.23-cli.jar ] || curl -sSL -o work/bin/bluemap-5.23-cli.jar \
+            https://github.com/BlueMap-Minecraft/BlueMap/releases/download/v5.23/bluemap-5.23-cli.jar
+          java -Xmx6G -jar work/bin/bluemap-5.23-cli.jar -c work/bluemap-config -v 26.2 -r -g
+          du -sh work/web || true
+          if [ ! -d work/web/maps/overworld ]; then echo "::error title=Carte::BlueMap n'a rien produit, voir le journal ci-dessus"; tail -40 work/bluemap.log || true; exit 1; fi
+          echo "::notice title=Carte::Rendu terminé ($(du -sh work/web | cut -f1))"
+
+      - name: Sauvegarde du rendu (pour le prochain passage)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: work
+          key: map-work-${{ github.run_id }}
+
+      - name: Sauvegarde de la carte pour le site
+        uses: actions/cache/save@v4
+        with:
+          path: work/web
+          key: map-web-${{ github.run_id }}
+
+      - name: Publication du site
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run update.yml --ref ${{ github.ref_name }}

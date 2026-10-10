@@ -96,6 +96,13 @@ summary{cursor:pointer;color:var(--crystal);font-weight:700}
 .crit span.y{background:var(--leaf-soft);color:var(--leaf-ink);border-color:transparent}
 .crit span.y::before{content:"✓ "}
 .more{display:block;margin:18px auto 0;font:600 1rem var(--display);background:var(--grass);color:#fff;border:0;border-radius:12px;padding:10px 20px;cursor:pointer}
+.mapbox{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:22px}
+.maphead{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
+.maphead h2{font:600 1.25rem/1.2 var(--display);margin:0}
+.maphead p{margin:2px 0 0;color:var(--muted);font-size:.88rem}
+.maphead a{font:600 .95rem var(--display);color:#fff;background:var(--grass);border-radius:10px;padding:8px 14px;text-decoration:none;white-space:nowrap}
+.mapbox iframe{display:block;width:100%;height:min(70vh,640px);border:0;background:#7dabff}
+.footer-legal{margin-top:6px}
 footer{margin-top:32px;color:var(--muted);font-size:.86rem;max-width:75ch}
 @media (max-width:640px){
   .bar{position:static}
@@ -103,6 +110,7 @@ footer{margin-top:32px;color:var(--muted);font-size:.86rem;max-width:75ch}
   .meta{grid-column:2;justify-content:flex-start}
   .brand h1{font-size:1.9rem}
   .border-card{width:100%}
+  .stat b{font-size:1.3rem}
 }
 @media (prefers-reduced-motion:no-preference){li.adv{transition:border-color .15s}li.adv:hover{border-color:var(--grass)}}
 </style>
@@ -134,6 +142,16 @@ footer{margin-top:32px;color:var(--muted);font-size:.86rem;max-width:75ch}
     <div class="stat sun"><b id="sBlocks">–</b><span>Blocs encore à gagner</span></div>
     <div class="stat"><b id="sMode">–</b><span>Mode de récompense</span></div>
   </div>
+  <section class="mapbox" id="mapbox" hidden>
+    <div class="maphead">
+      <div>
+        <h2>Carte du monde</h2>
+        <p>Overworld uniquement, limitée à la bordure actuelle. Mise à jour toutes les heures.</p>
+      </div>
+      <a href="carte/" target="_blank" rel="noopener">Plein écran</a>
+    </div>
+    <iframe id="mapframe" title="Carte de l'Overworld de Suménium" loading="lazy"></iframe>
+  </section>
   <div class="bar">
     <input id="q" type="search" placeholder="Chercher un succès, une description, une étape…" aria-label="Recherche">
     <select id="tab" aria-label="Catégorie"><option value="">Toutes les catégories</option></select>
@@ -265,6 +283,7 @@ async function loadData(){
   CAT=await (await fetch("catalog.json")).json();
   [...new Set(CAT.map(e=>e.tab))].sort().forEach(t=>$("tab").add(new Option(t,t)));
   Object.entries(TIERS).forEach(([k,v])=>{if(CAT.some(e=>e.tier===k))$("tier").add(new Option(v,k))});
+  fetch("carte/settings.json",{method:"HEAD"}).then(r=>{if(r.ok){$("mapframe").src="carte/";$("mapbox").hidden=false;}}).catch(()=>{});
   await loadData();
   setInterval(loadData,120000);
 })();

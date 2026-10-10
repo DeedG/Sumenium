@@ -34,7 +34,7 @@ def keep_previous(reason):
     data["error"] = reason
     data["checked"] = datetime.now(timezone.utc).isoformat()
     json.dump(data, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
-    log("Données précédentes conservées :", reason)
+    notice("warning", "Données précédentes conservées : " + reason)
 
 
 def connect():
@@ -68,6 +68,25 @@ def load_nbt(sftp, path):
         return nbtlib.load(f.name)
     finally:
         os.unlink(f.name)
+
+
+def read_border(sftp, w):
+    """Bordure de l'Overworld : centre et largeur (fichier de 26.x, sinon level.dat)."""
+    try:
+        d = load_nbt(sftp, w("dimensions/minecraft/overworld/data/minecraft/world_border.dat"))["data"]
+        return {"x": float(d["center_x"]), "z": float(d["center_z"]), "size": float(d["size"])}
+    except Exception:
+        pass
+    try:
+        d = load_nbt(sftp, w("level.dat"))["Data"]
+        return {"x": float(d["BorderCenterX"]), "z": float(d["BorderCenterZ"]), "size": float(d["BorderSize"])}
+    except Exception:
+        return None
+
+
+def notice(kind, msg):
+    """Message visible dans le résumé du workflow GitHub."""
+    print(f"::{kind} title=Lecture du serveur::{msg}", flush=True)
 
 
 def main():
@@ -105,6 +124,9 @@ def main():
     # Stockage du WB-Addon : taille du monde et multiplicateur
     st = load_nbt(sftp, w("data/bacap_wb_addon/command_storage.dat"))["data"]["contents"]
     world_size = int(st.get("world_size", {}).get("world", {}).get("size", 0))
+    border = read_border(sftp, w)
+    if border:
+        world_size = int(border["size"] // 2)
     mult_int = int(st.get("settings", {}).get("mult_int", 100))
 
     # Pseudos
@@ -191,6 +213,7 @@ def main():
         "updated": datetime.now(timezone.utc).isoformat(),
         "checked": datetime.now(timezone.utc).isoformat(),
         "worldSize": world_size,
+        "border": border,
         "mode": "tiers" if reward_mode == 1 else "individual",
         "multiplier": mult_int / 100,
         "players": len(players),
@@ -198,7 +221,7 @@ def main():
     }
     json.dump(data, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     done = sum(1 for r in out.values() if r.get("done"))
-    log(f"OK : monde {world_size}, {done}/{len(out)} succès obtenus, {len(players)} joueurs")
+    notice("notice", f"OK : monde {world_size}, {done}/{len(out)} succès obtenus, {len(players)} joueurs")
 
 
 if __name__ == "__main__":
