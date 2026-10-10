@@ -1,4 +1,4 @@
 site/data.json
-site/carte/
-work/
+homelab/.env
+homelab/data/
 __pycache__/

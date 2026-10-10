@@ -30,18 +30,7 @@ Minecraft n'écrit ces fichiers sur le disque qu'à la sauvegarde automatique (t
 
 ## Carte du monde
 
-Le workflow *Rendu de la carte* tourne toutes les heures : il télécharge en SFTP les régions de l'Overworld situées dans la bordure, les rend avec [BlueMap](https://bluemap.bluecolored.de/) et ajoute la carte au site (`/carte/`). Le Nether et l'End ne sont jamais téléchargés ni affichés.
-
-Réglages dans `map-config.json` :
-
-| Clé | Rôle |
-|---|---|
-| `mode` | `border` : la carte suit la bordure ; `fixed` : carré de `fixed_radius` blocs autour de `center_x`/`center_z` |
-| `margin` | blocs affichés en plus au-delà de la bordure (0 = rien au-delà) |
-| `max_radius` | limite de sécurité (taille du site et temps de rendu) |
-| `hires` | `true` : vue 3D détaillée en zoomant ; `false` : carte plate seulement, beaucoup plus légère |
-
-Le premier rendu peut prendre du temps ; les suivants ne recalculent que ce qui a changé.
+La carte 3D est hébergée sur le homelab et intégrée au site : voir [homelab/README.md](homelab/README.md). Son adresse est réglée dans `site/index.html` (`MAP_URL`).
 
 ## Bon à savoir
 

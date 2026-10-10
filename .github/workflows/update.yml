@@ -34,15 +34,6 @@ jobs:
           SFTP_ROOT: ${{ secrets.SFTP_ROOT }}
           PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
         run: python scripts/update.py
-      - name: Récupération de la dernière carte rendue
-        uses: actions/cache/restore@v4
-        with:
-          path: work/web
-          key: map-web-latest
-          restore-keys: map-web-
-      - name: Ajout de la carte au site
-        run: |
-          if [ -f work/web/settings.json ]; then cp -r work/web site/carte; echo "Carte ajoutée"; else echo "Pas encore de carte rendue"; fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
