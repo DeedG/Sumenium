@@ -285,7 +285,7 @@ function setupMap(){
   const send=()=>{try{f.contentWindow.postMessage({type:"sumenium-spoil",show:box.checked},new URL(MAP_URL).origin)}catch(e){}};
   f.addEventListener("load",()=>{send();setTimeout(send,3000);setTimeout(send,8000)});
   box.addEventListener("change",()=>{try{localStorage.setItem("sumenium-spoil",box.checked?"1":"0")}catch(e){};send()});
-  f.src=MAP_URL; $("mapfull").href=MAP_URL;
+  f.src=MAP_URL+"?v="+Date.now(); $("mapfull").href=MAP_URL;
 }
 
 async function loadData(){
