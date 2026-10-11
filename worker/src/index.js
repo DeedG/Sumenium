@@ -460,15 +460,17 @@ async function claim(env, s, name) {
   if (already) fail(400, `Ton compte est déjà relié à ${already.mc_name}. Demande au staff pour changer.`);
   // une ancienne fiche supprimée garde le lien Discord : on le libère
   await env.DB.prepare("UPDATE players SET discord_id = NULL WHERE discord_id = ? AND deleted = 1").bind(s.id).run();
+  // Le pseudo n'a pas besoin d'être déjà whitelisté : la fiche se remplit AVANT la whitelist.
+  // S'il y est, on reprend l'orthographe exacte du serveur.
   const wl = await env.DB.prepare("SELECT mc_name FROM whitelist WHERE mc_name = ?").bind(name).first();
-  if (!wl) fail(400, "Ce pseudo n'est pas dans la whitelist du serveur. Vérifie l'orthographe, ou attends d'être whitelisté (le site la relit toutes les 10 minutes).");
-  const existing = await env.DB.prepare("SELECT * FROM players WHERE mc_name = ?").bind(wl.mc_name).first();
+  const exact = wl ? wl.mc_name : name;
+  const existing = await env.DB.prepare("SELECT * FROM players WHERE mc_name = ?").bind(exact).first();
   if (existing && existing.discord_id && existing.discord_id !== s.id) fail(409, "Ce pseudo est déjà relié à un autre compte Discord. Contacte le staff.");
   if (existing) {
-    await update(env, s, "players", existing.id, { discord_id: s.id, deleted: 0, mc_name: wl.mc_name }, "claim");
+    await update(env, s, "players", existing.id, { discord_id: s.id, deleted: 0, mc_name: exact }, "claim");
     return { player: await row(env, "players", existing.id) };
   }
-  const id = await insert(env, s, "players", { mc_name: wl.mc_name, discord_id: s.id });
+  const id = await insert(env, s, "players", { mc_name: exact, discord_id: s.id });
   return { player: await row(env, "players", id) };
 }
 
@@ -528,11 +530,11 @@ async function allData(env, s) {
   const q = async (sql, ...a) => (await env.DB.prepare(sql).bind(...a).all()).results;
   const staff = s.level === "staff";
   const me = await env.DB.prepare("SELECT * FROM players WHERE discord_id = ? AND deleted = 0").bind(s.id).first();
-  const players = (await q("SELECT p.*, u.discord_name FROM players p LEFT JOIN users u ON u.discord_id = p.discord_id WHERE p.deleted = 0 ORDER BY p.mc_name"))
+  const players = (await q("SELECT p.*, u.discord_name, (w.mc_name IS NOT NULL) AS wl FROM players p LEFT JOIN users u ON u.discord_id = p.discord_id LEFT JOIN whitelist w ON w.mc_name = p.mc_name WHERE p.deleted = 0 ORDER BY p.mc_name"))
     .map((p) => {
       const own = me && me.id === p.id;
       const out = { id: p.id, mc_name: p.mc_name, faction_id: p.faction_id, metier: p.metier, metier_desc: p.metier_desc,
-        perso_desc: p.perso_desc, activite: p.activite, mort: p.mort, linked: !!p.discord_id, taille_appliquee: p.taille_appliquee };
+        perso_desc: p.perso_desc, activite: p.activite, mort: p.mort, linked: !!p.discord_id, whitelisted: !!p.wl, taille_appliquee: p.taille_appliquee };
       if (staff || own) Object.assign(out, { taille_cm: p.taille_cm, discord_name: p.discord_name || null });
       return out;
     });
@@ -550,7 +552,8 @@ async function allData(env, s) {
   if (staff || settings.election === "resultats") {
     results = await q("SELECT tour, candidat_id, COUNT(*) AS n FROM votes GROUP BY tour, candidat_id");
   }
-  return { players, factions, usines, choix, prix, settings, bases, candidats, myVotes, results, meId: me ? me.id : null };
+  const wlCount = (await env.DB.prepare("SELECT COUNT(*) AS n FROM whitelist").first()).n;
+  return { players, factions, usines, choix, prix, settings, bases, candidats, myVotes, results, meId: me ? me.id : null, wlSynced: wlCount > 0 };
 }
 
 async function importData(env, s, data) {

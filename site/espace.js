@@ -102,7 +102,8 @@ function fiche() {
   if (!p) {
     if (!canWrite()) return view('<div class="card"><p>Ta fiche sera disponible quand ton compte sera vérifié.</p></div>');
     view(`<div class="card"><h3>Relie ton pseudo Minecraft</h3>
-      <p>Écris ton pseudo exact. Il doit être dans la whitelist du serveur, et un pseudo ne peut être relié qu'à un seul compte Discord.</p>
+      <p>Écris ton pseudo Minecraft exact (Java). Pas besoin d'être déjà whitelisté : remplis ta fiche, et le staff t'ajoute à la whitelist une fois ta candidature validée.
+      Un pseudo ne peut être relié qu'à un seul compte Discord.</p>
       <form id="claimForm" class="inline"><input name="mc_name" required maxlength="16" pattern="[A-Za-z0-9_]{3,16}" placeholder="Pseudo Minecraft" autocomplete="off">
       <button class="btn">Relier</button></form></div>`);
     $("claimForm").onsubmit = (e) => { e.preventDefault(); act(() => call("POST", "/api/me/claim", formData(e.target)), "Pseudo relié !"); };
@@ -110,7 +111,7 @@ function fiche() {
   }
   const sc = scaleOf(p.taille_cm);
   const applied = p.taille_appliquee != null;
-  view(`<form id="ficheForm" class="card form">
+  view(`${wlBox(p)}<form id="ficheForm" class="card form">
     <h3>${esc(p.mc_name)}</h3>
     <label>Faction<select name="faction_id">${facOpts(p.faction_id)}</select></label>
     <label>Métier RP<input name="metier" maxlength="200" value="${esc(p.metier)}"></label>
@@ -124,6 +125,15 @@ function fiche() {
     <div class="wide actions"><button class="btn">Enregistrer</button></div></form>`);
   $("tailleIn").oninput = (e) => ($("tailleInfo").innerHTML = tailleTxt(scaleOf(+e.target.value), applied ? p.taille_appliquee : null));
   $("ficheForm").onsubmit = (e) => { e.preventDefault(); act(() => call("PUT", "/api/me/player", formData(e.target)), "Fiche enregistrée"); };
+}
+// Fiche suffisante pour être whitelisté : métier + « mourir ou survivre » (faction facultative : on peut jouer seul)
+const ficheOk = (p) => !!(p.metier && p.mort);
+function wlBox(p) {
+  if (p.whitelisted) return '<div class="banner ok">✓ Tu es dans la whitelist du serveur.</div>';
+  const miss = [!p.metier && "ton métier RP", !p.mort && "« mourir ou survivre »"].filter(Boolean);
+  return `<div class="banner info"><b>Pas encore whitelisté.</b> ${miss.length
+    ? `Complète ${miss.join(" et ")} (faction ou solo, au choix), puis le staff t'ajoutera une fois ta candidature validée.`
+    : "Ta fiche est complète : le staff t'ajoutera à la whitelist une fois ta candidature validée."}</div>`;
 }
 function tailleTxt(sc, applied) {
   if (!sc) return '<span class="muted">Indique ta taille pour avoir la taille RP.</span>';
@@ -163,6 +173,7 @@ function playerCard(p) {
     <div class="tags">${p.mort ? `<span class="chip m-${esc(p.mort)}" title="${esc(MORT[p.mort])}">${esc(MORT_COURT[p.mort])}</span>` : ""}
       ${p.activite ? `<span class="chip">${esc(ACT_COURT[p.activite])}</span>` : ""}
       ${isStaff() && !p.linked ? '<span class="chip muted">Discord non relié</span>' : ""}
+      ${isStaff() && D.wlSynced && !p.whitelisted ? '<span class="chip warn">pas whitelisté</span>' : ""}
       ${isStaff() && p.discord_name ? `<span class="chip muted">@${esc(p.discord_name)}</span>` : ""}</div>
     ${p.metier_desc || p.perso_desc ? `<details><summary>Descriptions</summary>${p.metier_desc ? `<h4>Métier</h4>${para(p.metier_desc)}` : ""}${p.perso_desc ? `<h4>Personnage</h4>${para(p.perso_desc)}` : ""}</details>` : ""}
     ${isStaff() ? `<details class="edit" data-pid="${p.id}"><summary>Modifier (staff)</summary></details>` : ""}
@@ -343,7 +354,18 @@ function staff() {
   const s = D.settings;
   const tailles = D.players.filter((p) => p.taille_cm).map((p) => ({ p, sc: scaleOf(p.taille_cm) }));
   const todo = tailles.filter(({ p, sc }) => p.taille_appliquee == null || Math.abs(p.taille_appliquee - sc) >= 0.0005);
-  view(`<div class="card form"><h3>Réglages</h3>
+  const aWl = D.wlSynced ? D.players.filter((p) => !p.whitelisted).sort((a, b) => ficheOk(b) - ficheOk(a) || a.mc_name.localeCompare(b.mc_name)) : [];
+  view(`<div class="card"><h3>À whitelister <small class="muted">${aWl.filter(ficheOk).length} fiche${aWl.filter(ficheOk).length > 1 ? "s" : ""} complète${aWl.filter(ficheOk).length > 1 ? "s" : ""}</small></h3>
+      ${D.wlSynced ? `<p class="muted small">Joueurs avec une fiche mais absents de la whitelist. Vérifie la candidature, lance la commande en jeu : ils disparaissent d'ici à la prochaine synchronisation (10 min).</p>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Joueur</th><th>Discord</th><th>Faction</th><th>Fiche</th><th>Commande</th></tr></thead><tbody>
+      ${aWl.map((p) => { const cmd = `/whitelist add ${p.mc_name}`;
+        return `<tr><td>${esc(p.mc_name)}</td><td>${p.discord_name ? "@" + esc(p.discord_name) : '<span class="muted">non relié</span>'}</td>
+          <td>${p.faction_id ? esc(facName(p.faction_id)) : '<span class="muted">solo</span>'}</td>
+          <td>${ficheOk(p) ? '<span class="chip ok">complète</span>' : `<span class="chip warn">manque ${[!p.metier && "métier", !p.mort && "mourir/survivre"].filter(Boolean).join(", ")}</span>`}</td>
+          <td><code>${esc(cmd)}</code> <button class="x copy" data-copy="${esc(cmd)}" aria-label="Copier">⧉</button></td></tr>`; }).join("")
+        || '<tr><td colspan="5" class="empty">Tout le monde est whitelisté.</td></tr>'}</tbody></table></div>`
+      : '<p class="muted small">La whitelist du serveur n\'a pas encore été synchronisée (toutes les 10 minutes).</p>'}</div>
+    <div class="card form"><h3>Réglages</h3>
       <label>Élection<select id="setElection">${opt(ELECTION, s.election)}</select></label>
       <label>Choix d'usines<select id="setUsOpen"><option value="1"${s.usines_ouvertes === "1" ? " selected" : ""}>Ouverts</option><option value="0"${s.usines_ouvertes !== "1" ? " selected" : ""}>Fermés</option></select></label>
       <label>Usines max par faction<input id="setUsMax" type="number" min="1" max="20" value="${esc(s.usines_max || 3)}"></label>
