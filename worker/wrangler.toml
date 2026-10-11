@@ -1,0 +1,24 @@
+name = "sumenium"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = false
+
+routes = [
+  { pattern = "sumenium.alheon.fr", custom_domain = true }
+]
+
+[vars]
+PUBLIC_URL = "https://sumenium.alheon.fr"
+SITE_ORIGIN = "https://deedg.github.io/Sumenium"
+DISCORD_CLIENT_ID = "1558815844879048734"
+GUILD_ID = "A_REMPLIR"
+ROLE_ADMIN = "507639801277841411"
+ROLE_STAFF = "752548324728635484"
+ROLE_SUMENIEN = "983812865238630400"
+ROLE_ATTENTE = "983811973701599262"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sumenium"
+database_id = "D1_DATABASE_ID"
+migrations_dir = "migrations"

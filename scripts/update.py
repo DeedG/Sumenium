@@ -5,7 +5,7 @@ Variables d'environnement (secrets GitHub) :
   SFTP_ROOT  dossier du serveur sur le SFTP (défaut : dossier d'arrivée)
   PAGES_URL  adresse du site, pour garder les dernières données si le SFTP ne répond pas
 """
-import io, json, os, posixpath, re, stat, sys, urllib.request
+import base64, hashlib, io, json, os, posixpath, re, stat, sys, urllib.request
 from datetime import datetime, timezone
 
 import nbtlib
@@ -91,6 +91,30 @@ def notice(kind, msg):
     print(f"::{kind} title=Lecture du serveur::{msg}", flush=True)
 
 
+def push_whitelist(sftp, j):
+    """Envoie la whitelist à l'Espace (sumenium.alheon.fr) : seuls ces pseudos peuvent être reliés à un compte Discord."""
+    secret = os.environ.get("DISCORD_CLIENT_SECRET")
+    if not secret:
+        return
+    try:
+        wl = json.loads(read(sftp, j("whitelist.json")))
+        players = [{"name": e["name"], "uuid": e.get("uuid", "")} for e in wl if e.get("name")]
+    except Exception as e:
+        notice("warning", f"whitelist.json illisible, Espace non synchronisé : {type(e).__name__}")
+        return
+    if not players:
+        return  # ne jamais vider la liste côté Espace sur une lecture ratée
+    token = base64.urlsafe_b64encode(hashlib.sha256(f"sumenium:ingest:{secret}".encode()).digest()).rstrip(b"=").decode()
+    url = (os.environ.get("ESPACE_URL") or "https://sumenium.alheon.fr").rstrip("/") + "/api/ingest/whitelist"
+    req = urllib.request.Request(url, data=json.dumps({"players": players}).encode(), method="POST", headers={
+        "content-type": "application/json", "authorization": f"Bearer {token}", "user-agent": "sumenium-update/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            log("Whitelist envoyée à l'Espace :", json.loads(r.read()).get("count"), "pseudos")
+    except Exception as e:
+        notice("warning", f"Whitelist non envoyée à l'Espace : {e}")
+
+
 def main():
     sftp = connect()
     root = os.environ.get("SFTP_ROOT") or "."
@@ -165,6 +189,7 @@ def main():
         json.dump(extra, open(os.path.join(SITE, "stats.json"), "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     except Exception as e:
         notice("warning", f"Classements non mis à jour : {type(e).__name__}: {e}")
+    push_whitelist(sftp, j)
     sftp.close()
 
     catalog = json.load(open(os.path.join(SITE, "catalog.json"), encoding="utf-8"))

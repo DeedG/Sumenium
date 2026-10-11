@@ -1,7 +1,7 @@
 // Chargé dans la carte BlueMap : permet au site Suménium d'afficher ou masquer
 // la zone hors bordure (marqueur "brouillard") depuis son propre bouton.
 (function () {
-  var ALLOWED = (window.SUMENIUM_ALLOWED_ORIGINS || ["https://deedg.github.io"]);
+  var ALLOWED = (window.SUMENIUM_ALLOWED_ORIGINS || ["https://deedg.github.io", "https://sumenium.alheon.fr"]);
   var wanted = null;
 
   function find(set, id) {

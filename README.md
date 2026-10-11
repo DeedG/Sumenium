@@ -40,6 +40,35 @@ Le même passage écrit `site/stats.json` (script `scripts/stats.py`) :
 
 La carte 3D est hébergée sur le homelab et intégrée au site : voir [homelab/README.md](homelab/README.md). Son adresse est réglée dans `site/index.html` (`MAP_URL`).
 
+## Espace joueurs (sumenium.alheon.fr)
+
+Remplace le Google Sheet de la saison : fiches RP, factions, usines, élections, prix du FISC et tailles RP. Connexion avec Discord ; les droits viennent des rôles du serveur Discord :
+
+| Rôle | Droits |
+|---|---|
+| Staff, Admins | tout modifier, outils staff, historique avec annulation, import |
+| En attente de vérification | lecture seule (même s'il a déjà Suménien) |
+| Suménien | sa fiche, sa candidature, son vote ; sa faction (infos, usines, coordonnées) |
+| aucun de ces rôles | refusé |
+
+Fonctionnement :
+
+- `worker/` : un Worker Cloudflare sert le site (copie de GitHub Pages) et l'API `/api/*`, avec une base D1. Déployé par `.github/workflows/deploy-worker.yml` à chaque modification de `worker/`.
+- Un joueur relie son compte Discord à **un** pseudo de la whitelist. La mise à jour toutes les 10 minutes envoie `whitelist.json` à l'Espace.
+- Les coordonnées ne sont visibles que par la faction concernée et le staff ; la taille IRL seulement par le joueur et le staff ; les votes sont secrets (le staff voit les totaux).
+- Chaque modification est inscrite dans l'historique (onglet Staff) et peut être annulée. Une suppression est toujours annulable.
+
+Mise en route :
+
+1. Application Discord « Sumenium 2 » → *OAuth2* → *Redirects* : ajouter `https://sumenium.alheon.fr/api/auth/callback`.
+2. Dans GitHub, *Settings → Secrets and variables → Actions* :
+   - secret `DISCORD_CLIENT_SECRET` (Discord → *OAuth2* → *Client Secret*) ;
+   - secret `CLOUDFLARE_ACCOUNT_ID` (Cloudflare → page d'accueil du compte → *Account ID*) ;
+   - secret `CLOUDFLARE_API_TOKEN` : jeton personnalisé avec *Account › Workers Scripts : Edit*, *Account › D1 : Edit*, *Account › Account Settings : Read*, *Zone (alheon.fr) › Workers Routes : Edit*, *Zone › DNS : Edit*, *Zone › Zone : Read* ;
+   - onglet *Variables* : `DISCORD_GUILD_ID` (clic droit sur le serveur Discord → *Copier l'identifiant du serveur*, mode développeur activé).
+3. *Actions → Déployer l'Espace → Run workflow*. La base, le domaine et le Worker sont créés automatiquement.
+4. Import du Google Sheet : télécharger le sheet en `.xlsx`, puis `python tools/import_sheet.py Saison.xlsx import.json`, et envoyer `import.json` depuis l'onglet *Staff → Importer*. Ce fichier contient des données personnelles : ne pas le commiter.
+
 ## Bon à savoir
 
 - Si le SFTP ne répond pas, le site garde les dernières données et affiche un bandeau d'avertissement.

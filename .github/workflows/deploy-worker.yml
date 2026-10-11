@@ -1,0 +1,63 @@
+name: Déployer l'Espace (sumenium.alheon.fr)
+
+on:
+  push:
+    branches: [main]
+    paths: ["worker/**", ".github/workflows/deploy-worker.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
+      GUILD_ID: ${{ vars.DISCORD_GUILD_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Vérifier la configuration
+        run: |
+          missing=""
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || missing="$missing secret CLOUDFLARE_API_TOKEN,"
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || missing="$missing secret CLOUDFLARE_ACCOUNT_ID,"
+          [ -n "$DISCORD_CLIENT_SECRET" ] || missing="$missing secret DISCORD_CLIENT_SECRET,"
+          echo "$GUILD_ID" | grep -Eq '^[0-9]{15,22}$' || missing="$missing variable DISCORD_GUILD_ID,"
+          if [ -n "$missing" ]; then
+            echo "::error::À ajouter dans Settings > Secrets and variables > Actions :${missing%,}"
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - name: Base de données D1
+        run: |
+          id=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="sumenium") | .uuid')
+          if [ -z "$id" ]; then
+            npx wrangler d1 create sumenium
+            id=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="sumenium") | .uuid')
+          fi
+          [ -n "$id" ] || { echo "::error::Impossible de créer ou trouver la base D1 « sumenium »."; exit 1; }
+          sed -i "s/D1_DATABASE_ID/$id/; s/GUILD_ID = \"A_REMPLIR\"/GUILD_ID = \"$GUILD_ID\"/" wrangler.toml
+          npx wrangler d1 migrations apply sumenium --remote
+
+      - name: Déployer le Worker
+        run: |
+          umask 077
+          jq -n --arg s "$DISCORD_CLIENT_SECRET" '{DISCORD_CLIENT_SECRET:$s}' > "$RUNNER_TEMP/secrets.json"
+          npx wrangler deploy --secrets-file "$RUNNER_TEMP/secrets.json"
+          rm -f "$RUNNER_TEMP/secrets.json"
+          echo "::notice::Espace déployé sur https://sumenium.alheon.fr"

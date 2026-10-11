@@ -5,3 +5,6 @@ homelab/.env
 homelab/data/
 __pycache__/
 work/
+# exports du Google Sheet (données personnelles)
+*.xlsx
+import*.json
