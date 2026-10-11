@@ -17,7 +17,7 @@ Toutes les 10 minutes, GitHub Actions lit le serveur en SFTP, calcule les donné
    | `SFTP_ROOT` | *(facultatif)* le dossier du serveur, si `server.properties` n'est pas à la racine du SFTP |
 
 2. **Pages** : dans *Settings → Pages*, choisir *Source : GitHub Actions*.
-3. **Premier lancement** : onglet *Actions → Mise à jour du site → Run workflow*. Le site est ensuite à l'adresse `https://deedg.github.io/Sumenium/`.
+3. **Premier lancement** : onglet *Actions → Mise à jour du site → Run workflow*. Le site est ensuite à l'adresse `https://sumenium.alheon.fr/` (l'ancienne adresse `deedg.github.io/Sumenium` y renvoie).
 
 ## Ce que le script lit sur le serveur
 

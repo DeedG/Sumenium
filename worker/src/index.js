@@ -28,6 +28,7 @@ export default {
       return await api(req, env, url);
     } catch (e) {
       if (e instanceof HttpError) return json({ error: e.message }, e.status);
+      if (/UNIQUE constraint failed/.test(String(e && e.message))) return json({ error: "Ce nom est déjà utilisé." }, 409);
       console.error(e);
       return json({ error: "Erreur interne du serveur." }, 500);
     }
@@ -44,7 +45,7 @@ const fail = (status, message) => { throw new HttpError(status, message); };
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers },
+    headers: securityHeaders(new Headers({ "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers })),
   });
 }
 
@@ -108,10 +109,18 @@ async function proxy(req, env, url) {
   const target = env.SITE_ORIGIN.replace(/\/$/, "") + url.pathname + url.search;
   const res = await fetch(target, { headers: { "user-agent": "sumenium-worker" }, redirect: "follow" });
   const out = new Response(res.body, res);
-  out.headers.set("x-content-type-options", "nosniff");
-  out.headers.set("referrer-policy", "strict-origin-when-cross-origin");
+  securityHeaders(out.headers);
   out.headers.delete("access-control-allow-origin");
   return out;
+}
+
+function securityHeaders(h) {
+  h.set("strict-transport-security", "max-age=31536000");
+  h.set("x-content-type-options", "nosniff");
+  h.set("referrer-policy", "strict-origin-when-cross-origin");
+  h.set("x-frame-options", "SAMEORIGIN");
+  h.set("permissions-policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  return h;
 }
 
 /* -------------------------------------------------------------- session/rôles */
