@@ -31,8 +31,8 @@ jobs:
           path: |
             site/icons
             work/client.jar
-          key: icons-v1-${{ hashFiles('site/catalog.json') }}
-          restore-keys: icons-v1-
+          key: icons-v2-${{ hashFiles('site/catalog.json') }}
+          restore-keys: icons-v2-
       - name: Extraction des icônes manquantes
         run: python scripts/icons.py
       - name: Lecture du serveur en SFTP

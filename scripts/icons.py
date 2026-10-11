@@ -17,25 +17,57 @@ def get(url):
         return r.read()
 
 
+_meta = None
+
+
+def version_meta():
+    global _meta
+    if _meta is None:
+        manifest = json.loads(get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"))
+        ids = {v["id"]: v["url"] for v in manifest["versions"]}
+        vid = WANTED_VERSION if WANTED_VERSION in ids else manifest["latest"]["release"]
+        print("Version de Minecraft :", vid)
+        _meta = json.loads(get(ids[vid]))
+    return _meta
+
+
 def client_jar():
     os.makedirs(CACHE, exist_ok=True)
     path = os.path.join(CACHE, "client.jar")
     if os.path.exists(path):
         return path
-    manifest = json.loads(get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"))
-    ids = {v["id"]: v["url"] for v in manifest["versions"]}
-    vid = WANTED_VERSION if WANTED_VERSION in ids else manifest["latest"]["release"]
-    print("Textures de la version", vid)
-    meta = json.loads(get(ids[vid]))
     with open(path, "wb") as f:
-        f.write(get(meta["downloads"]["client"]["url"]))
+        f.write(get(version_meta()["downloads"]["client"]["url"]))
     return path
+
+
+def french_names(items):
+    """Noms français officiels des objets (fichier de langue fr_fr du jeu) → site/icons/names_fr.json."""
+    path = os.path.join(OUT, "names_fr.json")
+    if os.path.exists(path) and set(items) <= set(json.load(open(path, encoding="utf-8"))):
+        return
+    index = json.loads(get(version_meta()["assetIndex"]["url"]))
+    h = index["objects"]["minecraft/lang/fr_fr.json"]["hash"]
+    lang = json.loads(get(f"https://resources.download.minecraft.net/{h[:2]}/{h}"))
+    names = {}
+    for it in items:
+        for key in (f"item.minecraft.{it}", f"block.minecraft.{it}"):
+            if key in lang:
+                names[it] = lang[key]
+                break
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(names, f, ensure_ascii=False, separators=(",", ":"))
+    print(f"Noms français : {len(names)}/{len(items)} objets")
 
 
 def main():
     cat = json.load(open(os.path.join(SITE, "catalog.json"), encoding="utf-8"))
     items = sorted({i["id"] for e in cat for k in ("rw", "tr") for i in e.get(k, [])})
     os.makedirs(OUT, exist_ok=True)
+    try:
+        french_names(items)
+    except Exception as e:
+        print(f"::warning title=Noms français::{type(e).__name__}: {e}")
     missing = [i for i in items if not os.path.exists(os.path.join(OUT, i + ".png"))]
     if not missing:
         print("Icônes déjà à jour")

@@ -69,11 +69,12 @@ body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);margin:0}
 .bar{position:static;z-index:2;background:var(--bg);padding-block:10px;display:flex;flex-wrap:wrap;gap:8px;border-bottom:2px solid var(--line)}
 .bar input,.bar select{font:inherit;font-size:.95rem;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 11px;min-width:0}
 .bar input[type=search]{flex:1 1 230px}
+.bar input[type=checkbox]{padding:0;width:auto;flex:none}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
 .seg button{font:inherit;font-size:.92rem;font-weight:700;background:transparent;color:var(--muted);border:0;padding:8px 13px;cursor:pointer}
 .seg button+button{border-left:1px solid var(--line)}
 .seg button[aria-pressed="true"]{background:var(--sun);color:#3b2a00}
-.chk{display:inline-flex;align-items:center;gap:6px;font-size:.92rem;font-weight:600;color:var(--muted);padding:0 4px}
+.chk{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-size:.92rem;font-weight:600;color:var(--muted);padding:0 4px}
 button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid var(--crystal);outline-offset:1px}
 .count{font-size:.88rem;font-weight:700;color:var(--muted);margin:14px 0 6px}
 
@@ -174,6 +175,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:.95rem}
 .slot .ph{display:grid;place-items:center;width:34px;height:34px;font:600 .62rem/1 "Pixelify Sans",monospace;color:#fff;text-align:center;overflow:hidden;word-break:break-all}
 .slot.glint::after{content:"";position:absolute;inset:3px;background:linear-gradient(115deg,transparent 30%,rgba(190,120,255,.45) 50%,transparent 70%);mix-blend-mode:screen;pointer-events:none}
 .slot .cnt{position:absolute;right:2px;bottom:0;font:600 .9rem/1 "Pixelify Sans",monospace;color:#fff;text-shadow:2px 2px 0 #3f3f3f}
+.slot.hl{outline:3px solid var(--sun);outline-offset:2px}
 .slot.trophy{background:#c9a227;box-shadow:inset 2px 2px 0 #7a5c00,inset -2px -2px 0 #ffe9a0}
 .xpchip{font:600 .85rem "Pixelify Sans",monospace;color:#7efc20;background:#1d2a12;border-radius:6px;padding:4px 8px;text-shadow:1px 1px 0 #2a3f12}
 #tip{position:fixed;z-index:50;max-width:320px;pointer-events:none;background:rgba(16,0,16,.95);border:2px solid #2b0f5c;outline:2px solid rgba(16,0,16,.95);box-shadow:inset 0 0 0 1px #5000ff55;padding:6px 9px;font:400 15px/1.35 "Pixelify Sans",monospace;color:#fff;text-shadow:2px 2px 0 #3f3f3f}
@@ -320,18 +322,20 @@ h3.sec small{font:600 .8rem var(--body);color:var(--muted);margin-left:8px}
     <div class="stat"><b id="sMode">–</b><span>Mode de récompense</span></div>
   </div>
   <div class="bar">
-    <input id="q" type="search" placeholder="Chercher un succès, une description, une étape…" aria-label="Recherche">
+    <input id="q" type="search" placeholder="Chercher un succès, une étape, un objet donné…" aria-label="Recherche">
     <select id="tab" aria-label="Catégorie"><option value="">Toutes les catégories</option></select>
     <select id="tier" aria-label="Type"><option value="">Tous les types</option></select>
     <select id="min" aria-label="Blocs minimum">
       <option value="0">Tous les gains</option><option value="1">≥ 1 bloc</option><option value="5">≥ 5 blocs</option><option value="10">≥ 10 blocs</option><option value="25">≥ 25 blocs</option><option value="100">≥ 100 blocs</option>
     </select>
     <select id="sort" aria-label="Tri">
-      <option value="blocks">Tri : blocs gagnés</option><option value="prog">Tri : presque finis</option><option value="recent">Tri : obtenus récemment</option><option value="az">Tri : A → Z</option>
+      <option value="blocks">Tri : blocs gagnés</option><option value="loot">Tri : quantité donnée</option><option value="prog">Tri : presque finis</option><option value="recent">Tri : obtenus récemment</option><option value="az">Tri : A → Z</option>
     </select>
     <div class="seg" role="group" aria-label="État">
       <button id="fRem" aria-pressed="true">Restants</button><button id="fDone" aria-pressed="false">Obtenus</button><button id="fAll" aria-pressed="false">Tous</button>
     </div>
+    <select id="loot" aria-label="Récompense"><option value="">Toutes les récompenses</option></select>
+    <label class="chk"><input type="checkbox" id="trophies" checked> Trophées</label>
     <label class="chk"><input type="checkbox" id="secret"> Succès secrets</label>
   </div>
   <p class="count" id="count"></p>
@@ -389,7 +393,26 @@ const fmt=n=>Number(n||0).toLocaleString("fr-FR",{maximumFractionDigits:2});
 const fmtB=n=>n>=10000?Number(n).toLocaleString("fr-FR",{notation:"compact",maximumFractionDigits:1}):fmt(n);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const crit=c=>c.replace(/^[a-z_]+:/,"").replace(/[_/]/g," ");
-let CAT=[],DATA={adv:{}},st={q:"",tab:"",tier:"",min:0,sort:"blocks",f:"rem",secret:false,limit:150};
+let CAT=[],DATA={adv:{}},NAMES={},st={q:"",tab:"",tier:"",min:0,sort:"blocks",f:"rem",secret:false,loot:"",trophies:true,limit:150};
+// Objets donnés par un succès, selon les réglages du serveur (récompenses / trophées activés) et le filtre « Trophées »
+const bacOn=k=>{const b=(DATA&&DATA.bac)||{};return b[k]===undefined||b[k]===null||b[k]!==0};
+function gives(e){
+  const out=[];
+  if(bacOn("reward"))(e.rw||[]).forEach(it=>out.push(it));
+  if(st.trophies&&bacOn("trophy"))(e.tr||[]).forEach(it=>out.push(it));
+  return out;
+}
+const lootQty=(e,id)=>gives(e).filter(it=>!id||it.id===id).reduce((a,it)=>a+(it.n||1),0);
+function lootOptions(){
+  const sel=$("loot"),cur=st.loot,counts={};
+  CAT.forEach(e=>new Set(gives(e).map(it=>it.id)).forEach(id=>counts[id]=(counts[id]||0)+1));
+  const items=Object.keys(counts).sort((a,b)=>iname(a).localeCompare(iname(b),"fr"));
+  const withXp=bacOn("exp")?CAT.filter(e=>e.xp).length:0;
+  sel.innerHTML=`<option value="">Toutes les récompenses</option><option value="any">Donne au moins un objet</option><option value="none">Ne donne aucun objet</option>`+
+    (withXp?`<option value="xp">Donne de l'XP (${withXp})</option>`:"")+
+    `<optgroup label="Objet donné">${items.map(id=>`<option value="i:${esc(id)}">${esc(iname(id))} (${counts[id]})</option>`).join("")}</optgroup>`;
+  sel.value=cur;if(sel.value!==cur){st.loot="";sel.value=""}
+}
 
 function ago(iso){
   const m=Math.round((Date.now()-new Date(iso))/60000);
@@ -452,13 +475,21 @@ function render(){
     if(st.tab&&e.tab!==st.tab)return false;
     if(st.tier&&e.tier!==st.tier)return false;
     if(r.b<st.min)return false;
-    if(q&&!(e.title+" "+e.desc+" "+e.req.flat().join(" ")).toLowerCase().includes(q))return false;
+    if(st.loot){
+      const g=gives(e);
+      if(st.loot==="any"&&!g.length)return false;
+      if(st.loot==="none"&&g.length)return false;
+      if(st.loot==="xp"&&!(bacOn("exp")&&e.xp))return false;
+      if(st.loot.startsWith("i:")&&!g.some(it=>it.id===st.loot.slice(2)))return false;
+    }
+    if(q&&!(e.title+" "+e.desc+" "+e.req.flat().join(" ")+" "+gives(e).map(it=>iname(it.id)+" "+it.id+" "+((it.name&&it.name.t)||"")).join(" ")).toLowerCase().includes(q))return false;
     return true;
   });
   const by={
     blocks:(a,b)=>(a.tier==="custom")-(b.tier==="custom")||rec(b).b-rec(a).b,
     prog:(a,b)=>((rec(b).p||0)/Math.max(b.req.length,1))-((rec(a).p||0)/Math.max(a.req.length,1))||rec(b).b-rec(a).b,
     recent:(a,b)=>String(rec(b).at||"").localeCompare(String(rec(a).at||"")),
+    loot:(a,b)=>{const id=st.loot.startsWith("i:")?st.loot.slice(2):null;return lootQty(b,id)-lootQty(a,id)},
     az:()=>0
   }[st.sort];
   rows.sort((a,b)=>by(a,b)||a.title.localeCompare(b.title));
@@ -477,6 +508,8 @@ $("tier").onchange=e=>set("tier",e.target.value);
 $("min").onchange=e=>set("min",+e.target.value);
 $("sort").onchange=e=>set("sort",e.target.value);
 $("secret").onchange=e=>set("secret",e.target.checked);
+$("loot").onchange=e=>{st.loot=e.target.value;if(st.loot.startsWith("i:")&&st.sort==="blocks"){st.sort="loot";$("sort").value="loot"}set("loot",st.loot)};
+$("trophies").onchange=e=>{st.trophies=e.target.checked;lootOptions();set("trophies",st.trophies)};
 $("more").onclick=()=>{st.limit+=300;render()};
 
 // Carte hébergée sur le homelab (via le tunnel Cloudflare)
@@ -505,17 +538,18 @@ async function loadData(){
 const MCCOL={black:"#000000",dark_blue:"#0000AA",dark_green:"#00AA00",dark_aqua:"#00AAAA",dark_red:"#AA0000",dark_purple:"#AA00AA",gold:"#FFAA00",gray:"#AAAAAA",dark_gray:"#555555",blue:"#5555FF",green:"#55FF55",aqua:"#55FFFF",red:"#FF5555",light_purple:"#FF55FF",yellow:"#FFFF55",white:"#FFFFFF"};
 const col=c=>c?(MCCOL[c]||c):null;
 const ROM=["","I","II","III","IV","V","VI","VII","VIII","IX","X"];
-const iname=id=>id.replace(/_/g," ").replace(/\b\w/g,m=>m.toUpperCase());
+const iname=id=>NAMES[id]||id.replace(/_/g," ").replace(/\b\w/g,m=>m.toUpperCase());
 function slot(it,ci,kind,j){
   const pic=it.skin?`<span class="head" style="background-image:url('${esc(it.skin)}')"></span>`
-    :`<img src="icons/${esc(it.id)}.png" alt="" loading="lazy" onerror="this.outerHTML='<span class=&quot;ph&quot;>${esc(iname(it.id).slice(0,10))}</span>'">`;
-  return `<button class="slot${it.glint?" glint":""}${kind==="tr"?" trophy":""}" data-c="${ci}" data-k="${kind}" data-j="${j}" aria-label="${esc((it.name&&it.name.t)||iname(it.id))}">${pic}${it.n>1?`<span class="cnt">${it.n}</span>`:""}</button>`;
+    :`<img src="icons/${esc(it.id)}.png" alt="" loading="lazy" data-ph="${esc(iname(it.id).slice(0,10))}" onerror="iconFail(this)">`;
+  return `<button class="slot${it.glint?" glint":""}${kind==="tr"?" trophy":""}${st.loot==="i:"+it.id?" hl":""}" data-c="${ci}" data-k="${kind}" data-j="${j}" aria-label="${esc((it.name&&it.name.t)||iname(it.id))}">${pic}${it.n>1?`<span class="cnt">${it.n}</span>`:""}</button>`;
 }
+function iconFail(img){const sp=document.createElement("span");sp.className="ph";sp.textContent=img.dataset.ph||"";img.replaceWith(sp)}
 function lootHtml(e){
   const b=(DATA&&DATA.bac)||{};const on=k=>b[k]===undefined||b[k]===null||b[k]!==0;
   const ci=CAT.indexOf(e);let h="";
   if(on("reward")&&e.rw&&e.rw.length)h+=`<span class="lbl">Récompense</span>`+e.rw.map((it,j)=>slot(it,ci,"rw",j)).join("");
-  if(on("trophy")&&e.tr&&e.tr.length)h+=`<span class="lbl">Trophée</span>`+e.tr.map((it,j)=>slot(it,ci,"tr",j)).join("");
+  if(st.trophies&&on("trophy")&&e.tr&&e.tr.length)h+=`<span class="lbl">Trophée</span>`+e.tr.map((it,j)=>slot(it,ci,"tr",j)).join("");
   if(on("exp")&&e.xp)h+=`<span class="xpchip">+${fmt(e.xp)} XP</span>`;
   return h?`<div class="loot">${h}</div>`:"";
 }
@@ -629,10 +663,13 @@ window.addEventListener("hashchange",()=>{const t=location.hash.slice(1).split(/
 
 (async()=>{
   route();
+  try{const r=await fetch("icons/names_fr.json");if(r.ok)NAMES=await r.json()}catch(e){}
   CAT=await (await fetch("catalog.json")).json();
   [...new Set(CAT.map(e=>e.tab))].sort().forEach(t=>$("tab").add(new Option(t,t)));
   Object.entries(TIERS).forEach(([k,v])=>{if(CAT.some(e=>e.tier===k))$("tier").add(new Option(v,k))});
+  lootOptions();
   await Promise.all([loadData(),loadStats()]);
+  lootOptions();
   setInterval(()=>{loadData();loadStats()},120000);
 })();
 </script>
