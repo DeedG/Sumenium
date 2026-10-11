@@ -270,7 +270,9 @@ function usines() {
     <p>${open ? '<span class="chip ok">Choix ouverts</span>' : '<span class="chip warn">Choix fermés</span>'}
       ${isStaff() ? `<label class="chk">Agir pour la faction <select id="usFac">${facOpts(staffFaction, "— choisir —")}</select></label>` : ""}
       ${myFid ? `<span class="muted">${esc(facName(myFid))} : ${mine} usine${mine > 1 ? "s" : ""} choisie${mine > 1 ? "s" : ""}</span>` : ""}</p>
-    <p class="muted small">Ordre du tirage : ${D.factions.filter((f) => f.tirage).sort((a, b) => a.tirage - b.tirage).map((f) => esc(f.name)).join(" → ") || "pas encore tiré"}</p></div>
+    </div>
+    ${tirageTable(myFid)}
+    <details class="all-usines"${open || isStaff() ? " open" : ""}><summary>Toutes les usines et places restantes</summary>
     ${Object.entries(TAILLE_USINE).map(([t, [label, max]]) => `<h3 class="sec">${label} <small>${max} max par usine sur le serveur</small></h3>
       <div class="usines">${D.usines.filter((u) => u.taille === t).map((u) => {
         const takers = D.choix.filter((c) => c.usine_id === u.id).map((c) => fac(c.faction_id)).filter(Boolean);
@@ -281,10 +283,47 @@ function usines() {
           <span class="muted small">${takers.length}/${max}</span></div>
           <div class="takers">${takers.map((f) => `<span class="chip">${esc(f.name)}</span>`).join("")}</div>
           ${can ? `<button class="btn small ${has ? "ghost" : ""}" data-us="${u.id}" data-on="${has ? 0 : 1}"${!has && !isStaff() && (full || mine >= (+D.settings.usines_max || 3)) ? " disabled" : ""}>${has ? "Retirer" : "Choisir"}</button>` : ""}</div>`;
-      }).join("")}</div>`).join("")}`);
+      }).join("")}</div>`).join("")}</details>`);
   if (isStaff()) $("usFac").onchange = (e) => { staffFaction = e.target.value ? +e.target.value : null; usines(); };
   document.querySelectorAll("[data-us]").forEach((b) => (b.onclick = () =>
     act(() => call("POST", `/api/factions/${myFid}/usines`, { usine_id: +b.dataset.us, on: b.dataset.on === "1" }), b.dataset.on === "1" ? "Usine choisie" : "Usine retirée")));
+}
+
+function tirageTable(myFid) {
+  const fs = [...D.factions].sort((a, b) => (a.tirage ?? 999) - (b.tirage ?? 999) || a.name.localeCompare(b.name));
+  const cell = (fid, t) => D.choix.filter((c) => c.faction_id === fid).map((c) => D.usines.find((u) => u.id === c.usine_id))
+    .filter((u) => u && u.taille === t).map((u) => `<span class="chip u-${t}">${esc(u.nom)}</span>`).join(" ") || '<span class="muted">—</span>';
+  return `<div class="card"><h3>Résultats du tirage</h3>
+    <div class="tbl-wrap"><table class="tbl left tirage"><thead><tr><th>Ordre</th><th>Faction</th><th>Grosse</th><th>Moyenne</th><th>Petite</th></tr></thead><tbody>
+    ${fs.map((f) => `<tr${f.id === myFid ? ' class="mine"' : ""}><td>${f.tirage ? f.tirage + "ᵉ" : "–"}</td><td><b>${esc(f.name)}</b></td>
+      <td>${cell(f.id, "grosse")}</td><td>${cell(f.id, "moyenne")}</td><td>${cell(f.id, "petite")}</td></tr>`).join("")}</tbody></table></div></div>`;
+}
+
+// Suggestion de pseudo whitelisté proche (fautes de frappe, majuscules, _ ajoutés…)
+const norm = (n) => n.toLowerCase().replace(/[^a-z0-9]/g, "");
+function lev(a, b) {
+  const d = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = d[0]; d[0] = i;
+    for (let j = 1; j <= b.length; j++) { const t = d[j]; d[j] = Math.min(d[j] + 1, d[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = t; }
+  }
+  return d[b.length];
+}
+function suggest(name) {
+  const a = norm(name);
+  let best = null, bestD = Infinity;
+  for (const w of D.wlFree) {
+    const b = norm(w);
+    const dist = a.length >= 4 && (b.startsWith(a) || a.startsWith(b)) ? 0.5 : lev(a, b);
+    if (dist < bestD) { bestD = dist; best = w; }
+  }
+  return best && bestD <= Math.max(1, Math.floor(Math.min(a.length, norm(best).length) / 3)) ? best : null;
+}
+function renameCell(p) {
+  const sug = suggest(p.mc_name);
+  return `<select data-ren="${p.id}" aria-label="Pseudo du serveur pour ${esc(p.mc_name)}"><option value="">—</option>
+    ${D.wlFree.map((w) => `<option${w === sug ? " selected" : ""}>${esc(w)}</option>`).join("")}</select>
+    <button class="btn small ghost" data-ren-go="${p.id}">Renommer</button>`;
 }
 
 /* Élections */
@@ -357,13 +396,16 @@ function staff() {
   const aWl = D.wlSynced ? D.players.filter((p) => !p.whitelisted).sort((a, b) => ficheOk(b) - ficheOk(a) || a.mc_name.localeCompare(b.mc_name)) : [];
   view(`<div class="card"><h3>À whitelister <small class="muted">${aWl.filter(ficheOk).length} fiche${aWl.filter(ficheOk).length > 1 ? "s" : ""} complète${aWl.filter(ficheOk).length > 1 ? "s" : ""}</small></h3>
       ${D.wlSynced ? `<p class="muted small">Joueurs avec une fiche mais absents de la whitelist. Vérifie la candidature, lance la commande en jeu : ils disparaissent d'ici à la prochaine synchronisation (10 min).</p>
-      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Joueur</th><th>Discord</th><th>Faction</th><th>Fiche</th><th>Commande</th></tr></thead><tbody>
+      ${D.wlFree && D.wlFree.length ? `<p class="muted small">Les fiches venues du Google Sheet portent parfois le pseudo Discord ou une faute de frappe. Si le joueur est en fait déjà whitelisté,
+        choisis son vrai pseudo dans « Pseudo du serveur » et renomme la fiche (${D.wlFree.length} pseudo${D.wlFree.length > 1 ? "s" : ""} whitelisté${D.wlFree.length > 1 ? "s" : ""} sans fiche ; suggestion pré-remplie quand les noms se ressemblent).</p>` : ""}
+      <div class="tbl-wrap"><table class="tbl left"><thead><tr><th>Joueur</th><th>Discord</th><th>Faction</th><th>Fiche</th>${D.wlFree && D.wlFree.length ? "<th>Pseudo du serveur</th>" : ""}<th>Commande</th></tr></thead><tbody>
       ${aWl.map((p) => { const cmd = `/whitelist add ${p.mc_name}`;
         return `<tr><td>${esc(p.mc_name)}</td><td>${p.discord_name ? "@" + esc(p.discord_name) : '<span class="muted">non relié</span>'}</td>
           <td>${p.faction_id ? esc(facName(p.faction_id)) : '<span class="muted">solo</span>'}</td>
           <td>${ficheOk(p) ? '<span class="chip ok">complète</span>' : `<span class="chip warn">manque ${[!p.metier && "métier", !p.mort && "mourir/survivre"].filter(Boolean).join(", ")}</span>`}</td>
+          ${D.wlFree && D.wlFree.length ? `<td class="ren">${renameCell(p)}</td>` : ""}
           <td><code>${esc(cmd)}</code> <button class="x copy" data-copy="${esc(cmd)}" aria-label="Copier">⧉</button></td></tr>`; }).join("")
-        || '<tr><td colspan="5" class="empty">Tout le monde est whitelisté.</td></tr>'}</tbody></table></div>`
+        || '<tr><td colspan="6" class="empty">Tout le monde est whitelisté.</td></tr>'}</tbody></table></div>`
       : '<p class="muted small">La whitelist du serveur n\'a pas encore été synchronisée (toutes les 10 minutes).</p>'}</div>
     <div class="card form"><h3>Réglages</h3>
       <label>Élection<select id="setElection">${opt(ELECTION, s.election)}</select></label>
@@ -387,6 +429,11 @@ function staff() {
       <div id="auditList" class="audit-scroll"><p class="empty">Chargement…</p></div><button class="btn small ghost" id="auditMore" hidden>Plus ancien</button></div>`);
   $("saveSettings").onclick = () => act(() => call("PUT", "/api/admin/settings",
     { election: $("setElection").value, usines_ouvertes: $("setUsOpen").value, usines_max: $("setUsMax").value }), "Réglages enregistrés");
+  document.querySelectorAll("[data-ren-go]").forEach((b) => (b.onclick = () => {
+    const sel = document.querySelector(`select[data-ren="${b.dataset.renGo}"]`), p = D.players.find((x) => x.id === +b.dataset.renGo);
+    if (!sel.value) return toast("Choisis d'abord le pseudo du serveur.", true);
+    if (confirm(`Renommer la fiche « ${p.mc_name} » en « ${sel.value} » ?`)) act(() => call("PUT", `/api/admin/players/${p.id}`, { mc_name: sel.value }), "Fiche renommée");
+  }));
   document.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = () => navigator.clipboard.writeText(b.dataset.copy).then(() => toast("Commande copiée"))));
   document.querySelectorAll("[data-applied]").forEach((b) => (b.onchange = () =>
     act(() => call("PUT", `/api/admin/players/${b.dataset.applied}`, { taille_appliquee: b.checked ? +b.dataset.sc : null }))));
@@ -394,7 +441,7 @@ function staff() {
     const f = e.target.files[0]; if (!f) return;
     let data; try { data = JSON.parse(await f.text()); } catch { return toast("Ce fichier n'est pas un JSON valide.", true); }
     act(async () => { const r = await call("POST", "/api/admin/import", data);
-      toast(`Import : ${r.done.factions} factions, ${r.done.players} joueurs, ${r.done.usines} choix d'usines ajoutés`); });
+      toast(`Import : ${r.done.factions} factions et ${r.done.players} joueurs créés, ${r.done.completes} fiches complétées, ${r.done.usines} choix d'usines ajoutés`); });
   };
   auditRows = []; auditEnd = false; loadAudit();
   $("auditMore").onclick = loadAudit;
@@ -422,7 +469,7 @@ async function loadAudit() {
       <div><b>${esc(a.actor_name || "?")}</b> · ${esc(ACTION[a.action] || a.action)} · ${esc(name(a))}
         <span class="muted small">${new Date(a.ts * 1000).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</span></div>
       <div class="small">${a.entity === "votes" ? '<span class="muted">vote secret</span>' : diff(a)}</div>
-      ${!a.reverted && !["revert", "vote", "import"].includes(a.action) ? `<button class="btn small ghost" data-rev="${a.id}">Annuler</button>` : a.reverted ? '<span class="chip">annulé</span>' : ""}</div>`).join("") || '<p class="empty">Aucune modification.</p>';
+      ${!a.reverted && !["revert", "vote"].includes(a.action) && a.entity !== "import" ? `<button class="btn small ghost" data-rev="${a.id}">Annuler</button>` : a.reverted ? '<span class="chip">annulé</span>' : ""}</div>`).join("") || '<p class="empty">Aucune modification.</p>';
   $("auditMore").hidden = auditEnd;
   list.querySelectorAll("[data-rev]").forEach((b) => (b.onclick = () => confirm("Annuler cette modification ?")
     && act(() => call("POST", `/api/admin/audit/${b.dataset.rev}/revert`), "Modification annulée")));

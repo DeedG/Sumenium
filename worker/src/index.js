@@ -562,43 +562,55 @@ async function allData(env, s) {
     results = await q("SELECT tour, candidat_id, COUNT(*) AS n FROM votes GROUP BY tour, candidat_id");
   }
   const wlCount = (await env.DB.prepare("SELECT COUNT(*) AS n FROM whitelist").first()).n;
-  return { players, factions, usines, choix, prix, settings, bases, candidats, myVotes, results, meId: me ? me.id : null, wlSynced: wlCount > 0 };
+  // Pseudos whitelistés sans fiche : aide le staff à corriger les fiches importées sous un autre nom
+  const wlFree = staff ? (await q("SELECT w.mc_name FROM whitelist w WHERE NOT EXISTS (SELECT 1 FROM players p WHERE p.mc_name = w.mc_name AND p.deleted = 0) ORDER BY w.mc_name")).map((r) => r.mc_name) : null;
+  return { players, factions, usines, choix, prix, settings, bases, candidats, myVotes, results, meId: me ? me.id : null, wlSynced: wlCount > 0, wlFree };
 }
 
 async function importData(env, s, data) {
-  // Import initial depuis le Google Sheet (fichier préparé hors ligne). N'écrase rien d'existant.
-  const done = { factions: 0, players: 0, usines: 0, prix: 0 };
+  // Import depuis le Google Sheet (fichier préparé hors ligne).
+  // Crée ce qui manque et complète les champs vides ; ne remplace jamais une valeur déjà saisie,
+  // et ne ressuscite pas une fiche supprimée. Le même fichier peut être réimporté sans risque.
+  const done = { factions: 0, players: 0, completes: 0, usines: 0 };
+  const empty = (v) => v === null || v === undefined || v === "";
+  const fill = async (table, cur, wanted) => {
+    const f = {};
+    for (const [k, v] of Object.entries(wanted)) if (empty(cur[k]) && !empty(v)) f[k] = v;
+    if (Object.keys(f).length) { await update(env, s, table, cur.id, f, "import"); done.completes++; }
+  };
   const fidByName = {};
   for (const f of data.factions || []) {
     const name = str(f.name, 40);
     if (!name) continue;
-    let ex = await env.DB.prepare("SELECT id FROM factions WHERE name = ?").bind(name).first();
+    const wanted = { theme: str(f.theme), hub: str(f.hub), projet_commu: str(f.projet_commu),
+      autres_projets: str(f.autres_projets), recrutement: str(f.recrutement), tirage: int(f.tirage) };
+    let ex = await env.DB.prepare("SELECT * FROM factions WHERE name = ?").bind(name).first();
     if (!ex) {
-      await insert(env, s, "factions", { name, theme: str(f.theme), hub: str(f.hub), projet_commu: str(f.projet_commu),
-        autres_projets: str(f.autres_projets), recrutement: str(f.recrutement), tirage: int(f.tirage) });
-      ex = await env.DB.prepare("SELECT id FROM factions WHERE name = ?").bind(name).first();
+      await insert(env, s, "factions", { name, ...wanted });
+      ex = await env.DB.prepare("SELECT * FROM factions WHERE name = ?").bind(name).first();
       done.factions++;
-    }
-    fidByName[name.toLowerCase()] = ex.id;
+    } else if (!ex.deleted) await fill("factions", ex, wanted);
+    if (!ex.deleted) fidByName[name.toLowerCase()] = ex.id;
   }
   for (const p of data.players || []) {
     const n = str(p.mc_name, 16);
     if (!MC_NAME.test(n)) continue;
-    const ex = await env.DB.prepare("SELECT id FROM players WHERE mc_name = ?").bind(n).first();
-    if (ex) continue;
-    const fid = p.faction ? fidByName[String(p.faction).toLowerCase()] ?? null : null;
-    await insert(env, s, "players", { mc_name: n, faction_id: fid, metier: str(p.metier), metier_desc: str(p.metier_desc),
-      perso_desc: str(p.perso_desc), activite: ACTIVITE.includes(p.activite) ? p.activite : "",
-      mort: MORT.includes(p.mort) ? p.mort : "", taille_cm: int(p.taille_cm),
-      taille_appliquee: p.taille_appliquee ?? null });
-    done.players++;
+    const wanted = { faction_id: p.faction ? fidByName[String(p.faction).toLowerCase()] ?? null : null,
+      metier: str(p.metier), metier_desc: str(p.metier_desc), perso_desc: str(p.perso_desc),
+      activite: ACTIVITE.includes(p.activite) ? p.activite : "", mort: MORT.includes(p.mort) ? p.mort : "",
+      taille_cm: int(p.taille_cm), taille_appliquee: p.taille_appliquee ?? null };
+    const ex = await env.DB.prepare("SELECT * FROM players WHERE mc_name = ?").bind(n).first();
+    if (!ex) { await insert(env, s, "players", { mc_name: n, ...wanted }); done.players++; }
+    else if (!ex.deleted) await fill("players", ex, wanted);
   }
   for (const [fname, list] of Object.entries(data.usine_choix || {})) {
     const fid = fidByName[fname.toLowerCase()];
     if (!fid) continue;
     for (const uname of list) {
       const u = await env.DB.prepare("SELECT id FROM usines WHERE nom = ? COLLATE NOCASE").bind(str(uname, 80)).first();
-      if (u) { await env.DB.prepare("INSERT OR IGNORE INTO usine_choix (faction_id, usine_id) VALUES (?, ?)").bind(fid, u.id).run(); done.usines++; }
+      if (!u) continue;
+      const r = await env.DB.prepare("INSERT OR IGNORE INTO usine_choix (faction_id, usine_id) VALUES (?, ?)").bind(fid, u.id).run();
+      if (r.meta.changes) done.usines++;
     }
   }
   await audit(env, s, "import", "sheet", "import", null, done);
