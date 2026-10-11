@@ -63,7 +63,7 @@ La bordure est tracée en jaune et mise à jour à chaque passage. Tout ce qui e
 
 ## Compatibilité Minecraft 26.3
 
-BlueMap 5.23 ne sait pas lire le nouveau format des chunks de la 26.3 (palette de blocs écrite en chaînes ou en `{id, properties}`). L'image corrige ce point au moment de la construction : `carte/patches/` contient la classe corrigée, compilée puis injectée dans le jar officiel. Quand BlueMap publiera une version compatible, il suffira de changer `BLUEMAP_VERSION` dans `carte/Dockerfile` et de supprimer le dossier `patches/`.
+La dernière version publiée de BlueMap (5.23) ne gère pas le format de la 26.3. Sa version en développement oui : l'image la compile depuis le code source (commit fixé par `BLUEMAP_COMMIT` dans `carte/Dockerfile`). La première construction prend quelques minutes. Quand une version officielle compatible sortira, on pourra revenir à un simple téléchargement.
 
 ## Commandes utiles
 

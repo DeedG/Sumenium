@@ -28,7 +28,7 @@ INTERVAL = int(E("INTERVAL_MINUTES", "60")) * 60
 THREADS = int(E("RENDER_THREADS", "8"))
 XMX = E("JAVA_XMX", "6G")
 MAP_NAME = E("MAP_NAME", "Suménium · Overworld")
-MC_VERSION = E("BLUEMAP_MC_VERSION", "26.2")
+MC_VERSION = E("BLUEMAP_MC_VERSION", "26.3")
 FOG = E("FOG_COLOR", "18,30,22")
 
 
@@ -232,7 +232,7 @@ marker-sets: {{{markers}
 
 
 # À changer quand le correctif BlueMap évolue : la carte est alors entièrement redessinée une fois.
-RENDER_VERSION = "26.3-palette-1"
+RENDER_VERSION = "bluemap-dev-a61e143"
 
 
 def reset_if_needed():
