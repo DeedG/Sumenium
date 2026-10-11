@@ -61,6 +61,10 @@ Après une modification : `docker compose up -d`.
 
 La bordure est tracée en jaune et mise à jour à chaque passage. Tout ce qui est au-delà est recouvert par un calque « Masquer hors bordure ». Sur le site, la case **« Voir toute la carte (spoil) »** l'enlève ; dans la carte en plein écran, c'est dans le menu des marqueurs. Ce calque évite de se spoiler sans le vouloir, il ne protège pas un joueur qui veut vraiment voir.
 
+## Compatibilité Minecraft 26.3
+
+BlueMap 5.23 ne sait pas lire le nouveau format des chunks de la 26.3 (palette de blocs écrite en chaînes ou en `{id, properties}`). L'image corrige ce point au moment de la construction : `carte/patches/` contient la classe corrigée, compilée puis injectée dans le jar officiel. Quand BlueMap publiera une version compatible, il suffira de changer `BLUEMAP_VERSION` dans `carte/Dockerfile` et de supprimer le dossier `patches/`.
+
 ## Commandes utiles
 
 ```bash

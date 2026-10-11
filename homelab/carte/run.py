@@ -231,6 +231,24 @@ marker-sets: {{{markers}
 ''')
 
 
+# À changer quand le correctif BlueMap évolue : la carte est alors entièrement redessinée une fois.
+RENDER_VERSION = "26.3-palette-1"
+
+
+def reset_if_needed():
+    marker = f"{BM}/render-version"
+    try:
+        current = open(marker).read().strip()
+    except OSError:
+        current = ""
+    if current != RENDER_VERSION:
+        log("Nouvelle version du rendu : la carte va être entièrement redessinée")
+        shutil.rmtree(f"{WEB}/maps/overworld", ignore_errors=True)
+        os.makedirs(BM, exist_ok=True)
+        with open(marker, "w") as f:
+            f.write(RENDER_VERSION)
+
+
 def render():
     cmd = ["java", f"-Xmx{XMX}", "-jar", "/opt/bluemap-cli.jar", "-c", f"{BM}/config",
            "-v", MC_VERSION, "-r", "-g", "-s", "--markers"]
@@ -251,6 +269,7 @@ def main():
         try:
             border, box = sync()
             write_config(border, box)
+            reset_if_needed()
             render()
         except Exception as e:
             log("Erreur :", type(e).__name__, e)

@@ -1,14 +1,24 @@
 # Rendu de la carte : synchronisation SFTP (Overworld uniquement) + BlueMap
-FROM eclipse-temurin:25-jre
 
+# 1) BlueMap, corrigé pour lire le format de chunks de Minecraft 26.3
+FROM eclipse-temurin:25-jdk AS bluemap
 ARG BLUEMAP_VERSION=5.23
-RUN apt-get update \
- && apt-get install -y --no-install-recommends python3 python3-pip curl ca-certificates tzdata \
- && pip3 install --no-cache-dir --break-system-packages "paramiko>=3.4" "nbtlib==2.0.4" \
- && curl -fsSL -o /opt/bluemap-cli.jar \
-    "https://github.com/BlueMap-Minecraft/BlueMap/releases/download/v${BLUEMAP_VERSION}/bluemap-${BLUEMAP_VERSION}-cli.jar" \
- && apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/* \
+ && curl -fsSL -o bluemap-cli.jar \
+    "https://github.com/BlueMap-Minecraft/BlueMap/releases/download/v${BLUEMAP_VERSION}/bluemap-${BLUEMAP_VERSION}-cli.jar"
+COPY patches/ src/
+RUN mkdir out \
+ && javac -nowarn -cp bluemap-cli.jar -d out $(find src -name "*.java") \
+ && cd out && jar uf ../bluemap-cli.jar $(find . -name "*.class")
 
+# 2) Image finale
+FROM eclipse-temurin:25-jre
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3 python3-pip ca-certificates tzdata \
+ && pip3 install --no-cache-dir --break-system-packages "paramiko>=3.4" "nbtlib==2.0.4" \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=bluemap /build/bluemap-cli.jar /opt/bluemap-cli.jar
 COPY run.py anti-spoil.js /app/
 
 # Utilisateur sans droits particuliers
