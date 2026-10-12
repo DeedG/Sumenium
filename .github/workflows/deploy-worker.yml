@@ -21,6 +21,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
       GUILD_ID: ${{ vars.DISCORD_GUILD_ID || secrets.DISCORD_GUILD_ID }}
+      GITHUB_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -59,7 +60,7 @@ jobs:
       - name: Déployer le Worker
         run: |
           umask 077
-          jq -n --arg s "$DISCORD_CLIENT_SECRET" '{DISCORD_CLIENT_SECRET:$s}' > "$RUNNER_TEMP/secrets.json"
+          jq -n --arg s "$DISCORD_CLIENT_SECRET" --arg g "$GITHUB_DISPATCH_TOKEN" '{DISCORD_CLIENT_SECRET:$s} + (if $g != "" then {GITHUB_DISPATCH_TOKEN:$g} else {} end)' > "$RUNNER_TEMP/secrets.json"
           set +e
           npx wrangler deploy --secrets-file "$RUNNER_TEMP/secrets.json" 2>&1 | tee "$RUNNER_TEMP/deploy.log"
           status=${PIPESTATUS[0]}
@@ -69,4 +70,5 @@ jobs:
             echo "::error::Déploiement refusé par Cloudflare : ${msg:-voir le journal}"
             exit 1
           fi
+          [ -n "$GITHUB_DISPATCH_TOKEN" ] || echo "::warning::Secret GH_DISPATCH_TOKEN absent : la mise à jour du site dépend du cron de GitHub (souvent en retard)."
           echo "::notice::Espace déployé sur https://sumenium.alheon.fr"

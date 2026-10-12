@@ -69,6 +69,14 @@ Mise en route :
 3. *Actions → Déployer l'Espace → Run workflow*. La base, le domaine et le Worker sont créés automatiquement.
 4. Import du Google Sheet : télécharger le sheet en `.xlsx`, puis `python tools/import_sheet.py Saison.xlsx import.json`, et envoyer `import.json` depuis l'onglet *Staff → Importer*. Ce fichier contient des données personnelles : ne pas le commiter.
 
+## Mise à jour fiable toutes les 10 minutes
+
+Le cron de GitHub Actions est souvent retardé de plusieurs heures (limite de GitHub, pas une panne). Le Worker Cloudflare lance donc lui-même la mise à jour toutes les 10 minutes. Il lui faut un jeton GitHub :
+
+1. GitHub → *Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate*.
+2. *Repository access* : seulement `DeedG/Sumenium`. *Permissions → Repository → Actions : Read and write*. Expiration : 1 an.
+3. Copier le jeton dans un secret du dépôt nommé `GH_DISPATCH_TOKEN`, puis relancer *Déployer l'Espace*.
+
 ## Bon à savoir
 
 - Si le SFTP ne répond pas, le site garde les dernières données et affiche un bandeau d'avertissement.

@@ -17,6 +17,18 @@ const MORT = ["", "oui", "sauf1", "sauf1_accord", "accord", "non"];
 const ACTIVITE = ["", "tres", "bcp", "moyen", "peu"];
 
 export default {
+  // Déclencheur fiable (Cloudflare) de la mise à jour du site : le cron de GitHub est souvent retardé de plusieurs heures
+  async scheduled(event, env) {
+    if (!env.GITHUB_DISPATCH_TOKEN) return;
+    const r = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/actions/workflows/update.yml/dispatches`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${env.GITHUB_DISPATCH_TOKEN}`, accept: "application/vnd.github+json",
+        "user-agent": "sumenium-worker", "x-github-api-version": "2022-11-28", "content-type": "application/json" },
+      body: JSON.stringify({ ref: "main" }),
+    });
+    if (!r.ok) console.error("Déclenchement de la mise à jour refusé :", r.status, (await r.text()).slice(0, 200));
+  },
+
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
     if (!url.pathname.startsWith("/api/")) return proxy(req, env, url);
