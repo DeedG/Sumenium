@@ -317,7 +317,7 @@ function projets() {
     <div class="card steps">
       <ol>
         <li><b>Réalise le projet</b> avec ta faction.</li>
-        <li><b>Ouvre un ticket sur Discord</b> en indiquant le projet et l'usine souhaitée.</li>
+        <li><b>Ouvre un ticket sur Discord</b> (DraftBot) en indiquant le projet réalisé et l'usine souhaitée.</li>
         <li><b>Le staff valide</b> : le projet et l'usine apparaissent ici et sur la fiche de ta faction.</li>
       </ol>
       <p class="small muted">Règles : un projet <b>unique</b> ne peut être fait que par une seule faction sur tout le serveur. Les autres : une fois par faction. L'organisation d'un évènement n'a pas de limite.</p>
@@ -339,7 +339,7 @@ function projetStaffForm() {
     <label>Projet<select name="projet_id" id="pfProjet" required><option value="">— choisir —</option>${(D.projets || []).map((pr) => `<option value="${pr.id}">${esc(pr.nom)} (${esc(taillesTxt(pr.tailles))})</option>`).join("")}</select></label>
     <label>Faction<select name="faction_id" required>${facOpts(null, "— choisir —")}</select></label>
     <label>Usine débloquée<select name="usine_id" id="pfUsine"><option value="">Choisis d'abord le projet</option></select></label>
-    <label>Note (n° de ticket…)<input name="note" maxlength="500" placeholder="Ticket #123"></label>
+    <label>Note (facultatif)<input name="note" maxlength="500" placeholder="Ex. : ticket de linetaru du 14/10"></label>
     <div class="wide actions"><button class="btn small">Valider le projet</button><span class="muted small">Les règles (unique, 1 fois par faction) sont vérifiées.</span></div></form>`;
 }
 function projetListEditor() {

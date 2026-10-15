@@ -133,6 +133,8 @@ footer{margin-top:32px;color:var(--muted);font-size:.86rem;max-width:75ch}
 .panel p.sub2{color:var(--muted);margin:0 0 16px}
 /* Classements */
 .boards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:24px}
+.boards-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:760px){.boards-2{grid-template-columns:1fr}}
 .board{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;min-width:0}
 .board h3{font:600 1.15rem/1.2 var(--display);margin:0 0 10px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
 .board h3 small{font:600 .78rem var(--body);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
@@ -284,10 +286,11 @@ h3.sec small{font:600 .8rem var(--body);color:var(--muted);margin-left:8px}
 .tbl.left th,.tbl.left td{text-align:left}.tbl.tirage td{white-space:normal;vertical-align:top}.tbl.tirage tr.mine td{background:var(--sun-soft)}
 .all-usines>summary{font:600 1.05rem var(--display);margin:18px 0 4px}
 /* Espace : sous-onglets comme les onglets du site */
-.subtabs{display:flex;align-items:flex-end;gap:2px;overflow-x:auto;scrollbar-width:thin;border-bottom:2px solid var(--line);margin:4px 0 18px}
+.subtabs{display:flex;flex-wrap:wrap;align-items:flex-end;gap:2px;border-bottom:2px solid var(--line);margin:4px 0 18px}
+@media (max-width:760px){.subtabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.subtabs::-webkit-scrollbar{display:none}}
 .subtabs .grp{font:700 .68rem var(--body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:0 6px 13px 14px;white-space:nowrap}
 .subtabs .grp:first-child{padding-left:0}
-.subtabs a{font:600 .98rem var(--display);color:var(--muted);text-decoration:none;padding:10px 12px;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.subtabs a{font:600 .98rem var(--display);color:var(--muted);text-decoration:none;padding:10px 9px;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
 .subtabs a:hover{color:var(--fg)}
 .subtabs a[aria-current="page"]{color:var(--fg);border-bottom-color:var(--sun)}
 .badge{display:inline-block;min-width:1.4em;padding:1px 6px;border-radius:999px;background:var(--warn);color:#fff;font:700 .72rem var(--body);text-align:center;vertical-align:2px}
@@ -359,7 +362,7 @@ body.busy{cursor:progress}
   <section class="panel" id="p-classement" hidden>
     <h2 class="ttl">Classement</h2>
     <p class="sub2">Les trois compteurs du tableau en jeu (touche Tab), puis le total par faction.</p>
-    <div class="boards" id="tabBoards"><p class="empty">Chargement…</p></div>
+    <div class="boards boards-2" id="tabBoards"><p class="empty">Chargement…</p></div>
     <h2 class="ttl">Factions</h2>
     <div class="tbl-wrap"><table class="tbl" id="teamTable"><thead><tr><th>#</th><th>Faction</th><th>Membres</th><th>Succès</th><th>Premiers succès</th><th>Morts</th><th>Blocs de bordure</th></tr></thead><tbody></tbody></table></div>
   </section>
