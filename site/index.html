@@ -175,6 +175,21 @@ table.tbl{width:100%;border-collapse:collapse;font-size:.95rem}
 .slot .ph{display:grid;place-items:center;width:34px;height:34px;font:600 .62rem/1 "Pixelify Sans",monospace;color:#fff;text-align:center;overflow:hidden;word-break:break-all}
 .slot.glint::after{content:"";position:absolute;inset:3px;background:linear-gradient(115deg,transparent 30%,rgba(190,120,255,.45) 50%,transparent 70%);mix-blend-mode:screen;pointer-events:none}
 .slot .cnt{position:absolute;right:2px;bottom:0;font:600 .9rem/1 "Pixelify Sans",monospace;color:#fff;text-shadow:2px 2px 0 #3f3f3f}
+.who-card{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin-bottom:6px}
+.who-card select{font:inherit;font-size:.95rem;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:7px 10px;min-width:0;max-width:100%}
+.who-sum{color:var(--muted);font-size:.9rem;flex:1 1 260px}
+.who-sum b{color:var(--fg)}
+.chip.border-done{background:var(--bg);color:var(--muted)}
+.tech{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
+.tech summary{color:var(--purple)}
+.tech .adv-id{font:600 .8rem ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);margin:8px 0 2px}
+.tech .cr{margin:6px 0;padding:8px 10px;border-radius:10px;background:var(--bg);border:1px solid var(--line)}
+.tech .cr.y{border-color:var(--grass)}
+.tech .cr b{font-size:.88rem}
+.tech .cr .tg{font-size:.82rem;color:var(--muted);margin-left:6px}
+.tech code,.tech pre{font:.8rem/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
+.tech pre{margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--fg)}
+.tech .note{font-size:.85rem;color:var(--muted);margin:6px 0}
 .slot.hl{outline:3px solid var(--sun);outline-offset:2px}
 .slot.trophy{background:#c9a227;box-shadow:inset 2px 2px 0 #7a5c00,inset -2px -2px 0 #ffe9a0}
 .xpchip{font:600 .85rem "Pixelify Sans",monospace;color:#7efc20;background:#1d2a12;border-radius:6px;padding:4px 8px;text-shadow:1px 1px 0 #2a3f12}
@@ -268,6 +283,40 @@ h3.sec small{font:600 .8rem var(--body);color:var(--muted);margin-left:8px}
 .tbl td.ren{white-space:nowrap}.tbl td.ren select{font:inherit;font-size:.88rem;padding:4px 6px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);max-width:150px}
 .tbl.left th,.tbl.left td{text-align:left}.tbl.tirage td{white-space:normal;vertical-align:top}.tbl.tirage tr.mine td{background:var(--sun-soft)}
 .all-usines>summary{font:600 1.05rem var(--display);margin:18px 0 4px}
+/* Espace : sous-onglets comme les onglets du site */
+.subtabs{display:flex;align-items:flex-end;gap:2px;overflow-x:auto;scrollbar-width:thin;border-bottom:2px solid var(--line);margin:4px 0 18px}
+.subtabs .grp{font:700 .68rem var(--body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:0 6px 13px 14px;white-space:nowrap}
+.subtabs .grp:first-child{padding-left:0}
+.subtabs a{font:600 .98rem var(--display);color:var(--muted);text-decoration:none;padding:10px 12px;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.subtabs a:hover{color:var(--fg)}
+.subtabs a[aria-current="page"]{color:var(--fg);border-bottom-color:var(--sun)}
+.badge{display:inline-block;min-width:1.4em;padding:1px 6px;border-radius:999px;background:var(--warn);color:#fff;font:700 .72rem var(--body);text-align:center;vertical-align:2px}
+.sec-head{margin:0 0 14px}
+.sec-head h3{font:600 1.35rem/1.2 var(--display);margin:0 0 4px}
+.sec-head .sub2{color:var(--muted);margin:0}
+.card.narrow{max-width:640px}
+.fiche-grid{display:grid;grid-template-columns:minmax(220px,280px) 1fr;gap:14px;align-items:start}
+.profile{position:sticky;top:64px}
+.profile-id{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.profile-id b{display:block;font:600 1.2rem var(--display)}
+.profile .status{list-style:none;padding:0;margin:0 0 10px;display:grid;gap:6px}
+.profile-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.fiche-form fieldset{grid-column:1/-1;border:0;border-top:1px solid var(--line);padding:12px 0 0;margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 16px}
+.fiche-form fieldset:first-child{border-top:0;padding-top:0}
+.fiche-form legend{font:600 1rem var(--display);padding:0 0 6px;color:var(--fg)}
+.save-bar{padding-top:10px;border-top:1px solid var(--line)}
+.anchors{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.anchors a{font-size:.88rem;font-weight:700;color:var(--crystal);text-decoration:none;background:var(--crystal-soft);padding:5px 10px;border-radius:999px}
+section.card{scroll-margin-top:70px}
+.steps ol{margin:0 0 10px;padding-left:1.3em;display:grid;gap:4px}
+.mini-stats{margin:10px 0}
+.mini-stats .stat b{font-size:1.35rem}
+p.cmd{margin:4px 0;overflow-x:auto;white-space:nowrap}
+.tbl.projets td{white-space:normal}
+.card.fac.mine{border-color:var(--sun);box-shadow:0 0 0 2px var(--sun-soft)}
+.metier.muted{font-weight:400;font-style:italic}
+body.busy{cursor:progress}
+@media (max-width:760px){.fiche-grid{grid-template-columns:1fr}.profile{position:static}}
 .audit-scroll{max-height:560px;overflow-y:auto;padding-right:6px;margin-bottom:8px}
 .df{display:inline-block;margin-right:10px;overflow-wrap:anywhere}.df i{color:var(--muted);font-style:normal}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:60;background:var(--leaf-ink);color:#fff;font-weight:700;padding:10px 18px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:calc(100vw - 32px)}
@@ -312,7 +361,7 @@ h3.sec small{font:600 .8rem var(--body);color:var(--muted);margin-left:8px}
     <p class="sub2">Les trois compteurs du tableau en jeu (touche Tab), puis le total par faction.</p>
     <div class="boards" id="tabBoards"><p class="empty">Chargement…</p></div>
     <h2 class="ttl">Factions</h2>
-    <div class="tbl-wrap"><table class="tbl" id="teamTable"><thead><tr><th>#</th><th>Faction</th><th>Membres</th><th>Succès</th><th>Premiers succès</th><th>Morts</th></tr></thead><tbody></tbody></table></div>
+    <div class="tbl-wrap"><table class="tbl" id="teamTable"><thead><tr><th>#</th><th>Faction</th><th>Membres</th><th>Succès</th><th>Premiers succès</th><th>Morts</th><th>Blocs de bordure</th></tr></thead><tbody></tbody></table></div>
   </section>
   <section class="panel" id="p-succes" hidden>
   <div class="stats">
@@ -320,6 +369,11 @@ h3.sec small{font:600 .8rem var(--body);color:var(--muted);margin-left:8px}
     <div class="stat leaf"><b id="sDone">–</b><span>Déjà obtenus</span></div>
     <div class="stat sun"><b id="sBlocks">–</b><span>Blocs encore à gagner</span></div>
     <div class="stat"><b id="sMode">–</b><span>Mode de récompense</span></div>
+  </div>
+  <div class="who-card">
+    <label for="who"><b>Progression de</b></label>
+    <select id="who"><option value="">Tout le serveur (meilleur joueur)</option></select>
+    <span class="who-sum" id="whoSum">Choisis ton pseudo pour suivre tes succès, critère par critère.</span>
   </div>
   <div class="bar">
     <input id="q" type="search" placeholder="Chercher un succès, une étape, un objet donné…" aria-label="Recherche">
@@ -332,7 +386,7 @@ h3.sec small{font:600 .8rem var(--body);color:var(--muted);margin-left:8px}
       <option value="blocks">Tri : blocs gagnés</option><option value="loot">Tri : quantité donnée</option><option value="prog">Tri : presque finis</option><option value="recent">Tri : obtenus récemment</option><option value="az">Tri : A → Z</option>
     </select>
     <div class="seg" role="group" aria-label="État">
-      <button id="fRem" aria-pressed="true">Restants</button><button id="fDone" aria-pressed="false">Obtenus</button><button id="fAll" aria-pressed="false">Tous</button>
+      <button id="fRem" aria-pressed="true">À faire</button><button id="fDone" aria-pressed="false">Obtenus</button><button id="fAll" aria-pressed="false">Tous</button>
     </div>
     <select id="loot" aria-label="Récompense"><option value="">Toutes les récompenses</option></select>
     <label class="chk"><input type="checkbox" id="trophies" checked> Trophées</label>
@@ -342,7 +396,7 @@ h3.sec small{font:600 .8rem var(--body);color:var(--muted);margin-left:8px}
   <ul id="list"></ul>
   <button class="more" id="more" hidden>Afficher plus</button>
   <footer>
-    Chaque succès agrandit la bordure une seule fois, pour le premier joueur qui l'obtient. Le gain s'ajoute au diamètre, donc la moitié de chaque côté. La progression affichée est celle du joueur le plus avancé.
+    Chaque succès agrandit la bordure une seule fois, pour le premier joueur qui l'obtient. Le gain s'ajoute au diamètre, donc la moitié de chaque côté. Sans joueur choisi, « À faire » et « Obtenus » parlent du serveur et la progression affichée est celle du joueur le plus avancé ; avec un joueur choisi, ils parlent de ce joueur.
     Les données sont relues sur le serveur toutes les 10 minutes environ, et Minecraft les enregistre toutes les 5 minutes.
   </footer>
   </section>
@@ -393,6 +447,7 @@ const fmt=n=>Number(n||0).toLocaleString("fr-FR",{maximumFractionDigits:2});
 const fmtB=n=>n>=10000?Number(n).toLocaleString("fr-FR",{notation:"compact",maximumFractionDigits:1}):fmt(n);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const crit=c=>c.replace(/^[a-z_]+:/,"").replace(/[_/]/g," ");
+let PROG=null,TECH=null,techLoading=null;
 let CAT=[],DATA={adv:{}},NAMES={},st={q:"",tab:"",tier:"",min:0,sort:"blocks",f:"rem",secret:false,loot:"",trophies:true,limit:150};
 // Objets donnés par un succès, selon les réglages du serveur (récompenses / trophées activés) et le filtre « Trophées »
 const bacOn=k=>{const b=(DATA&&DATA.bac)||{};return b[k]===undefined||b[k]===null||b[k]!==0};
@@ -424,6 +479,10 @@ function fdate(s){
   return isNaN(d)?s:d.toLocaleString("fr-FR",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
 }
 const rec=e=>(DATA.adv&&DATA.adv[e.id])||{b:0};
+// Avancement du joueur choisi (ou null si « tout le serveur »)
+const mine=e=>PROG?{done:PROG.done[e.id]!==undefined,at:PROG.done[e.id],pc:PROG.prog[e.id]||[]}:null;
+const isDone=e=>PROG?mine(e).done:!!rec(e).done;
+const groupsDone=(e,have)=>e.req.filter(g=>g.some(c=>have.has(c))).length;
 const hasData=()=>DATA.adv&&Object.keys(DATA.adv).length>0;
 
 function header(){
@@ -440,14 +499,21 @@ function header(){
   const rem=CAT.filter(e=>!rec(e).done);
   $("sRem").textContent=fmt(rem.length);
   $("sDone").textContent=fmt(CAT.length-rem.length);
-  $("sBlocks").textContent=hasData()?"+"+fmt(rem.filter(e=>e.tier!=="custom").reduce((a,e)=>a+rec(e).b,0)):"–";
+  $("sBlocks").textContent=hasData()?"+"+fmt(Math.round(rem.reduce((a,e)=>a+rec(e).b,0))):"–";
   $("sMode").textContent=hasData()?(DATA.mode==="tiers"?"Paliers":"Individuel")+" ×"+fmt(DATA.multiplier??1):"–";
 }
 
 function item(e){
-  const r=rec(e),n=e.req.length;
+  const r=rec(e),n=e.req.length,m=mine(e);
   let extra="";
-  if(r.done){
+  if(m){
+    const have=new Set(m.pc),k=groupsDone(e,have);
+    if(m.done)extra=`<div class="prog"><span class="chip ok">✓ Obtenu par ${esc(PROG.name)}</span>${m.at?` · ${fdate(m.at)}`:""}</div>`;
+    else if(n>1)extra=`<div class="prog"><i><s style="width:${Math.round(k/n*100)}%"></s></i><span><b>${k}/${n}</b> pour ${esc(PROG.name)}</span></div>`;
+    else extra=`<div class="prog">Pas encore obtenu par ${esc(PROG.name)}</div>`;
+    extra+=r.done?`<div class="prog small">Bordure déjà agrandie${r.by?` par <b>${esc(r.by)}</b>`:""} : plus de blocs à gagner avec celui-ci.</div>`
+      :(r.p&&r.pw!==PROG.name?`<div class="prog small">Le plus avancé : ${esc(r.pw)} (${r.p}/${n})</div>`:"");
+  }else if(r.done){
     extra=`<div class="prog">Obtenu${r.by?` par <b>${esc(r.by)}</b>${r.team?` (${esc(r.team)})`:""}`:""}${r.at?` · ${fdate(r.at)}`:""}</div>`;
   }else if(r.p){
     extra=`<div class="prog"><i><s style="width:${Math.round(r.p/n*100)}%"></s></i><span><b>${r.p}/${n}</b> · ${esc(r.pw)}${r.team?` (${esc(r.team)})`:""}</span></div>`;
@@ -455,13 +521,14 @@ function item(e){
   const parts=[];
   if(e.parent)parts.push(`<div>Se débloque après : <b>${esc(e.parent)}</b></div>`);
   if(n>1){
-    const have=new Set(r.pc||[]);
+    const have=new Set(m?m.pc:(r.pc||[]));
     parts.push(`<div class="crit">${e.req.map(g=>`<span class="${g.some(c=>have.has(c))?"y":""}">${esc(g.map(crit).join(" ou "))}</span>`).join("")}</div>`);
   }
   const loot=lootHtml(e);
-  const det=parts.length?`<details><summary>${n>1?`Comment le faire · ${n} étapes`:"Détails"}</summary>${parts.join("")}</details>`:"";
+  parts.push(`<details class="tech" data-id="${esc(e.id)}"><summary>Détection technique (pour comprendre pourquoi il ne se valide pas)</summary><p class="empty">Chargement…</p></details>`);
+  const det=`<details><summary>${n>1?`Comment le faire · ${n} étapes`:"Comment le faire"}</summary>${parts.join("")}</details>`;
   const pts=hasData()?`+${fmtB(r.b)}`:"?";
-  return `<li class="adv ${r.done?"done":""}"><div class="row"><span class="pts">${pts}</span><div><div class="t">${esc(e.title)}</div><div class="d">${esc(String(e.desc).replace(/\\n/g," "))}</div>${extra}${loot}${det}</div><div class="meta"><span class="chip">${esc(e.tab)}</span><span class="chip ${esc(e.tier)}">${TIERS[e.tier]||esc(e.tier)}</span>${r.done?'<span class="chip ok">Obtenu</span>':""}</div></div></li>`;
+  return `<li class="adv ${isDone(e)?"done":""}"><div class="row"><span class="pts">${pts}</span><div><div class="t">${esc(e.title)}</div><div class="d">${esc(String(e.desc).replace(/\\n/g," "))}</div>${extra}${loot}${det}</div><div class="meta"><span class="chip">${esc(e.tab)}</span><span class="chip ${esc(e.tier)}">${TIERS[e.tier]||esc(e.tier)}</span>${m?(m.done?'<span class="chip ok">Obtenu</span>':"")+(r.done?'<span class="chip border-done">Bordure prise</span>':""):(r.done?'<span class="chip ok">Obtenu</span>':"")}</div></div></li>`;
 }
 
 function render(){
@@ -469,9 +536,10 @@ function render(){
   const q=st.q.toLowerCase();
   let rows=CAT.filter(e=>{
     const r=rec(e);
-    if(st.f==="rem"&&r.done)return false;
-    if(st.f==="done"&&!r.done)return false;
-    if(!st.secret&&e.hidden&&!r.done)return false;
+    const d=isDone(e);
+    if(st.f==="rem"&&d)return false;
+    if(st.f==="done"&&!d)return false;
+    if(!st.secret&&e.hidden&&!d)return false;
     if(st.tab&&e.tab!==st.tab)return false;
     if(st.tier&&e.tier!==st.tier)return false;
     if(r.b<st.min)return false;
@@ -486,18 +554,97 @@ function render(){
     return true;
   });
   const by={
-    blocks:(a,b)=>(a.tier==="custom")-(b.tier==="custom")||rec(b).b-rec(a).b,
-    prog:(a,b)=>((rec(b).p||0)/Math.max(b.req.length,1))-((rec(a).p||0)/Math.max(a.req.length,1))||rec(b).b-rec(a).b,
-    recent:(a,b)=>String(rec(b).at||"").localeCompare(String(rec(a).at||"")),
+    blocks:(a,b)=>rec(b).b-rec(a).b,
+    prog:(a,b)=>progOf(b)-progOf(a)||rec(b).b-rec(a).b,
+    recent:(a,b)=>String(PROG?(mine(b).at||""):(rec(b).at||"")).localeCompare(String(PROG?(mine(a).at||""):(rec(a).at||""))),
     loot:(a,b)=>{const id=st.loot.startsWith("i:")?st.loot.slice(2):null;return lootQty(b,id)-lootQty(a,id)},
     az:()=>0
   }[st.sort];
   rows.sort((a,b)=>by(a,b)||a.title.localeCompare(b.title));
   $("count").textContent=`${fmt(rows.length)} succès`;
+  renderWhoSum();
   $("list").innerHTML=rows.slice(0,st.limit).map(item).join("")||'<li class="adv"><div class="d">Aucun succès ne correspond à ces filtres.</div></li>';
   $("more").hidden=rows.length<=st.limit;
   $("more").textContent=`Afficher plus (${fmt(rows.length-st.limit)} restants)`;
 }
+
+const progOf=e=>{const n=Math.max(e.req.length,1);if(PROG){const m=mine(e);return m.done?0:groupsDone(e,new Set(m.pc))/n}return (rec(e).p||0)/n};
+function renderWhoSum(){
+  const el=$("whoSum");
+  if(!PROG){el.innerHTML="Choisis ton pseudo pour suivre tes succès, critère par critère.";return}
+  const done=CAT.filter(e=>mine(e).done).length,started=CAT.filter(e=>!mine(e).done&&mine(e).pc.length).length;
+  const firsts=CAT.filter(e=>rec(e).by===PROG.name),blocks=firsts.reduce((a,e)=>a+rec(e).b,0);
+  el.innerHTML=`<b>${fmt(done)}</b> obtenus · <b>${fmt(started)}</b> commencés · <b>${fmt(firsts.length)}</b> premiers du serveur (+${fmt(Math.round(blocks))} blocs de bordure)`;
+}
+async function setWho(name){
+  try{localStorage.setItem("sumenium-who",name)}catch(e){}
+  if(!name){PROG=null;render();return}
+  try{const r=await fetch(`progress/${encodeURIComponent(name)}.json?t=${Date.now()}`);PROG=r.ok?await r.json():null}catch(e){PROG=null}
+  if(!PROG){$("who").value="";$("whoSum").textContent="Pas encore de données pour ce joueur (elles arrivent à la prochaine mise à jour).";return}
+  render();
+}
+async function setupWho(){
+  let list=[];
+  try{const r=await fetch("progress/index.json?t="+Date.now());if(r.ok)list=await r.json()}catch(e){}
+  const sel=$("who");
+  sel.innerHTML='<option value="">Tout le serveur (meilleur joueur)</option>'+list.filter(p=>okName(p.name)).map(p=>`<option value="${esc(p.name)}">${esc(p.name)}${p.team?` · ${esc(p.team)}`:""} (${fmt(p.done)})</option>`).join("");
+  let want="";try{want=localStorage.getItem("sumenium-who")||""}catch(e){}
+  if(!want&&location.hostname==="sumenium.alheon.fr"){
+    try{const me=await (await fetch("/api/me",{credentials:"same-origin"})).json();want=(me.player&&me.player.mc_name)||""}catch(e){}
+  }
+  if(want&&list.some(p=>p.name.toLowerCase()===want.toLowerCase())){sel.value=list.find(p=>p.name.toLowerCase()===want.toLowerCase()).name;await setWho(sel.value)}
+}
+$("who").onchange=e=>setWho(e.target.value);
+
+// Détection technique (site/tech.json, chargé au premier besoin)
+const TRIG={inventory_changed:"Avoir ces objets dans l'inventaire (vérifié quand l'inventaire change)",location:"Se trouver à cet endroit (vérifié chaque seconde)",
+  player_killed_entity:"Tuer cette créature",entity_killed_player:"Être tué par",item_used_on_block:"Utiliser un objet sur un bloc (clic droit)",
+  villager_trade:"Faire un échange avec un villageois ou un marchand",player_interacted_with_entity:"Interagir (clic droit) avec une entité",placed_block:"Poser ce bloc",
+  impossible:"Aucun déclencheur du jeu : c'est une fonction du datapack qui accorde le succès (voir plus bas)",recipe_crafted:"Fabriquer cette recette",
+  consume_item:"Manger ou boire cet objet",thrown_item_picked_up_by_entity:"Un objet lancé est ramassé par une entité",using_item:"Utiliser un objet (en le maintenant)",
+  tick:"Vérifié à chaque tick",changed_dimension:"Changer de dimension",enter_block:"Entrer dans ce bloc",bred_animals:"Faire se reproduire des animaux",
+  tame_animal:"Apprivoiser un animal",effects_changed:"Avoir ces effets",enchanted_item:"Enchanter un objet",brewed_potion:"Préparer une potion",
+  filled_bucket:"Remplir un seau",fishing_rod_hooked:"Pêcher / accrocher avec la canne",summoned_entity:"Faire apparaître une entité (golem, wither…)",
+  slept_in_bed:"Dormir dans un lit",used_totem:"Utiliser un totem d'immortalité",levitation:"Léviter",construct_beacon:"Construire une balise",
+  cured_zombie_villager:"Soigner un zombie villageois",channeled_lightning:"Canaliser la foudre",shot_crossbow:"Tirer à l'arbalète",target_hit:"Toucher une cible",
+  started_riding:"Monter sur une entité",fall_from_height:"Tomber d'une hauteur",item_durability_changed:"Durabilité d'un objet modifiée",
+  player_hurt_entity:"Blesser une entité",entity_hurt_player:"Être blessé par une entité",recipe_unlocked:"Débloquer une recette",
+  nether_travel:"Voyager par le Nether",hero_of_the_village:"Gagner un raid",voluntary_exile:"Tuer un capitaine de raid",lightning_strike:"Foudre à proximité",
+  slide_down_block:"Glisser le long d'un bloc",used_ender_eye:"Lancer un œil de l'Ender",avoid_vibration:"Éviter une vibration (accroupi)",
+  kill_mob_near_sculk_catalyst:"Tuer près d'un catalyseur de sculk",allay_drop_item_on_block:"Un allay dépose un objet sur un bloc",
+  crafter_recipe_crafted:"Fabriquer avec un crafteur",any_block_use:"Utiliser un bloc",default_block_use:"Utiliser un bloc",fall_after_explosion:"Être projeté par une explosion",
+  ride_entity_in_lava:"Chevaucher dans la lave",bee_nest_destroyed:"Casser une ruche ou un nid",killed_by_arrow:"Tuer avec des flèches",
+  killed_by_crossbow:"Tuer à l'arbalète",player_generates_container_loot:"Ouvrir un coffre généré (butin)",spear_mobs:"Toucher avec une lance"};
+async function loadTech(){
+  if(TECH)return TECH;
+  techLoading=techLoading||fetch("tech.json").then(r=>r.ok?r.json():{}).catch(()=>({}));
+  TECH=await techLoading;return TECH;
+}
+function techHtml(id){
+  const advs=TECH[id];
+  if(!advs)return '<p class="empty">Pas de détail technique pour ce succès.</p>';
+  const e=CAT.find(x=>x.id===id),m=e&&mine(e),best=e&&rec(e);
+  const have=new Set(m?m.pc:((best&&best.pc)||[]));
+  let h=`<p class="note">Ce que vérifie réellement le jeu (datapack BACAP). Le serveur enregistre la progression toutes les 5 min et le site la relit toutes les 10 min.</p>`;
+  const counts=advs.some(a=>a.crit.some(c=>c.c.some(l=>/\.count = /.test(l))));
+  if(counts)h+=`<p class="note"><code>count = N</code> : il faut une <b>pile</b> de N dans un seul emplacement d'inventaire (pas le total miné). <code>count.min = N</code> : au moins N.</p>`;
+  advs.forEach(a=>{
+    h+=`<div class="adv-id">${esc(a.id)}</div>`;
+    if(a.req&&a.req.length===1)h+=`<p class="note"><b>Un seul</b> de ces critères suffit.</p>`;
+    else if(a.req)h+=`<p class="note">Il faut <b>chaque</b> groupe ; dans un groupe, <b>un seul</b> critère suffit : ${a.req.map(g=>"["+g.map(esc).join(" ou ")+"]").join(" + ")}</p>`;
+    else if(a.crit.length>1)h+=`<p class="note">Il faut <b>tous</b> les critères ci-dessous.</p>`;
+    a.crit.forEach(c=>{
+      const lines=c.c.filter(l=>l!==" = {}");
+      h+=`<div class="cr${have.has(c.n)?" y":""}"><b>${have.has(c.n)?"✓ ":""}${esc(c.n)}</b><span class="tg">${esc(c.t)} · ${esc(TRIG[c.t]||"déclencheur du jeu")}</span>${lines.length?`<pre>${esc(lines.join("\n"))}</pre>`:""}</div>`;
+    });
+    if(a.grant&&a.crit.some(c=>c.t==="impossible"))h+=`<p class="note">Accordé par ces lignes de fonctions du datapack :</p>`+a.grant.map(g=>`<div class="cr"><b>${esc(g.f)}</b><pre>${esc(g.l)}</pre></div>`).join("");
+  });
+  return h;
+}
+document.addEventListener("toggle",async ev=>{
+  const d=ev.target;if(!(d instanceof HTMLDetailsElement)||!d.classList.contains("tech")||!d.open||d.dataset.ok)return;
+  await loadTech();d.dataset.ok="1";d.innerHTML=d.querySelector("summary").outerHTML+techHtml(d.dataset.id);
+},true);
 
 function set(k,v){st[k]=v;st.limit=150;render()}
 function seg(ids,vals){ids.forEach((id,i)=>$(id).onclick=()=>{ids.forEach(j=>$(j).setAttribute("aria-pressed",j===id));set("f",vals[i])})}
@@ -528,7 +675,7 @@ function setupMap(){
 async function loadData(){
   try{
     const r=await fetch("data.json?t="+Date.now());
-    if(r.ok){const d=await r.json();DATA=Object.assign({adv:{}},d);}
+    if(r.ok){const d=await r.json();DATA=Object.assign({adv:{}},d);if(STATS)renderClassement();}
     else DATA={adv:{},error:"données introuvables"};
   }catch(e){DATA={adv:{},error:"données illisibles"};}
   render();
@@ -592,11 +739,19 @@ function rankList(rows,fmtv,limit){
   return '<div class="rank-scroll"><ol class="rank">'+rows.map((r,i)=>{const t=teamOf(r[0]);
     return `<li><span class="pos">${i+1}</span><span class="who">${esc(r[0])}${t?`<small>${esc(t)}</small>`:""}</span><span class="val">${fmtv(r[1])}</span><span class="bar2"><s style="width:${Math.max(2,Math.round(Math.abs(r[1])/max*100))}%"></s></span></li>`}).join("")+'</ol></div>';
 }
+// Blocs de bordure gagnés : chaque succès compte pour le premier joueur qui l'a obtenu (et sa faction)
+function borderBlocks(){
+  const p={},t={};
+  Object.values(DATA.adv||{}).forEach(r=>{if(!r.done||!r.by||!r.b)return;p[r.by]=(p[r.by]||0)+r.b;if(r.team)t[r.team]=(t[r.team]||0)+r.b});
+  return {players:Object.entries(p).sort((a,b)=>b[1]-a[1]),teams:t};
+}
 function renderClassement(){
   if(!STATS){$("tabBoards").innerHTML='<p class="empty">Les classements arrivent à la prochaine mise à jour du serveur.</p>';return}
-  $("tabBoards").innerHTML=STATS.tab.map(t=>`<div class="board"><h3>${esc(t.label)}<small>${fmt(t.rows.filter(r=>okName(r[0])).length)} joueurs</small></h3>${rankList(t.rows,fmt)}</div>`).join("");
-  const rows=(STATS.teams||[]).map((t,i)=>`<tr><td>${i+1}</td><td><b>${esc(t.team)}</b></td><td>${fmt(t.members)}</td><td>${fmt(t.bac_advancements)}</td><td>${fmt(t.bac_advfirst)}</td><td>${fmt(t.Morts)}</td></tr>`).join("");
-  document.querySelector("#teamTable tbody").innerHTML=rows||'<tr><td colspan="6" class="empty">Aucune faction trouvée.</td></tr>';
+  const bb=borderBlocks();
+  $("tabBoards").innerHTML=STATS.tab.map(t=>`<div class="board"><h3>${esc(t.label)}<small>${fmt(t.rows.filter(r=>okName(r[0])).length)} joueurs</small></h3>${rankList(t.rows,fmt)}</div>`).join("")+
+    `<div class="board"><h3>Blocs ajoutés à la bordure<small>${fmt(bb.players.length)} joueurs</small></h3>${rankList(bb.players,v=>"+"+fmt(Math.round(v)))}<p class="empty small">Somme des gains des succès dont le joueur a été le premier, au multiplicateur actuel (×${fmt(DATA.multiplier??1)}).</p></div>`;
+  const rows=(STATS.teams||[]).map((t,i)=>`<tr><td>${i+1}</td><td><b>${esc(t.team)}</b></td><td>${fmt(t.members)}</td><td>${fmt(t.bac_advancements)}</td><td>${fmt(t.bac_advfirst)}</td><td>${fmt(t.Morts)}</td><td>+${fmt(Math.round(bb.teams[t.team]||0))}</td></tr>`).join("");
+  document.querySelector("#teamTable tbody").innerHTML=rows||'<tr><td colspan="7" class="empty">Aucune faction trouvée.</td></tr>';
 }
 function fmtUnit(u){
   if(u==="time")return v=>{const h=v/72000;return h>=1?fmt(Math.round(h*10)/10)+" h":fmt(Math.round(v/1200))+" min"};
@@ -668,6 +823,7 @@ window.addEventListener("hashchange",()=>{const t=location.hash.slice(1).split(/
   [...new Set(CAT.map(e=>e.tab))].sort().forEach(t=>$("tab").add(new Option(t,t)));
   Object.entries(TIERS).forEach(([k,v])=>{if(CAT.some(e=>e.tier===k))$("tier").add(new Option(v,k))});
   lootOptions();
+  setupWho();
   await Promise.all([loadData(),loadStats()]);
   lootOptions();
   setInterval(()=>{loadData();loadStats()},120000);

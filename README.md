@@ -81,4 +81,4 @@ Le cron de GitHub Actions est souvent retardé de plusieurs heures (limite de Gi
 
 - Si le SFTP ne répond pas, le site garde les dernières données et affiche un bandeau d'avertissement.
 - GitHub met en pause les tâches planifiées d'un dépôt public sans activité pendant 60 jours. Si le site ne se met plus à jour, relancer le workflow depuis l'onglet *Actions*.
-- Le catalogue des succès (`site/catalog.json`) est tiré des datapacks BACAP 1.21.1, BACAP Enhanced Discoveries 2.9.4 et WB-Addon. Après une mise à jour d'un de ces datapacks, le regénérer avec `tools/build_catalog.py`.
+- Le catalogue des succès (`site/catalog.json`) est tiré des datapacks BACAP 1.21.1, BACAP Enhanced Discoveries 2.9.4 et WB-Addon. Après une mise à jour d'un de ces datapacks, le regénérer avec `tools/build_catalog.py`, puis `tools/build_tech.py` (détection technique de chaque succès, `site/tech.json`).

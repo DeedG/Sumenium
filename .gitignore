@@ -8,3 +8,4 @@ work/
 # exports du Google Sheet (données personnelles)
 *.xlsx
 import*.json
+site/progress/

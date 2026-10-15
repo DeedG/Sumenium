@@ -12,7 +12,8 @@
  */
 
 const TEXT_MAX = 2000;
-const SESSION_HOURS = 12;
+const SESSION_DAYS = 30;        // durée de la connexion
+const RECHECK_HOURS = 6;        // revérification des rôles Discord, sans redemander la connexion
 const MORT = ["", "oui", "sauf1", "sauf1_accord", "accord", "non"];
 const ACTIVITE = ["", "tres", "bcp", "moyen", "peu"];
 
@@ -37,12 +38,15 @@ export default {
       return json({ error: "L'espace n'est pas encore configuré." }, 503);
     }
     try {
-      return await api(req, env, url);
+      const res = await api(req, env, url);
+      if (req.__cookie) res.headers.append("set-cookie", req.__cookie);
+      return res;
     } catch (e) {
-      if (e instanceof HttpError) return json({ error: e.message }, e.status);
-      if (/UNIQUE constraint failed/.test(String(e && e.message))) return json({ error: "Ce nom est déjà utilisé." }, 409);
+      const extra = req.__cookie ? { "set-cookie": req.__cookie } : {};
+      if (e instanceof HttpError) return json({ error: e.message }, e.status, extra);
+      if (/UNIQUE constraint failed/.test(String(e && e.message))) return json({ error: "Ce nom est déjà utilisé." }, 409, extra);
       console.error(e);
-      return json({ error: "Erreur interne du serveur." }, 500);
+      return json({ error: "Erreur interne du serveur." }, 500, extra);
     }
   },
 };
@@ -145,8 +149,42 @@ function levelFromRoles(env, roles) {
   return null;
 }
 
+/** Session : cookie signé valable 30 jours. Toutes les 6 h, les rôles sont revérifiés auprès de Discord
+ *  avec le jeton de renouvellement (sans rien demander au joueur). Quitter le Discord ou perdre ses rôles coupe l'accès. */
 async function session(req, env) {
-  return verify(env, cookies(req).sid);
+  if (req.__s !== undefined) return req.__s;
+  let s = await verify(env, cookies(req).sid);
+  if (s && !(s.chk > now() - RECHECK_HOURS * 3600)) s = await recheck(req, env, s);
+  req.__s = s;
+  return s;
+}
+async function recheck(req, env, s) {
+  const u = await env.DB.prepare("SELECT refresh_token FROM users WHERE discord_id = ?").bind(s.id).first();
+  if (!u || !u.refresh_token) return dropSession(req);
+  let tok;
+  try {
+    tok = await fetch("https://discord.com/api/oauth2/token", {
+      method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID, client_secret: env.DISCORD_CLIENT_SECRET,
+        grant_type: "refresh_token", refresh_token: u.refresh_token }),
+    });
+  } catch { return s; } // Discord injoignable : on garde la session, on réessaiera
+  if (tok.status >= 500 || tok.status === 429) return s;
+  if (!tok.ok) return dropSession(req, s.id); // jeton révoqué (application retirée du compte)
+  const t = await tok.json();
+  const mres = await fetch(`https://discord.com/api/users/@me/guilds/${env.GUILD_ID}/member`, { headers: { authorization: `Bearer ${t.access_token}` } });
+  if (mres.status >= 500 || mres.status === 429) return s;
+  const level = mres.ok ? levelFromRoles(env, (await mres.json()).roles || []) : null;
+  if (!level) return dropSession(req, s.id);
+  await env.DB.prepare("UPDATE users SET refresh_token = ?, level = ?, last_login = ? WHERE discord_id = ?")
+    .bind(t.refresh_token || u.refresh_token, level, now(), s.id).run();
+  const fresh = { ...s, level, chk: now(), exp: now() + SESSION_DAYS * 86400 };
+  req.__cookie = setCookie("sid", await sign(env, fresh), SESSION_DAYS * 86400);
+  return fresh;
+}
+async function dropSession(req, id) {
+  req.__cookie = setCookie("sid", "", 0);
+  return null;
 }
 async function need(req, env, level) {
   const s = await session(req, env);
@@ -174,6 +212,8 @@ const TABLES = {
   bases: ["faction_id", "type", "nom", "x", "y", "z", "deleted"],
   candidats: ["player_id", "resume", "lien", "affiche", "tour2", "deleted"],
   prix: ["minerai", "roche", "prix", "ordre", "deleted"],
+  projets: ["nom", "tailles", "unique_srv", "illimite", "ordre", "deleted"],
+  projet_faction: ["projet_id", "faction_id", "usine_id", "note", "ts", "deleted"],
 };
 
 async function row(env, table, id) {
@@ -187,7 +227,7 @@ async function update(env, s, table, id, fields, action = "update") {
   const cols = Object.keys(fields).filter((k) => TABLES[table].includes(k));
   if (!cols.length) return before;
   const sets = cols.map((c) => `${c} = ?`).join(", ");
-  const hasUpdated = ["players", "factions", "bases", "candidats"].includes(table);
+  const hasUpdated = ["players", "factions", "bases", "candidats", "projet_faction"].includes(table);
   await env.DB.prepare(`UPDATE ${table} SET ${sets}${hasUpdated ? ", updated = ?" : ""} WHERE id = ?`)
     .bind(...cols.map((c) => fields[c]), ...(hasUpdated ? [now()] : []), id).run();
   const after = await row(env, table, id);
@@ -217,6 +257,8 @@ async function api(req, env, url) {
   if (p === "/api/auth/login") return login(req, env, url);
   if (p === "/api/auth/callback") return callback(req, env, url);
   if (p === "/api/auth/logout") {
+    const s = await verify(env, cookies(req).sid);
+    if (s) await env.DB.prepare("UPDATE users SET refresh_token = NULL WHERE discord_id = ?").bind(s.id).run();
     return new Response(null, { status: 302, headers: { location: "/#espace", "set-cookie": setCookie("sid", "", 0) } });
   }
 
@@ -370,6 +412,31 @@ async function api(req, env, url) {
     return json({ ok: true });
   }
 
+  /* ---- projets communautaires (validés par le staff après un ticket Discord) ---- */
+  if (p === "/api/projets/realises" && m === "POST") {
+    const s = await need(req, env, "staff");
+    return json(await addProjet(env, s, body));
+  }
+  if ((mm = p.match(/^\/api\/projets\/realises\/(\d+)$/)) && (m === "PUT" || m === "DELETE")) {
+    const s = await need(req, env, "staff");
+    const pf = await row(env, "projet_faction", Number(mm[1]));
+    if (!pf || pf.deleted) fail(404, "Projet introuvable.");
+    if (m === "DELETE") await update(env, s, "projet_faction", pf.id, { deleted: 1 }, "delete");
+    else await update(env, s, "projet_faction", pf.id, { note: str(body.note, 500) });
+    await syncProjetUsine(env, pf.id);
+    return json({ ok: true });
+  }
+  if (p === "/api/projets" && m === "POST") {
+    const s = await need(req, env, "staff");
+    return json({ id: await insert(env, s, "projets", projetFields(body, true)) });
+  }
+  if ((mm = p.match(/^\/api\/projets\/(\d+)$/)) && (m === "PUT" || m === "DELETE")) {
+    const s = await need(req, env, "staff");
+    const id = Number(mm[1]);
+    if (m === "DELETE") { await update(env, s, "projets", id, { deleted: 1 }, "delete"); return json({ ok: true }); }
+    return json({ projet: await update(env, s, "projets", id, projetFields(body, false)) });
+  }
+
   /* ---- staff ---- */
   if ((mm = p.match(/^\/api\/admin\/players\/(\d+)$/)) && (m === "PUT" || m === "DELETE")) {
     const s = await need(req, env, "staff");
@@ -379,6 +446,7 @@ async function api(req, env, url) {
     if ("mc_name" in body) {
       const n = str(body.mc_name, 16);
       if (!MC_NAME.test(n)) fail(400, "Pseudo Minecraft invalide.");
+      await freeName(env, n, id);
       f.mc_name = n;
     }
     if ("faction_id" in body) f.faction_id = int(body.faction_id);
@@ -390,6 +458,7 @@ async function api(req, env, url) {
     const s = await need(req, env, "staff");
     const n = str(body.mc_name, 16);
     if (!MC_NAME.test(n)) fail(400, "Pseudo Minecraft invalide.");
+    await freeName(env, n, 0);
     return json({ id: await insert(env, s, "players", { mc_name: n }) });
   }
   if (p === "/api/admin/settings" && m === "PUT") {
@@ -475,6 +544,67 @@ async function canEditFaction(env, s, fid) {
   return f;
 }
 
+/** Libère un pseudo occupé par une fiche SUPPRIMÉE (elle garde l'historique sous un autre nom).
+ *  Une fiche active avec ce pseudo bloque le renommage. */
+async function freeName(env, name, keepId) {
+  const other = await env.DB.prepare("SELECT id, mc_name, deleted FROM players WHERE mc_name = ? AND id != ?").bind(name, keepId).first();
+  if (!other) return;
+  if (!other.deleted) fail(409, `Le pseudo ${other.mc_name} est déjà celui d'une autre fiche. Supprime-la ou renomme-la d'abord.`);
+  await env.DB.prepare("UPDATE players SET mc_name = ?, discord_id = NULL WHERE id = ?").bind(`${other.mc_name}~${other.id}`, other.id).run();
+}
+
+const TAILLES_USINE = ["grosse", "moyenne", "petite"];
+function projetFields(b, creating) {
+  const f = {};
+  if ("nom" in b || creating) { f.nom = str(b.nom, 80); if (!f.nom) fail(400, "Donne un nom au projet."); }
+  if ("tailles" in b || creating) {
+    const t = String(b.tailles || "petite").split(",").map((x) => x.trim()).filter((x) => TAILLES_USINE.includes(x));
+    if (!t.length) fail(400, "Choisis au moins une taille d'usine.");
+    f.tailles = t.join(",");
+  }
+  if ("unique_srv" in b) f.unique_srv = b.unique_srv ? 1 : 0;
+  if ("illimite" in b) f.illimite = b.illimite ? 1 : 0;
+  if ("ordre" in b) f.ordre = int(b.ordre) || 0;
+  return f;
+}
+
+/** Valide un projet communautaire pour une faction, avec l'usine qu'il débloque.
+ *  Règles : projet « unique » = une seule fois sur le serveur ; sinon une fois par faction, sauf les projets illimités (évènements). */
+async function addProjet(env, s, b) {
+  const pr = await row(env, "projets", int(b.projet_id));
+  if (!pr || pr.deleted) fail(400, "Choisis un projet.");
+  const fac = await row(env, "factions", int(b.faction_id));
+  if (!fac || fac.deleted) fail(400, "Choisis une faction.");
+  if (pr.unique_srv) {
+    const ex = await env.DB.prepare("SELECT f.name FROM projet_faction pf JOIN factions f ON f.id = pf.faction_id WHERE pf.projet_id = ? AND pf.deleted = 0").bind(pr.id).first();
+    if (ex) fail(400, `« ${pr.nom} » est un projet unique, déjà réalisé par ${ex.name}.`);
+  } else if (!pr.illimite) {
+    const ex = await env.DB.prepare("SELECT 1 FROM projet_faction WHERE projet_id = ? AND faction_id = ? AND deleted = 0").bind(pr.id, fac.id).first();
+    if (ex) fail(400, `${fac.name} a déjà réalisé « ${pr.nom} » (une seule fois par faction).`);
+  }
+  let usineId = null;
+  if (b.usine_id) {
+    const u = await env.DB.prepare("SELECT * FROM usines WHERE id = ?").bind(int(b.usine_id)).first();
+    if (!u) fail(400, "Usine introuvable.");
+    if (!pr.tailles.split(",").includes(u.taille)) fail(400, `Ce projet débloque une usine ${pr.tailles.replace(",", " ou ")}, pas une ${u.taille}.`);
+    const has = await env.DB.prepare("SELECT 1 FROM usine_choix WHERE faction_id = ? AND usine_id = ?").bind(fac.id, u.id).first();
+    if (has) fail(400, `${fac.name} a déjà « ${u.nom} ».`);
+    usineId = u.id;
+  }
+  const id = await insert(env, s, "projet_faction", { projet_id: pr.id, faction_id: fac.id, usine_id: usineId, note: str(b.note, 500), ts: now(), deleted: 0 });
+  await syncProjetUsine(env, id);
+  return { id };
+}
+
+/** Garde l'usine d'un projet en phase avec le projet (ajoutée s'il est actif, retirée s'il est supprimé). */
+async function syncProjetUsine(env, pfId) {
+  const pf = await row(env, "projet_faction", pfId);
+  await env.DB.prepare("DELETE FROM usine_choix WHERE projet_faction_id = ?").bind(pfId).run();
+  if (pf && !pf.deleted && pf.usine_id) {
+    await env.DB.prepare("INSERT OR IGNORE INTO usine_choix (faction_id, usine_id, projet_faction_id) VALUES (?, ?, ?)").bind(pf.faction_id, pf.usine_id, pfId).run();
+  }
+}
+
 async function claim(env, s, name) {
   if (!MC_NAME.test(name)) fail(400, "Pseudo Minecraft invalide (3 à 16 lettres, chiffres ou _).");
   const already = await env.DB.prepare("SELECT * FROM players WHERE discord_id = ? AND deleted = 0").bind(s.id).first();
@@ -499,13 +629,14 @@ async function toggleUsine(env, s, fid, uid, on) {
   if (s.level !== "staff" && (await setting(env, "usines_ouvertes")) !== "1") fail(400, "Les choix d'usines sont fermés pour le moment.");
   const u = uid ? await env.DB.prepare("SELECT * FROM usines WHERE id = ?").bind(uid).first() : null;
   if (!u) fail(404, "Usine introuvable.");
-  const has = await env.DB.prepare("SELECT 1 FROM usine_choix WHERE faction_id = ? AND usine_id = ?").bind(fid, uid).first();
+  const has = await env.DB.prepare("SELECT projet_faction_id FROM usine_choix WHERE faction_id = ? AND usine_id = ?").bind(fid, uid).first();
+  if (has && has.projet_faction_id && !on) fail(400, "Cette usine a été débloquée par un projet communautaire : retire le projet dans l'onglet Projets.");
   if (on && !has) {
     if (s.level !== "staff") {
       const max = { grosse: 3, moyenne: 4, petite: 5 }[u.taille];
       const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM usine_choix WHERE usine_id = ?").bind(uid).first();
       if (n.n >= max) fail(400, `Plus de place pour « ${u.nom} » (${max} maximum sur le serveur).`);
-      const mine = (await env.DB.prepare("SELECT u.taille FROM usine_choix c JOIN usines u ON u.id = c.usine_id WHERE c.faction_id = ?").bind(fid).all()).results;
+      const mine = (await env.DB.prepare("SELECT u.taille FROM usine_choix c JOIN usines u ON u.id = c.usine_id WHERE c.faction_id = ? AND c.projet_faction_id IS NULL").bind(fid).all()).results;
       const count = (t) => mine.filter((x) => x.taille === t).length + (u.taille === t ? 1 : 0);
       const total = mine.length + 1;
       const maxTotal = Number(await setting(env, "usines_max")) || 3;
@@ -539,7 +670,11 @@ async function revert(env, s, auditId) {
   } else if (TABLES[a.entity]) {
     const id = Number(a.entity_id);
     if (a.action === "create") await update(env, s, a.entity, id, { deleted: 1 }, "revert");
-    else if (before) await update(env, s, a.entity, id, before, "revert");
+    else if (before) {
+      if (a.entity === "players" && before.mc_name) await freeName(env, before.mc_name, id);
+      await update(env, s, a.entity, id, before, "revert");
+    }
+    if (a.entity === "projet_faction") await syncProjetUsine(env, id);
   } else {
     fail(400, "Ce type de modification ne peut pas être annulé.");
   }
@@ -562,6 +697,8 @@ async function allData(env, s) {
   const factions = await q("SELECT * FROM factions WHERE deleted = 0 ORDER BY name");
   const usines = await q("SELECT * FROM usines ORDER BY ordre, id");
   const choix = await q("SELECT * FROM usine_choix");
+  const projets = await q("SELECT * FROM projets WHERE deleted = 0 ORDER BY ordre, id");
+  const realises = await q("SELECT id, projet_id, faction_id, usine_id, note, ts FROM projet_faction WHERE deleted = 0 ORDER BY ts");
   const prix = await q("SELECT * FROM prix WHERE deleted = 0 ORDER BY ordre, id");
   const settings = Object.fromEntries((await q("SELECT * FROM settings")).map((r) => [r.key, r.value]));
   // Coordonnées : visibles seulement par la faction concernée et le staff
@@ -576,7 +713,7 @@ async function allData(env, s) {
   const wlCount = (await env.DB.prepare("SELECT COUNT(*) AS n FROM whitelist").first()).n;
   // Pseudos whitelistés sans fiche : aide le staff à corriger les fiches importées sous un autre nom
   const wlFree = staff ? (await q("SELECT w.mc_name FROM whitelist w WHERE NOT EXISTS (SELECT 1 FROM players p WHERE p.mc_name = w.mc_name AND p.deleted = 0) ORDER BY w.mc_name")).map((r) => r.mc_name) : null;
-  return { players, factions, usines, choix, prix, settings, bases, candidats, myVotes, results, meId: me ? me.id : null, wlSynced: wlCount > 0, wlFree };
+  return { players, factions, usines, choix, projets, realises, prix, settings, bases, candidats, myVotes, results, meId: me ? me.id : null, wlSynced: wlCount > 0, wlFree };
 }
 
 async function importData(env, s, data) {
@@ -663,7 +800,7 @@ async function callback(req, env, url) {
       grant_type: "authorization_code", code, redirect_uri: redirectUri(env) }),
   });
   if (!tok.ok) return back("Discord a refusé la connexion.");
-  const { access_token } = await tok.json();
+  const { access_token, refresh_token } = await tok.json();
   const auth = { authorization: `Bearer ${access_token}` };
   const user = await (await fetch("https://discord.com/api/users/@me", { headers: auth })).json();
   const memberRes = await fetch(`https://discord.com/api/users/@me/guilds/${env.GUILD_ID}/member`, { headers: auth });
@@ -676,13 +813,13 @@ async function callback(req, env, url) {
   const name = member.nick || user.global_name || user.username;
   const avatar = user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64` : null;
   await env.DB.prepare(
-    "INSERT INTO users (discord_id, discord_name, avatar, level, last_login) VALUES (?,?,?,?,?) " +
-    "ON CONFLICT(discord_id) DO UPDATE SET discord_name = excluded.discord_name, avatar = excluded.avatar, level = excluded.level, last_login = excluded.last_login"
-  ).bind(user.id, name, avatar, level, now()).run();
+    "INSERT INTO users (discord_id, discord_name, avatar, level, last_login, refresh_token) VALUES (?,?,?,?,?,?) " +
+    "ON CONFLICT(discord_id) DO UPDATE SET discord_name = excluded.discord_name, avatar = excluded.avatar, level = excluded.level, last_login = excluded.last_login, refresh_token = excluded.refresh_token"
+  ).bind(user.id, name, avatar, level, now(), refresh_token || null).run();
 
-  const sid = await sign(env, { id: user.id, name, avatar, level, exp: now() + SESSION_HOURS * 3600 });
+  const sid = await sign(env, { id: user.id, name, avatar, level, chk: now(), exp: now() + SESSION_DAYS * 86400 });
   return new Response(null, {
     status: 302,
-    headers: [["location", "/#espace"], ["set-cookie", setCookie("sid", sid, SESSION_HOURS * 3600)], ["set-cookie", setCookie("oauth_state", "", 0)]],
+    headers: [["location", "/#espace"], ["set-cookie", setCookie("sid", sid, SESSION_DAYS * 86400)], ["set-cookie", setCookie("oauth_state", "", 0)]],
   });
 }

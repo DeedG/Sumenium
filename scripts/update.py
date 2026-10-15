@@ -91,6 +91,35 @@ def notice(kind, msg):
     print(f"::{kind} title=Lecture du serveur::{msg}", flush=True)
 
 
+def write_progress(catalog, players, teams):
+    """Un fichier par joueur (site/progress/<pseudo>.json) : succès obtenus et critères déjà remplis."""
+    pdir = os.path.join(SITE, "progress")
+    os.makedirs(pdir, exist_ok=True)
+    index = []
+    for who, data in players.items():
+        if not re.fullmatch(r"[A-Za-z0-9_]{2,16}", who):
+            continue
+        done, prog = {}, {}
+        for e in catalog:
+            reqs = e.get("req") or []
+            for full in e["adv"]:
+                a = data.get(full)
+                if not a or not a.get("criteria"):
+                    continue
+                if a.get("done"):
+                    done[e["id"]] = max(a["criteria"].values())
+                    break
+                have = sorted(c for c in a["criteria"] if any(c in g for g in reqs))
+                if have:
+                    prog[e["id"]] = have
+        with open(os.path.join(pdir, who + ".json"), "w", encoding="utf-8") as f:
+            json.dump({"name": who, "team": teams.get(who), "done": done, "prog": prog}, f, ensure_ascii=False, separators=(",", ":"))
+        index.append({"name": who, "team": teams.get(who), "done": len(done)})
+    index.sort(key=lambda x: x["name"].lower())
+    with open(os.path.join(pdir, "index.json"), "w", encoding="utf-8") as f:
+        json.dump(index, f, ensure_ascii=False, separators=(",", ":"))
+
+
 def push_whitelist(sftp, j):
     """Envoie la whitelist à l'Espace (sumenium.alheon.fr) : seuls ces pseudos peuvent être reliés à un compte Discord."""
     secret = os.environ.get("DISCORD_CLIENT_SECRET")
@@ -244,6 +273,12 @@ def main():
                     rec["pc"] = best[2]
         out[e["id"]] = rec
 
+    write_progress(catalog, players, teams)
+
+    # Taille théorique : bordure de départ (5 blocs) + gains de tous les succès obtenus, au multiplicateur ACTUEL.
+    # Le WB-Addon ne recalcule pas la bordure quand on change le multiplicateur : l'écart vient des gains passés.
+    expected = 5 + sum(r["b"] for r in out.values() if r.get("done"))
+
     data = {
         "updated": datetime.now(timezone.utc).isoformat(),
         "checked": datetime.now(timezone.utc).isoformat(),
@@ -252,6 +287,7 @@ def main():
         "border": border,
         "mode": "tiers" if reward_mode == 1 else "individual",
         "multiplier": mult_int / 100,
+        "expectedDiameter": round(expected, 2),
         "players": len(players),
         "adv": out,
     }
