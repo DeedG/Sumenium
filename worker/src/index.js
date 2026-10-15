@@ -683,37 +683,47 @@ async function revert(env, s, auditId) {
 }
 
 async function allData(env, s) {
-  const q = async (sql, ...a) => (await env.DB.prepare(sql).bind(...a).all()).results;
+  // Une seule requête groupée vers la base (un aller-retour au lieu de quinze)
   const staff = s.level === "staff";
-  const me = await env.DB.prepare("SELECT * FROM players WHERE discord_id = ? AND deleted = 0").bind(s.id).first();
-  const players = (await q("SELECT p.*, u.discord_name, (w.mc_name IS NOT NULL) AS wl FROM players p LEFT JOIN users u ON u.discord_id = p.discord_id LEFT JOIN whitelist w ON w.mc_name = p.mc_name WHERE p.deleted = 0 ORDER BY p.mc_name"))
-    .map((p) => {
-      const own = me && me.id === p.id;
-      const out = { id: p.id, mc_name: p.mc_name, faction_id: p.faction_id, metier: p.metier, metier_desc: p.metier_desc,
-        perso_desc: p.perso_desc, activite: p.activite, mort: p.mort, linked: !!p.discord_id, whitelisted: !!p.wl, taille_appliquee: p.taille_appliquee };
-      if (staff || own) Object.assign(out, { taille_cm: p.taille_cm, discord_name: p.discord_name || null });
-      return out;
-    });
-  const factions = await q("SELECT * FROM factions WHERE deleted = 0 ORDER BY name");
-  const usines = await q("SELECT * FROM usines ORDER BY ordre, id");
-  const choix = await q("SELECT * FROM usine_choix");
-  const projets = await q("SELECT * FROM projets WHERE deleted = 0 ORDER BY ordre, id");
-  const realises = await q("SELECT id, projet_id, faction_id, usine_id, note, ts FROM projet_faction WHERE deleted = 0 ORDER BY ts");
-  const prix = await q("SELECT * FROM prix WHERE deleted = 0 ORDER BY ordre, id");
-  const settings = Object.fromEntries((await q("SELECT * FROM settings")).map((r) => [r.key, r.value]));
-  // Coordonnées : visibles seulement par la faction concernée et le staff
-  const bases = staff ? await q("SELECT * FROM bases WHERE deleted = 0 ORDER BY faction_id, type, nom")
-    : me && me.faction_id ? await q("SELECT * FROM bases WHERE deleted = 0 AND faction_id = ? ORDER BY type, nom", me.faction_id) : [];
-  const candidats = await q("SELECT c.*, p.mc_name FROM candidats c JOIN players p ON p.id = c.player_id WHERE c.deleted = 0 ORDER BY c.id");
-  const myVotes = Object.fromEntries((await q("SELECT tour, candidat_id FROM votes WHERE discord_id = ?", s.id)).map((v) => [v.tour, v.candidat_id]));
-  let results = null;
-  if (staff || settings.election === "resultats") {
-    results = await q("SELECT tour, candidat_id, COUNT(*) AS n FROM votes GROUP BY tour, candidat_id");
-  }
-  const wlCount = (await env.DB.prepare("SELECT COUNT(*) AS n FROM whitelist").first()).n;
-  // Pseudos whitelistés sans fiche : aide le staff à corriger les fiches importées sous un autre nom
-  const wlFree = staff ? (await q("SELECT w.mc_name FROM whitelist w WHERE NOT EXISTS (SELECT 1 FROM players p WHERE p.mc_name = w.mc_name AND p.deleted = 0) ORDER BY w.mc_name")).map((r) => r.mc_name) : null;
-  return { players, factions, usines, choix, projets, realises, prix, settings, bases, candidats, myVotes, results, meId: me ? me.id : null, wlSynced: wlCount > 0, wlFree };
+  const Q = (sql, ...a) => env.DB.prepare(sql).bind(...a);
+  const myFaction = "(SELECT faction_id FROM players WHERE discord_id = ? AND deleted = 0)";
+  const [meR, playersR, factionsR, usinesR, choixR, projetsR, realisesR, prixR, settingsR, basesR, candidatsR, votesR, resultsR, wlCountR, wlFreeR] = await env.DB.batch([
+    Q("SELECT * FROM players WHERE discord_id = ? AND deleted = 0", s.id),
+    Q("SELECT p.*, u.discord_name, (w.mc_name IS NOT NULL) AS wl FROM players p LEFT JOIN users u ON u.discord_id = p.discord_id LEFT JOIN whitelist w ON w.mc_name = p.mc_name WHERE p.deleted = 0 ORDER BY p.mc_name"),
+    Q("SELECT * FROM factions WHERE deleted = 0 ORDER BY name"),
+    Q("SELECT * FROM usines ORDER BY ordre, id"),
+    Q("SELECT * FROM usine_choix"),
+    Q("SELECT * FROM projets WHERE deleted = 0 ORDER BY ordre, id"),
+    Q("SELECT id, projet_id, faction_id, usine_id, note, ts FROM projet_faction WHERE deleted = 0 ORDER BY ts"),
+    Q("SELECT * FROM prix WHERE deleted = 0 ORDER BY ordre, id"),
+    Q("SELECT * FROM settings"),
+    // Coordonnées : visibles seulement par la faction concernée et le staff
+    staff ? Q("SELECT * FROM bases WHERE deleted = 0 ORDER BY faction_id, type, nom")
+      : Q(`SELECT * FROM bases WHERE deleted = 0 AND faction_id = ${myFaction} ORDER BY type, nom`, s.id),
+    Q("SELECT c.*, p.mc_name FROM candidats c JOIN players p ON p.id = c.player_id WHERE c.deleted = 0 ORDER BY c.id"),
+    Q("SELECT tour, candidat_id FROM votes WHERE discord_id = ?", s.id),
+    Q("SELECT tour, candidat_id, COUNT(*) AS n FROM votes GROUP BY tour, candidat_id"),
+    Q("SELECT COUNT(*) AS n FROM whitelist"),
+    // Pseudos whitelistés sans fiche : aide le staff à corriger les fiches importées sous un autre nom
+    Q("SELECT w.mc_name FROM whitelist w WHERE NOT EXISTS (SELECT 1 FROM players p WHERE p.mc_name = w.mc_name AND p.deleted = 0) ORDER BY w.mc_name"),
+  ]);
+  const me = meR.results[0] || null;
+  const players = playersR.results.map((p) => {
+    const own = me && me.id === p.id;
+    const out = { id: p.id, mc_name: p.mc_name, faction_id: p.faction_id, metier: p.metier, metier_desc: p.metier_desc,
+      perso_desc: p.perso_desc, activite: p.activite, mort: p.mort, linked: !!p.discord_id, whitelisted: !!p.wl, taille_appliquee: p.taille_appliquee };
+    if (staff || own) Object.assign(out, { taille_cm: p.taille_cm, discord_name: p.discord_name || null });
+    return out;
+  });
+  const settings = Object.fromEntries(settingsR.results.map((r) => [r.key, r.value]));
+  return {
+    user: { id: s.id, name: s.name, avatar: s.avatar, level: s.level },
+    players, factions: factionsR.results, usines: usinesR.results, choix: choixR.results, projets: projetsR.results,
+    realises: realisesR.results, prix: prixR.results, settings, bases: basesR.results, candidats: candidatsR.results,
+    myVotes: Object.fromEntries(votesR.results.map((v) => [v.tour, v.candidat_id])),
+    results: staff || settings.election === "resultats" ? resultsR.results : null,
+    meId: me ? me.id : null, wlSynced: wlCountR.results[0].n > 0, wlFree: staff ? wlFreeR.results.map((r) => r.mc_name) : null,
+  };
 }
 
 async function importData(env, s, data) {

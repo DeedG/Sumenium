@@ -26,7 +26,7 @@ const SUBS = GROUPS.flatMap(([, l]) => l);
 // Échelle RP : 1,87 m IRL = taille normale (1), comme dans l'ancien tableau
 const scaleOf = (cm) => (cm ? Math.round((cm / 187) * 10000) / 10000 : null);
 
-let ME = null, D = null, sub = "fiche", busy = false, staffFaction = null, auditRows = [], auditEnd = false, WORLD = null;
+let ME = null, D = null, checking = true, sub = "fiche", busy = false, staffFaction = null, auditRows = [], auditEnd = false, WORLD = null;
 
 /* ---------- API ---------- */
 async function call(method, path, body) {
@@ -55,6 +55,7 @@ async function act(fn, ok) {
 }
 async function reload() {
   D = await call("GET", "/api/data");
+  ME = D.user || ME;
   render();
 }
 
@@ -91,12 +92,13 @@ function render() {
       <a class="btn" href="https://${HOST}/#espace">Ouvrir l'Espace Suménium</a></div>`;
     return;
   }
+  if (checking) { root.innerHTML = '<div class="card center loading-card"><span class="spinner" aria-hidden="true"></span><p>Chargement de ton espace…</p></div>'; return; }
   if (!ME) {
     const err = new URLSearchParams(location.hash.split("?")[1] || "").get("erreur");
     root.innerHTML = `${err ? `<div class="banner">${esc(err)}</div>` : ""}<div class="card center">
       <h3>Connecte-toi avec Discord</h3>
       <p>L'espace est réservé aux membres du Discord Suménium. Tu restes connecté 30 jours sur cet appareil.</p>
-      <a class="btn discord" href="/api/auth/login">Se connecter avec Discord</a>
+      <a class="btn discord" href="/api/auth/login" onclick="if(this.dataset.go)return false;this.dataset.go=1;this.textContent='Redirection vers Discord…';this.classList.add('wait')">Se connecter avec Discord</a>
       <p class="muted small">On lit seulement ton pseudo Discord et tes rôles sur le serveur Suménium. Rien n'est publié sur Discord.</p></div>`;
     return;
   }
@@ -636,9 +638,11 @@ async function show(s) {
     started = true;
     render();
     if (!LIVE) return;
-    try { const r = await call("GET", "/api/me"); ME = r.user; }
-    catch (e) { ME = null; }
-    if (ME) { try { await reload(); } catch (e) { toast(e.message, true); } return; }
+    // Un seul appel : il dit qui est connecté ET renvoie les données (401 = pas connecté)
+    try { await reload(); }
+    catch (e) { if (ME === null && !/Connecte-toi/.test(e.message)) toast(e.message, true); }
+    finally { checking = false; render(); }
+    return;
   }
   render();
   // les autres joueurs ont pu modifier des choses : on relit à chaque changement d'onglet
