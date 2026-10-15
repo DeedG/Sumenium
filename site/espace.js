@@ -325,16 +325,22 @@ function projets() {
       <p class="small muted">Règles : un projet <b>unique</b> ne peut être fait que par une seule faction sur tout le serveur. Les autres : une fois par faction. L'organisation d'un évènement n'a pas de limite.</p>
     </div>
     ${isStaff() ? projetStaffForm() : ""}
-    <div class="tbl-wrap"><table class="tbl left projets"><thead><tr><th>Projet</th><th>Usine débloquée</th><th>Règle</th><th>Réalisé par</th>${myF ? "<th>Pour ma faction</th>" : ""}</tr></thead><tbody>
+    <div class="tbl-wrap tips"><table class="tbl left projets"><thead><tr><th>Projet</th><th>Usine débloquée</th><th>Règle</th><th>Réalisé par</th>${myF ? "<th>Pour ma faction</th>" : ""}</tr></thead><tbody>
     ${P.map((pr) => {
       const done = byP(pr.id), c = can(pr);
-      return `<tr><td><b>${esc(pr.nom)}</b></td><td>${esc(taillesTxt(pr.tailles))}</td><td>${reglesProjet(pr)}</td>
+      return `<tr><td>${projetNom(pr)}</td><td>${esc(taillesTxt(pr.tailles))}</td><td>${reglesProjet(pr)}</td>
         <td>${done.map((r) => `<span class="chip${r.faction_id === myF ? " ok" : ""}" title="${esc(r.note || "")}">${esc(facName(r.faction_id))}${r.usine_id ? ` → ${esc((usine(r.usine_id) || {}).nom || "")}` : ""}</span>`).join(" ") || '<span class="muted">—</span>'}
           ${isStaff() ? done.map((r) => `<button class="x" data-pf-del="${r.id}" title="Retirer ce projet de ${esc(facName(r.faction_id))}" aria-label="Retirer">✕</button>`).join("") : ""}</td>
         ${myF ? `<td>${c === true ? '<span class="chip ok">Disponible</span>' : pr.unique_srv ? '<span class="chip muted">Déjà pris</span>' : '<span class="chip muted">Déjà fait</span>'}</td>` : ""}</tr>`;
     }).join("") || '<tr><td colspan="5" class="empty">Aucun projet.</td></tr>'}</tbody></table></div>
     ${isStaff() ? projetListEditor() : ""}`);
   bindProjets();
+}
+function projetNom(pr) {
+  if (!pr.description) return `<b>${esc(pr.nom)}</b>`;
+  return `<span class="ptip" tabindex="0"><b>${esc(pr.nom)}</b><span class="ptip-i" aria-hidden="true">?</span>
+    <span class="ptip-box" role="tooltip"><b>${esc(pr.nom)}</b>${esc(pr.description)}
+      <span class="ptip-meta">Débloque une usine ${esc(taillesTxt(pr.tailles))} · ${pr.unique_srv ? "unique sur le serveur" : pr.illimite ? "sans limite" : "1 fois par faction"}</span></span></span>`;
 }
 function projetStaffForm() {
   return `<form id="pfForm" class="card form compact"><h3>Valider un projet (après le ticket)</h3>
@@ -346,8 +352,8 @@ function projetStaffForm() {
 }
 function projetListEditor() {
   return `<details class="card"><summary>Modifier la liste des projets</summary>
-    <div class="tbl-wrap"><table class="tbl left edit"><thead><tr><th>Nom</th><th>Usine</th><th>Unique</th><th>Sans limite</th><th></th></tr></thead><tbody>
-    ${(D.projets || []).map((pr) => `<tr data-pr="${pr.id}"><td><input name="nom" value="${esc(pr.nom)}"></td>
+    <div class="tbl-wrap"><table class="tbl left edit"><thead><tr><th>Nom</th><th>Ce qu'il faut faire</th><th>Usine</th><th>Unique</th><th>Sans limite</th><th></th></tr></thead><tbody>
+    ${(D.projets || []).map((pr) => `<tr data-pr="${pr.id}"><td><input name="nom" value="${esc(pr.nom)}" aria-label="Nom"></td><td><textarea name="description" rows="2" aria-label="Ce qu'il faut faire">${esc(pr.description || "")}</textarea></td>
       <td>${["moyenne", "petite", "grosse"].map((t) => `<label class="chk"><input type="checkbox" name="t_${t}"${pr.tailles.split(",").includes(t) ? " checked" : ""}> ${t}</label>`).join(" ")}</td>
       <td><input type="checkbox" name="unique_srv"${pr.unique_srv ? " checked" : ""} aria-label="Unique"></td><td><input type="checkbox" name="illimite"${pr.illimite ? " checked" : ""} aria-label="Sans limite"></td>
       <td><button type="button" class="btn small ghost" data-pr-save="${pr.id}">Enregistrer</button> <button type="button" class="x" data-pr-del="${pr.id}" aria-label="Supprimer">✕</button></td></tr>`).join("")}
@@ -372,7 +378,7 @@ function bindProjets() {
   f.onsubmit = (e) => { e.preventDefault(); act(() => call("POST", "/api/projets/realises", formData(f)), "Projet validé"); };
   document.querySelectorAll("[data-pr-save]").forEach((b) => (b.onclick = () => {
     const tr = b.closest("tr"), v = (n) => tr.querySelector(`[name="${n}"]`);
-    act(() => call("PUT", `/api/projets/${b.dataset.prSave}`, { nom: v("nom").value,
+    act(() => call("PUT", `/api/projets/${b.dataset.prSave}`, { nom: v("nom").value, description: v("description").value,
       tailles: ["grosse", "moyenne", "petite"].filter((t) => v("t_" + t).checked).join(","), unique_srv: v("unique_srv").checked, illimite: v("illimite").checked }), "Projet enregistré");
   }));
   document.querySelectorAll("[data-pr-del]").forEach((b) => (b.onclick = () => confirm("Supprimer ce projet de la liste ?") && act(() => call("DELETE", `/api/projets/${b.dataset.prDel}`), "Projet supprimé")));

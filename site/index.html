@@ -319,6 +319,29 @@ p.cmd{margin:4px 0;overflow-x:auto;white-space:nowrap}
 .card.fac.mine{border-color:var(--sun);box-shadow:0 0 0 2px var(--sun-soft)}
 .metier.muted{font-weight:400;font-style:italic}
 body.busy{cursor:progress}
+/* Infobulle des projets communautaires */
+.ptip{position:relative;display:inline-flex;align-items:center;gap:6px;cursor:help;outline:none}
+.ptip-i{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--crystal-soft);color:var(--crystal);font:700 .72rem var(--body);flex:none}
+.ptip-box{position:absolute;left:0;top:calc(100% + 8px);z-index:20;width:min(320px,80vw);background:var(--fg);color:var(--bg);border-radius:12px;padding:10px 12px;
+  font-size:.88rem;line-height:1.4;font-weight:400;white-space:normal;box-shadow:0 10px 28px rgba(0,0,0,.28);opacity:0;visibility:hidden;transform:translateY(-4px);transition:opacity .15s,transform .15s,visibility .15s}
+.ptip-box::before{content:"";position:absolute;left:18px;top:-6px;border:6px solid transparent;border-top:0;border-bottom-color:var(--fg)}
+.ptip-box b{display:block;font:600 .95rem var(--display);margin-bottom:3px}
+.ptip-meta{display:block;margin-top:6px;font-size:.78rem;opacity:.75}
+.ptip:hover .ptip-box,.ptip:focus .ptip-box,.ptip:focus-within .ptip-box{opacity:1;visibility:visible;transform:none}
+.ptip:focus-visible .ptip-i{outline:2px solid var(--crystal);outline-offset:1px}
+.tbl.projets td{overflow:visible}
+.tbl-wrap.tips{overflow:visible}
+@media (max-width:640px){
+  .tbl-wrap.tips{overflow-x:auto}
+  .tbl.projets th:nth-child(2),.tbl.projets td:nth-child(2),.tbl.projets th:nth-child(3),.tbl.projets td:nth-child(3){display:none}
+  .tbl.projets td{padding:10px}
+  .tbl.projets td:first-child{width:62%}
+  .ptip{display:block;cursor:auto}.ptip-i{display:none}
+  .ptip-box{position:static;display:block;width:auto;opacity:1;visibility:visible;transform:none;background:none;color:var(--muted);box-shadow:none;padding:4px 0 0;font-size:.84rem}
+  .ptip-box::before,.ptip-box b{display:none}
+}
+.tbl.edit textarea{font:inherit;font-size:.88rem;width:100%;min-width:220px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;resize:vertical}
+@media (prefers-reduced-motion:reduce){.ptip-box{transition:none}}
 .loading-card{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--muted)}
 .spinner{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--sun);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}

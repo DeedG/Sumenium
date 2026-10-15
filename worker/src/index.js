@@ -212,7 +212,7 @@ const TABLES = {
   bases: ["faction_id", "type", "nom", "x", "y", "z", "deleted"],
   candidats: ["player_id", "resume", "lien", "affiche", "tour2", "deleted"],
   prix: ["minerai", "roche", "prix", "ordre", "deleted"],
-  projets: ["nom", "tailles", "unique_srv", "illimite", "ordre", "deleted"],
+  projets: ["nom", "description", "tailles", "unique_srv", "illimite", "ordre", "deleted"],
   projet_faction: ["projet_id", "faction_id", "usine_id", "note", "ts", "deleted"],
 };
 
@@ -562,6 +562,7 @@ function projetFields(b, creating) {
     if (!t.length) fail(400, "Choisis au moins une taille d'usine.");
     f.tailles = t.join(",");
   }
+  if ("description" in b) f.description = str(b.description, 600);
   if ("unique_srv" in b) f.unique_srv = b.unique_srv ? 1 : 0;
   if ("illimite" in b) f.illimite = b.illimite ? 1 : 0;
   if ("ordre" in b) f.ordre = int(b.ordre) || 0;
