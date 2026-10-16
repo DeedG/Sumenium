@@ -1,3 +1,4 @@
+import { COMMANDES_STAFF } from "./commandes-staff.js";
 /**
  * Espace Suménium — Worker Cloudflare
  *
@@ -290,6 +291,10 @@ async function api(req, env, url) {
     const me = await env.DB.prepare("SELECT mc_name FROM players WHERE discord_id = ? AND deleted = 0").bind(s.id).first();
     if (!me) return json({ uuid: null, reason: "fiche", rows: [] });
     return json(await history(env, me.mc_name, url));
+  }
+  if (p === "/api/admin/commandes" && m === "GET") {
+    await need(req, env, "staff");
+    return json(COMMANDES_STAFF);
   }
   if (p === "/api/admin/historique" && m === "GET") {
     await need(req, env, "staff");

@@ -4,7 +4,7 @@
 const $ = (id) => document.getElementById(id);
 const E_ = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 let E = null, loaded = false, sub = "apercu", timer = null, tick = null;
-const SUBS = [["apercu", "Aperçu"], ["boutiques", "Boutiques"], ["hdv", "Hôtel des ventes"], ["fisc", "FISC"], ["factions", "Factions"], ["baltop", "Baltop"]];
+const SUBS = [["apercu", "Aperçu"], ["boutiques", "Boutiques"], ["hdv", "Hôtel des ventes"], ["fisc", "FISC"], ["factions", "Factions"], ["baltop", "Baltop"], ["commandes", "Commandes"]];
 const f = { q: "", owner: "", fac: "", type: "", stock: false, sort: "recent" };
 
 const SYM = () => (E && E.monnaie) || "Su";
@@ -47,8 +47,9 @@ function render() {
     ${E ? `<p class="muted small eco-when">Données du serveur ${E_(when)} · synchronisées toutes les 5 minutes</p>` : ""}
     <div id="ecoView"></div>`;
   const view = $("ecoView");
+  if (sub === "commandes") { commandes(view); return; }  // le guide ne dépend pas des données du serveur
   if (!E) { view.innerHTML = unavailable(); return; }
-  ({ apercu, boutiques, hdv, fisc, factions, baltop })[sub](view);
+  ({ apercu, boutiques, hdv, fisc, factions, baltop, commandes })[sub](view);
   view.querySelectorAll("[data-map]").forEach((b) => (b.onclick = () => { const [x, y, z] = b.dataset.map.split(",").map(Number); showOnMap(x, y, z); }));
 }
 
@@ -266,6 +267,99 @@ function baltop(view) {
       ${facRows ? `<div class="rank-scroll"><ol class="rank">${facRows.map((x, i) => `<li><span class="pos">${i + 1}</span><span class="who"><span class="ftag" style="--fc:${E_(facColor(x.couleur))}">${E_(x.tag)}</span></span>
         <span class="val">${su(x.banque, 0)}</span><span class="bar2"><s style="width:${Math.max(2, Math.round(x.banque / max * 100))}%"></s></span></li>`).join("")}</ol></div>` : '<p class="empty">Données indisponibles.</p>'}</div>
   </div>`;
+}
+
+/* ---------------- Commandes (doc « Commandes Suménium Economy », v2.0.0) ---------------- */
+const SANS_COMMANDE = [
+  ["Acheter dans une boutique", "Clic droit sur le coffre ou son panneau. Le chat affiche l'item (survolable), le prix et le stock. Taper ensuite la quantité dans le chat : un nombre, « tout » ou « annuler » (30 s pour répondre, invisible pour les autres)."],
+  ["Vendre au FISC", "Clic droit sur le coffre du FISC, puis taper la quantité à vendre ou « tout »."],
+  ["Ravitailler sa boutique", "Le propriétaire et, pour une boutique de faction, tous les membres ouvrent le coffre normalement. Le stock et le panneau se mettent à jour à la fermeture."],
+  ["Acheter dans la boutique de sa faction", "Avec son compte perso (/compte perso), cliquer sur le panneau : l'argent va dans la banque de faction."],
+  ["Panneau", "Posé automatiquement à la création de la boutique (ou un panneau déjà accroché au coffre est repris). Il est ciré : personne ne peut le modifier ni le casser à part les membres."],
+  ["Signal de redstone à chaque vente", "Après chaque vente (boutiques des joueurs et du FISC), le coffre émet un signal de redstone pendant 1 seconde. Une poudre de redstone, un répéteur, un comparateur ou une lampe collés au coffre le captent : libre à chacun d'en faire une sonnette, une porte, un compteur…"],
+  ["Dépôt de service (optionnel)", "Un coffre ou tonneau relié à un service avec /boutique depot. Le client y pose son bon et referme le coffre : si le bon est valide pour ce service, il est consommé (un par fermeture) et le coffre émet un signal de redstone d'1 seconde pour lancer l'usine ou ouvrir une porte. Un bon déjà utilisé ou d'un autre service est refusé et reste dans le coffre. Tout le monde peut ouvrir un dépôt ; seuls les membres du service le cassent."],
+  ["Hôtel des ventes", "Clic droit sur le PNJ du spawn : un menu affiche toutes les annonces (45 par page, survolables). Clic sur un item puis taper son offre dans le chat, « achat » pour l'achat immédiat ou « annuler ». L'argent de l'offre est bloqué et rendu si quelqu'un surenchérit. Une offre dans les 5 dernières minutes prolonge l'enchère de 5 minutes."],
+  ["Boîte aux lettres", "Clic droit sur la boîte aux lettres du spawn : chacun y retrouve ses items gagnés aux enchères et ses invendus. On ne peut que retirer, pas déposer."],
+  ["Annuaire", "Le livre sur le lutrin de l'entrée de la zone commerciale liste toutes les boutiques (propriétaire, item, prix, rupture, coordonnées). Il se met à jour tout seul et revient si quelqu'un le prend."],
+];
+const JOUEURS = [
+  { titre: "Compte", lignes: [
+    ["/compte", "Solde perso, banque de faction, compte utilisé", "Tous"],
+    ["/compte perso", "Acheter et créer des boutiques avec son compte perso", "Tous"],
+    ["/compte faction", "Acheter et créer des boutiques avec la banque de faction", "Chef, trésoriers"],
+    ["/historique [page]", "Achats, ventes, frais et dépôts des 30 derniers jours, avec le montant sur son compte et sur la banque de sa faction", "Tous"],
+    ["/baltop [page]", "Classement des joueurs les plus riches, 10 par page", "Tous"],
+    ["/baltop factions [page]", "Classement des banques de faction", "Tous"],
+    ["/boutique (ou /boutique aide)", "Rappel des commandes de boutique, cliquables", "Tous"],
+  ] },
+  { titre: "Boutiques", intro: "Regarder le coffre (ou le tonneau) de la boutique pour toutes ces commandes.", lignes: [
+    ["/boutique creer item <prix> <quantité>", "Crée une boutique, l'item à vendre en main. Ex. /boutique creer item 20 16 = 16 items pour 20 Su. Frais : 150 Su, ou 50 Su si on a déjà une boutique de la même famille (couleurs, essences de bois)", "Tous"],
+    ["/boutique creer service <prix> <nom du bon>", "Boutique de service, stock infini : l'acheteur reçoit un bon à ce nom. Frais : 300 Su", "Tous"],
+    ["/boutique info", "Offre, stock, ventes et chiffre d'affaires", "Tous (stats : membres)"],
+    ["/boutique liste", "Toutes ses boutiques et celles de sa faction, avec stock et coordonnées", "Tous"],
+    ["/boutique prix <prix> [quantité]", "Change le prix (et la quantité par lot)", "Membres de la boutique"],
+    ["/boutique panneau", "Réécrit le panneau, en reprend un accroché au coffre ou en pose un neuf", "Membres de la boutique"],
+    ["/boutique faction", "Donne sa boutique perso à sa faction : tous les membres ravitaillent, les ventes vont à la banque", "Propriétaire"],
+    ["/boutique perso", "Reprend une boutique de faction en perso", "Chef, créateur de la boutique"],
+    ["/boutique supprimer", "Supprime la boutique (50 % des frais remboursés). Casser le coffre fait pareil", "Membres de la boutique"],
+    ["/boutique depot <nom du service>", "En regardant un coffre ou un tonneau : le transforme en dépôt d'un de ses services (un bon valide déposé = signal de redstone). Optionnel", "Membres du service"],
+    ["/boutique depot retirer", "Le coffre visé redevient un coffre normal (casser le coffre fait pareil)", "Membres du service"],
+  ] },
+  { titre: "Bons de service", lignes: [
+    ["/bon verifier", "Le bon en main est-il authentique et déjà utilisé ?", "Tous"],
+    ["/bon valider", "Marque le bon en main comme utilisé et le retire (facultatif : un coffre de dépôt suffit pour une ferme en libre service)", "Vendeur du service"],
+  ] },
+  { titre: "Factions", lignes: [
+    ["/faction", "Sa faction : membres, rôles, banque", "Tous"],
+    ["/faction info <faction>", "Une autre faction", "Tous"],
+    ["/faction liste", "Toutes les factions", "Tous"],
+    ["/faction inviter <joueur>", "Invite un joueur (8 membres max)", "Chef"],
+    ["/faction rejoindre <faction>", "Accepte une invitation", "Joueur invité"],
+    ["/faction quitter", "Quitte la faction (le chef doit d'abord nommer un autre chef)", "Tous"],
+    ["/faction exclure <joueur>", "Exclut un membre", "Chef"],
+    ["/faction role <joueur> <membre|tresorier|chef>", "Change le rôle d'un membre. Trésorier = peut dépenser la banque", "Chef"],
+    ["/faction deposer <montant>", "Verse de l'argent perso dans la banque", "Tous les membres"],
+    ["/faction retirer <montant>", "Retire de la banque vers son compte perso", "Chef, trésoriers"],
+  ] },
+  { titre: "Hôtel des ventes", intro: "Enchères de 7 jours avec achat immédiat facultatif, 3 annonces actives maximum, taxe de 15 % prélevée sur le prix final.", lignes: [
+    ["/hdv vendre <prix de départ> [achat immédiat]", "Près du PNJ, met en vente tout le stack tenu en main. Ex. /hdv vendre 100 400", "Tous"],
+    ["/hdv annonces", "Ses annonces en cours, avec l'offre actuelle et le temps restant", "Tous"],
+    ["/hdv annuler <n°>", "Retire une annonce qui n'a pas encore d'offre (l'item va dans la boîte aux lettres)", "Vendeur"],
+    ["/hdv", "Rappel du fonctionnement", "Tous"],
+  ] },
+];
+let cq = "", STAFF_CMD = null, staffTried = false;
+// La commande : surligne les <arguments>, bouton pour copier la partie avant le premier argument
+const cmdHtml = (c) => { const first = c.split(/ [<[(]/)[0];
+  return `<code class="cmd-c">${E_(c).replace(/(&lt;[^&]*&gt;|\[[^\]]*\])/g, '<i>$1</i>')}</code> <button class="x copy" data-copy="${E_(first)}" aria-label="Copier ${E_(first)}" title="Copier">⧉</button>`; };
+const match = (...t) => !cq || t.join(" ").toLowerCase().includes(cq);
+function cmdTable(sec, withWho) {
+  const rows = sec.lignes.filter((l) => match(sec.titre, ...l));
+  if (!rows.length) return "";
+  return `<section class="board cmd-sec"><h3>${E_(sec.titre)}</h3>${sec.intro ? `<p class="small muted">${E_(sec.intro)}</p>` : ""}
+    <div class="tbl-wrap"><table class="tbl left cmds"><thead><tr><th>Commande</th><th>Usage</th>${withWho ? "<th>Qui</th>" : ""}</tr></thead><tbody>
+    ${rows.map((l) => `<tr><td>${cmdHtml(l[0])}</td><td>${E_(l[1])}</td>${withWho ? `<td class="muted small">${E_(l[2])}</td>` : ""}</tr>`).join("")}</tbody></table></div>
+    ${sec.note ? `<p class="small muted">${E_(sec.note)}</p>` : ""}</section>`;
+}
+function commandes(view) {
+  const live = /(^|\.)alheon\.fr$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
+  if (live && !staffTried) {
+    staffTried = true;  // réservé au staff : le Worker ne renvoie la liste qu'aux comptes Discord staff
+    fetch("/api/admin/commandes", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).then((d) => { STAFF_CMD = d; if (sub === "commandes") render(); }).catch(() => {});
+  }
+  const sans = SANS_COMMANDE.filter((l) => match("en jeu", ...l));
+  view.innerHTML = `<div class="bar"><input type="search" id="cq" placeholder="Chercher une commande ou une action (boutique, bon, faction, hdv…)" value="${E_(cq)}" aria-label="Chercher une commande"></div>
+    <p class="small muted">Mod Sumenium Economy 2.0.0. Les montants s'écrivent avec un point (3.5). Entre &lt; &gt; : obligatoire ; entre [ ] : facultatif.</p>
+    ${sans.length ? `<section class="board cmd-sec"><h3>En jeu, sans commande</h3><p class="small muted">Acheter, vendre au FISC et ravitailler se fait en cliquant sur les coffres, pas avec des commandes.</p>
+      <div class="tbl-wrap"><table class="tbl left cmds"><thead><tr><th>Action</th><th>Comment</th></tr></thead><tbody>
+      ${sans.map((l) => `<tr><td><b>${E_(l[0])}</b></td><td>${E_(l[1])}</td></tr>`).join("")}</tbody></table></div></section>` : ""}
+    <h3 class="sec">Commandes des joueurs <small>accessibles à tous ; certaines sont réservées au chef ou aux trésoriers</small></h3>
+    ${JOUEURS.map((s) => cmdTable(s, true)).join("")}
+    ${STAFF_CMD ? `<h3 class="sec">Commandes des admins <span class="chip lvl-staff">Staff</span> <small>${E_(STAFF_CMD.intro)}</small></h3>${STAFF_CMD.sections.map((s) => cmdTable(s, false)).join("")}` : ""}
+    <p class="empty" id="cmdNone" hidden>Aucune commande ne correspond.</p>`;
+  if (!view.querySelector(".cmd-sec")) $("cmdNone").hidden = false;
+  $("cq").oninput = (e) => { cq = e.target.value.toLowerCase(); const pos = e.target.selectionStart; render(); const el = $("cq"); el.focus(); el.setSelectionRange(pos, pos); };
+  view.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = () => navigator.clipboard.writeText(b.dataset.copy).then(() => { b.textContent = "✓"; setTimeout(() => (b.textContent = "⧉"), 1200); })));
 }
 
 /* ---------------- entrée ---------------- */
