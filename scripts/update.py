@@ -5,7 +5,7 @@ Variables d'environnement (secrets GitHub) :
   SFTP_ROOT  dossier du serveur sur le SFTP (défaut : dossier d'arrivée)
   PAGES_URL  adresse du site, pour garder les dernières données si le SFTP ne répond pas
 """
-import base64, hashlib, io, json, os, posixpath, re, stat, sys, time, urllib.parse, urllib.request
+import base64, hashlib, io, json, os, posixpath, re, socket, stat, sys, time, urllib.parse, urllib.request
 from datetime import datetime, timezone
 
 import nbtlib
@@ -79,18 +79,31 @@ def connect():
     log(f"Connexion SFTP à {host[:3]}… port {port}")
     user = os.environ["SFTP_USER"].strip()
     password = os.environ["SFTP_PASSWORD"].strip("\r\n")  # retour à la ligne collé avec le secret
-    for attempt in (1, 2):
-        t = paramiko.Transport((host, port))
+    # Une seule session, toujours fermée proprement (voir close_sftp) : MineStrator limite le nombre
+    # de sessions SFTP ouvertes en même temps et bloque les nouvelles quand la limite est atteinte.
+    sock = socket.create_connection((host, port), timeout=30)
+    t = paramiko.Transport(sock)
+    t.banner_timeout = t.auth_timeout = 30
+    _open.append(t)
+    try:
+        t.connect(username=user, password=password)
+    except EOFError:
+        # Le serveur a coupé pendant l'identification : identifiants refusés ou trop de sessions ouvertes
+        raise SftpClosed()
+    sftp = paramiko.SFTPClient.from_transport(t)
+    sftp.get_channel().settimeout(60)  # une lecture bloquée ne garde pas la session ouverte des heures
+    return sftp
+
+
+_open = []
+
+
+def close_sftp():
+    while _open:
         try:
-            t.connect(username=user, password=password)
-            return paramiko.SFTPClient.from_transport(t)
-        except EOFError:
-            # Le serveur a coupé pendant l'identification : identifiants refusés (certains panels
-            # ferment la connexion au lieu de répondre « refusé »), ou blocage temporaire après des échecs.
-            t.close()
-            if attempt == 2:
-                raise SftpClosed()
-            time.sleep(20)
+            _open.pop().close()  # envoie la déconnexion SSH : le serveur libère la session tout de suite
+        except Exception:
+            pass
 
 
 def read(sftp, path):
@@ -267,7 +280,7 @@ def main():
         eco_mod.push_journal(sftp, read, j, log, notice)
     except Exception as e:
         notice("warning", f"Journal non envoyé : {type(e).__name__}: {e}")
-    sftp.close()
+    close_sftp()
 
     catalog = json.load(open(os.path.join(SITE, "catalog.json"), encoding="utf-8"))
     reward_mode = cfg.get("reward_mode", 0)
@@ -346,17 +359,19 @@ def main():
 
 if __name__ == "__main__":
     try:
-        main()
+        try:
+            main()
+        finally:
+            close_sftp()
     except KeyError as e:
         keep_previous(f"Réglage manquant : {e}")
     except Exception as e:
-        import socket
         if isinstance(e, socket.gaierror):
             msg = "adresse SFTP introuvable, vérifie le secret SFTP_HOST"
         elif isinstance(e, SftpClosed):
             msg = ("le serveur SFTP a coupé la connexion pendant l'identification : identifiant ou mot de passe "
-                   "refusé (vérifie SFTP_USER et SFTP_PASSWORD dans le panel MineStrator), ou blocage temporaire "
-                   "après plusieurs échecs (se débloque tout seul, compter jusqu'à une heure)")
+                   "refusé (vérifie SFTP_USER et SFTP_PASSWORD), ou trop de sessions SFTP déjà ouvertes sur le compte "
+                   "(fermer les sessions dans le panel ou demander au support MineStrator)")
         elif isinstance(e, paramiko.AuthenticationException):
             msg = "identifiant ou mot de passe SFTP refusé, vérifie SFTP_USER et SFTP_PASSWORD"
         elif isinstance(e, (socket.timeout, TimeoutError, ConnectionRefusedError, paramiko.SSHException)):

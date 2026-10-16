@@ -11,7 +11,7 @@ fusionnés dans les marqueurs de la carte (seuls les ensembles « sumenium-* » 
 
 Tout se règle dans le fichier .env (voir .env.example).
 """
-import io, json, math, os, posixpath, re, shutil, stat, subprocess, sys, tempfile, threading, time
+import contextlib, io, json, math, os, posixpath, re, shutil, socket, stat, subprocess, sys, tempfile, threading, time
 from datetime import datetime
 
 import nbtlib
@@ -51,9 +51,35 @@ def connect():
     if ":" in host:
         host, p = host.rsplit(":", 1)
         port = port or p
-    t = paramiko.Transport((host, int(port or 22)))
-    t.connect(username=E("SFTP_USER", "").strip(), password=E("SFTP_PASSWORD", ""))
-    return paramiko.SFTPClient.from_transport(t)
+    sock = socket.create_connection((host, int(port or 22)), timeout=30)
+    t = paramiko.Transport(sock)
+    t.banner_timeout = t.auth_timeout = 30
+    try:
+        t.connect(username=E("SFTP_USER", "").strip(), password=E("SFTP_PASSWORD", "").strip("\r\n"))
+        sftp = paramiko.SFTPClient.from_transport(t)
+        sftp.get_channel().settimeout(120)
+    except BaseException:
+        t.close()
+        raise
+    return sftp
+
+
+@contextlib.contextmanager
+def session():
+    """Une session SFTP fermée à coup sûr. sftp.close() seul ferme le canal mais laisse la session SSH
+    ouverte tant que le programme tourne : MineStrator limite les sessions et bloque les nouvelles."""
+    with _sftp_lock:  # jamais deux sessions en même temps (rendu et marqueurs)
+        sftp = connect()
+        try:
+            yield sftp
+        finally:
+            try:
+                sftp.close()
+            finally:
+                sftp.get_channel().get_transport().close()
+
+
+_sftp_lock = threading.Lock()
 
 
 def read(sftp, path):
@@ -73,7 +99,11 @@ def load_nbt(raw):
 
 def sync():
     """Copie les régions modifiées et renvoie la bordure (centre x, z, largeur)."""
-    sftp = connect()
+    with session() as sftp:
+        return _sync(sftp)
+
+
+def _sync(sftp):
     root = E("SFTP_ROOT") or "."
     j = lambda *p: posixpath.join(root, *p)
     level = "world"
@@ -132,7 +162,6 @@ def sync():
         os.utime(dst, (a.st_atime, a.st_mtime))
         if i % 50 == 0:
             log(f"  {i}/{len(todo)}")
-    sftp.close()
     return border, (x0, x1, z0, z1)
 
 
@@ -262,12 +291,8 @@ def markers_loop():
     global _eco_sets
     while True:
         try:
-            sftp = connect()
-            try:
-                root = E("SFTP_ROOT") or "."
-                data = json.loads(read(sftp, posixpath.join(root, ECO_MARKERS)))
-            finally:
-                sftp.close()
+            with session() as sftp:
+                data = json.loads(read(sftp, posixpath.join(E("SFTP_ROOT") or ".", ECO_MARKERS)))
             sets = {k: v for k, v in data.items() if k.startswith("sumenium-") and isinstance(v, dict) and isinstance(v.get("markers"), dict)}
             if sets:
                 _eco_sets = sets

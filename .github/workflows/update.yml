@@ -19,6 +19,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 10      # un passage bloqué ne garde pas une session SFTP ouverte
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
