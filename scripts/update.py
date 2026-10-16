@@ -5,7 +5,7 @@ Variables d'environnement (secrets GitHub) :
   SFTP_ROOT  dossier du serveur sur le SFTP (défaut : dossier d'arrivée)
   PAGES_URL  adresse du site, pour garder les dernières données si le SFTP ne répond pas
 """
-import base64, hashlib, io, json, os, posixpath, re, stat, sys, urllib.request
+import base64, hashlib, io, json, os, posixpath, re, stat, sys, time, urllib.parse, urllib.request
 from datetime import datetime, timezone
 
 import nbtlib
@@ -33,19 +33,36 @@ def keep_previous(reason):
         except Exception as e:  # premier déploiement, site absent...
             log("Pas de données précédentes :", e)
     # Les autres fichiers du site : on reprend les précédents tels quels
-    for name in ("stats.json", "eco.json"):
-        if not url:
-            break
+    def copy(name):
         try:
-            with urllib.request.urlopen(url.rstrip("/") + "/" + name, timeout=20) as r, open(os.path.join(SITE, name), "wb") as f:
-                f.write(r.read())
+            with urllib.request.urlopen(url.rstrip("/") + "/" + urllib.parse.quote(name), timeout=20) as r:
+                raw = r.read()
+            os.makedirs(os.path.dirname(os.path.join(SITE, name)), exist_ok=True)
+            with open(os.path.join(SITE, name), "wb") as f:
+                f.write(raw)
+            return raw
         except Exception:
+            return None
+    if url:
+        for name in ("stats.json", "eco.json"):
+            copy(name)
+        # Progression par joueur (sélecteur « Progression de » de l'onglet Succès)
+        idx = copy("progress/index.json")
+        try:
+            for p in json.loads(idx or b"[]"):
+                if p.get("name"):
+                    copy(f"progress/{p['name']}.json")
+        except ValueError:
             pass
     data = prev or {}
     data["error"] = reason
     data["checked"] = datetime.now(timezone.utc).isoformat()
     json.dump(data, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     notice("warning", "Données précédentes conservées : " + reason)
+
+
+class SftpClosed(Exception):
+    pass
 
 
 def connect():
@@ -60,9 +77,20 @@ def connect():
         port = port or p
     port = int(port or 22)
     log(f"Connexion SFTP à {host[:3]}… port {port}")
-    t = paramiko.Transport((host, port))
-    t.connect(username=os.environ["SFTP_USER"].strip(), password=os.environ["SFTP_PASSWORD"])
-    return paramiko.SFTPClient.from_transport(t)
+    user = os.environ["SFTP_USER"].strip()
+    password = os.environ["SFTP_PASSWORD"].strip("\r\n")  # retour à la ligne collé avec le secret
+    for attempt in (1, 2):
+        t = paramiko.Transport((host, port))
+        try:
+            t.connect(username=user, password=password)
+            return paramiko.SFTPClient.from_transport(t)
+        except EOFError:
+            # Le serveur a coupé pendant l'identification : identifiants refusés (certains panels
+            # ferment la connexion au lieu de répondre « refusé »), ou blocage temporaire après des échecs.
+            t.close()
+            if attempt == 2:
+                raise SftpClosed()
+            time.sleep(20)
 
 
 def read(sftp, path):
@@ -325,12 +353,18 @@ if __name__ == "__main__":
         import socket
         if isinstance(e, socket.gaierror):
             msg = "adresse SFTP introuvable, vérifie le secret SFTP_HOST"
+        elif isinstance(e, SftpClosed):
+            msg = ("le serveur SFTP a coupé la connexion pendant l'identification : identifiant ou mot de passe "
+                   "refusé (vérifie SFTP_USER et SFTP_PASSWORD dans le panel MineStrator), ou blocage temporaire "
+                   "après plusieurs échecs (se débloque tout seul, compter jusqu'à une heure)")
         elif isinstance(e, paramiko.AuthenticationException):
             msg = "identifiant ou mot de passe SFTP refusé, vérifie SFTP_USER et SFTP_PASSWORD"
         elif isinstance(e, (socket.timeout, TimeoutError, ConnectionRefusedError, paramiko.SSHException)):
             msg = f"le serveur SFTP ne répond pas, vérifie SFTP_HOST et SFTP_PORT ({e})"
         elif isinstance(e, FileNotFoundError) or (isinstance(e, IOError) and getattr(e, "errno", None) == 2):
             msg = f"fichier introuvable sur le serveur, vérifie SFTP_ROOT ({e})"
+        elif isinstance(e, EOFError):
+            msg = "le serveur SFTP a coupé la connexion en cours de lecture (redémarrage du serveur ?), nouvel essai dans 5 minutes"
         else:
             msg = f"{type(e).__name__}: {e}"
         keep_previous(msg)
