@@ -9,3 +9,4 @@ work/
 *.xlsx
 import*.json
 site/progress/
+site/eco.json

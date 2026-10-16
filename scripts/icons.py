@@ -62,7 +62,11 @@ def french_names(items):
 
 def main():
     cat = json.load(open(os.path.join(SITE, "catalog.json"), encoding="utf-8"))
-    items = sorted({i["id"] for e in cat for k in ("rw", "tr") for i in e.get(k, [])})
+    items = {i["id"] for e in cat for k in ("rw", "tr") for i in e.get(k, [])}
+    # Objets vendus en boutique, au FISC et à l'hôtel des ventes (si l'économie a déjà été lue)
+    sys.path.insert(0, HERE)
+    import eco
+    items = sorted(items | eco.items(os.path.join(SITE, "eco.json")))
     os.makedirs(OUT, exist_ok=True)
     try:
         french_names(items)

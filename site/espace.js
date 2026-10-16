@@ -18,7 +18,7 @@ const TAILLE_USINE = { grosse: ["Grosses usines", 3], moyenne: ["Moyennes usines
 const TAILLE_MOT = { grosse: "grosse", moyenne: "moyenne", petite: "petite" };
 // Sous-onglets, regroupés : ce qui me concerne / la vie du serveur / le staff
 const GROUPS = [
-  ["Moi", [["fiche", "Ma fiche"]]],
+  ["Moi", [["fiche", "Ma fiche"], ["historique", "Mon historique"]]],
   ["Serveur", [["factions", "Factions"], ["projets", "Projets"], ["usines", "Usines"], ["joueurs", "Joueurs"], ["elections", "Élections"], ["prix", "Prix du FISC"]]],
   ["Staff", [["staff", "Outils staff"]]],
 ];
@@ -113,7 +113,7 @@ function render() {
     <nav class="subtabs" aria-label="Espace joueurs">${GROUPS.filter(([g]) => g !== "Staff" || isStaff()).map(([g, items]) =>
       `<span class="grp">${g}</span>` + items.map(([k, l]) => `<a href="#espace/${k}" aria-current="${k === sub ? "page" : "false"}">${l}${badge[k] ? ` <span class="badge">${badge[k]}</span>` : ""}</a>`).join("")).join("")}</nav>
     <div id="espView"></div>`;
-  ({ fiche, joueurs, factions, projets, usines, elections, prix, staff })[sub]();
+  ({ fiche, historique, joueurs, factions, projets, usines, elections, prix, staff })[sub]();
 }
 const view = (h) => ($("espView").innerHTML = h);
 
@@ -181,6 +181,56 @@ function tailleTxt(sc, applied) {
   const st = applied == null ? '<span class="chip warn">pas encore appliquée</span>'
     : Math.abs(applied - sc) < 0.0005 ? '<span class="chip ok">appliquée en jeu</span>' : `<span class="chip warn">en jeu : ${fmt(applied)}, à mettre à jour</span>`;
   return `Échelle <b>${fmt(sc)}</b> (≈ ${fmt(Math.round(sc * 180) / 100)} blocs) ${st}`;
+}
+
+/* ---------- Historique (journal du mod Sumenium Economy, montants en CENTIMES) ---------- */
+const TX = { ACHAT: "Achat en boutique", ACHAT_SERVICE: "Achat de service", RACHAT_FISC: "Vente au FISC", ACHAT_FISC: "Achat au FISC",
+  FRAIS_BOUTIQUE: "Frais de boutique", REMBOURSEMENT_BOUTIQUE: "Remboursement de boutique", SUPPRESSION_BOUTIQUE: "Suppression de boutique",
+  DEPOT_FACTION: "Dépôt à la faction", RETRAIT_FACTION: "Retrait de la faction", ADMIN: "Opération du staff", IMPORT: "Reprise de Savs",
+  BON_UTILISE: "Bon de service utilisé", HDV_OFFRE: "Offre à l'HDV", HDV_REMBOURSEMENT: "Offre HDV rendue", HDV_VENTE: "Vente à l'HDV" };
+const su = (cents) => (cents / 100).toLocaleString("fr-FR", { minimumFractionDigits: cents % 100 ? 2 : 0, maximumFractionDigits: 2 }) + "\u00a0Su";
+const itemLabel = (t) => { const id = String(t.item || "").replace(/^minecraft:/, ""); return (typeof NAMES !== "undefined" && NAMES[id]) || t.itemName || id.replace(/_/g, " "); };
+function txRow(t, uuid) {
+  const me = `joueur:${uuid}`, from = (t.from || "").toLowerCase(), to = (t.to || "").toLowerCase();
+  const amount = t.amount || 0, tax = t.tax || 0;
+  let sign = 0, value = amount, who = "";
+  if (from === me && to !== me) { sign = -1; who = t.toName || (t.to === "fisc" ? "FISC" : ""); }
+  else if (to === me && from !== me) { sign = 1; value = amount - (t.type === "RACHAT_FISC" ? 0 : tax); who = t.fromName || (t.from === "fisc" ? "FISC" : ""); }
+  else if (from.startsWith("faction:") || to.startsWith("faction:")) who = from.startsWith("faction:") ? `banque ${from.slice(8)}` : `banque ${to.slice(8)}`;
+  const what = t.item ? `${t.qty ? t.qty + " × " : ""}${itemLabel(t)}` : (t.note || "");
+  return `<tr><td class="nowrap">${new Date(t.t).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</td>
+    <td>${esc(TX[t.type] || t.type)}</td><td>${esc(what)}${who ? `<span class="muted small"> · ${sign < 0 ? "à" : sign > 0 ? "de" : ""} ${esc(who)}</span>` : ""}</td>
+    <td class="num ${sign < 0 ? "amt-neg" : sign > 0 ? "amt-pos" : ""}">${sign < 0 ? "−" : sign > 0 ? "+" : ""}${su(value)}${!sign && (from || to) && !from.startsWith("joueur:") ? '<span class="muted small"> (faction)</span>' : ""}</td>
+    <td class="num muted">${tax ? su(tax) : ""}</td></tr>`;
+}
+let hType = "", hRows = [], hMore = false, hUuid = null;
+async function loadHistory(path, el, append) {
+  try {
+    const before = append && hRows.length ? hRows[hRows.length - 1].t : "";
+    const r = await call("GET", `${path}${path.includes("?") ? "&" : "?"}type=${encodeURIComponent(hType)}${before ? "&before=" + before : ""}`);
+    if (!r.uuid) {
+      el.innerHTML = `<p class="empty">${r.reason === "fiche" ? "Relie d'abord ton pseudo Minecraft (onglet Ma fiche)." : "Ce pseudo n'est pas encore dans la whitelist : l'historique arrivera une fois whitelisté."}</p>`;
+      return;
+    }
+    hUuid = r.uuid; hRows = append ? hRows.concat(r.rows) : r.rows; hMore = r.more;
+  } catch (e) { el.innerHTML = `<p class="empty">${esc(e.message)}</p>`; return; }
+  const sum = hRows.reduce((a, t) => { const me = `joueur:${hUuid}`, f = (t.from || "").toLowerCase(), to = (t.to || "").toLowerCase();
+    if (f === me && to !== me) a.out += t.amount || 0; else if (to === me && f !== me) a.in += (t.amount || 0) - (t.type === "RACHAT_FISC" ? 0 : t.tax || 0); return a; }, { in: 0, out: 0 });
+  el.innerHTML = hRows.length ? `<p class="small muted">${hRows.length} opération${hRows.length > 1 ? "s" : ""} affichée${hRows.length > 1 ? "s" : ""} ·
+      reçu <b class="amt-pos">+${su(sum.in)}</b> · dépensé <b class="amt-neg">−${su(sum.out)}</b></p>
+    <div class="tbl-wrap"><table class="tbl left hist"><thead><tr><th>Date</th><th>Opération</th><th>Détail</th><th class="num">Montant</th><th class="num">Taxe</th></tr></thead>
+    <tbody>${hRows.map((t) => txRow(t, hUuid)).join("")}</tbody></table></div>
+    ${hMore ? '<div class="actions"><button class="btn small ghost" id="hMore">Plus ancien</button></div>' : ""}`
+    : '<p class="empty">Aucune opération pour l\'instant.</p>';
+  const more = el.querySelector("#hMore");
+  if (more) more.onclick = () => loadHistory(path, el, true);
+}
+const typeSelect = (id) => `<select id="${id}" aria-label="Type d'opération"><option value="">Toutes les opérations</option>${Object.entries(TX).map(([k, v]) => `<option value="${k}"${k === hType ? " selected" : ""}>${v}</option>`).join("")}</select>`;
+function historique() {
+  view(head("Mon historique", "Tes achats, ventes, frais et dépôts, d'après le journal du serveur (mis à jour toutes les 5 minutes). Visible seulement par toi et le staff.") +
+    `<div class="bar">${typeSelect("hType")}</div><div id="hList"><p class="empty">Chargement…</p></div>`);
+  $("hType").onchange = (e) => { hType = e.target.value; loadHistory("/api/me/historique", $("hList"), false); };
+  loadHistory("/api/me/historique", $("hList"), false);
 }
 
 /* ---------- Joueurs ---------- */
@@ -521,7 +571,7 @@ function staff() {
   const tailles = D.players.filter((p) => p.taille_cm).map((p) => ({ p, sc: scaleOf(p.taille_cm) }));
   const todo = tailles.filter(({ p, sc }) => p.taille_appliquee == null || Math.abs(p.taille_appliquee - sc) >= 0.0005);
   const aWl = D.wlSynced ? D.players.filter((p) => !p.whitelisted).sort((a, b) => ficheOk(b) - ficheOk(a) || a.mc_name.localeCompare(b.mc_name)) : [];
-  const nav = [["st-wl", `À whitelister (${aWl.filter(ficheOk).length})`], ["st-taille", `Tailles RP (${todo.length})`], ["st-bordure", "Bordure"], ["st-reglages", "Réglages"], ["st-import", "Import"], ["st-histo", "Historique"]];
+  const nav = [["st-wl", `À whitelister (${aWl.filter(ficheOk).length})`], ["st-taille", `Tailles RP (${todo.length})`], ["st-bordure", "Bordure"], ["st-hist", "Historique d'un joueur"], ["st-reglages", "Réglages"], ["st-import", "Import"], ["st-histo", "Historique"]];
   view(head("Outils staff", "Whitelist, tailles RP, bordure, réglages et historique de toutes les modifications.") +
     `<nav class="anchors">${nav.map(([id, l]) => `<a href="#" data-jump="${id}">${l}</a>`).join("")}</nav>
     <section class="card" id="st-wl"><h3>À whitelister</h3>
@@ -545,6 +595,10 @@ function staff() {
           <td><input type="checkbox" data-applied="${p.id}" data-sc="${sc}"${ok ? " checked" : ""} aria-label="Taille appliquée pour ${esc(p.mc_name)}"></td></tr>`;
       }).join("") || '<tr><td colspan="5" class="empty">Aucune taille renseignée.</td></tr>'}</tbody></table></div></section>
     <section class="card" id="st-bordure"><h3>Bordure après un changement de multiplicateur</h3><div id="borderTool"><p class="empty">Chargement…</p></div></section>
+    <section class="card" id="st-hist"><h3>Historique économique d'un joueur</h3>
+      <p class="muted small">Achats, ventes, rachats du FISC, frais… d'après le journal du mod. Utile pour vérifier un abus (prix mal réglé, par exemple).</p>
+      <div class="bar"><select id="shPlayer" aria-label="Joueur"><option value="">— choisir un joueur —</option>${D.players.map((p) => `<option>${esc(p.mc_name)}</option>`).join("")}</select>${typeSelect("shType")}</div>
+      <div id="shList"></div></section>
     <section class="card form" id="st-reglages"><h3>Réglages</h3>
       <label>Élection<select id="setElection">${opt(ELECTION, s.election)}</select></label>
       <label>Choix d'usines<select id="setUsOpen"><option value="1"${s.usines_ouvertes === "1" ? " selected" : ""}>Ouverts</option><option value="0"${s.usines_ouvertes !== "1" ? " selected" : ""}>Fermés</option></select></label>
@@ -572,6 +626,9 @@ function staff() {
     act(async () => { const r = await call("POST", "/api/admin/import", data);
       toast(`Import : ${r.done.factions} factions et ${r.done.players} joueurs créés, ${r.done.completes} fiches complétées, ${r.done.usines} choix d'usines ajoutés`); });
   };
+  const shGo = () => { const n = $("shPlayer").value; if (n) loadHistory(`/api/admin/historique?joueur=${encodeURIComponent(n)}`, $("shList"), false); else $("shList").innerHTML = ""; };
+  $("shPlayer").onchange = shGo;
+  $("shType").onchange = (e) => { hType = e.target.value; shGo(); };
   borderTool();
   auditRows = []; auditEnd = false; loadAudit();
   $("auditMore").onclick = loadAudit;

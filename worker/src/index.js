@@ -126,6 +126,8 @@ async function proxy(req, env, url) {
   const res = await fetch(target, { headers: { "user-agent": "sumenium-worker" }, redirect: "follow" });
   const out = new Response(res.body, res);
   securityHeaders(out.headers);
+  // Jamais plus de 5 minutes de cache ; les données (JSON) sont toujours revalidées
+  out.headers.set("cache-control", /\.json$/.test(url.pathname) ? "no-cache" : "public, max-age=300");
   out.headers.delete("access-control-allow-origin");
   return out;
 }
@@ -272,6 +274,28 @@ async function api(req, env, url) {
     }
     await env.DB.batch(stmts);
     return json({ ok: true, count: stmts.length - 1 });
+  }
+
+  /* ---- journal des transactions (mod Sumenium Economy), envoyé par la mise à jour du site ---- */
+  if (p === "/api/ingest/journal" && (m === "GET" || m === "POST")) {
+    if (req.headers.get("authorization") !== `Bearer ${await ingestToken(env)}`) fail(401, "Jeton invalide.");
+    if (m === "GET") {
+      const r = await env.DB.prepare("SELECT MAX(t) AS t FROM tx").first();
+      return json({ lastT: (r && r.t) || 0 });
+    }
+    return json(await ingestJournal(env, Array.isArray(body.lines) ? body.lines.slice(0, 1000) : []));
+  }
+  if (p === "/api/me/historique" && m === "GET") {
+    const s = await need(req, env, "attente");
+    const me = await env.DB.prepare("SELECT mc_name FROM players WHERE discord_id = ? AND deleted = 0").bind(s.id).first();
+    if (!me) return json({ uuid: null, reason: "fiche", rows: [] });
+    return json(await history(env, me.mc_name, url));
+  }
+  if (p === "/api/admin/historique" && m === "GET") {
+    await need(req, env, "staff");
+    const n = str(url.searchParams.get("joueur"), 16);
+    if (!MC_NAME.test(n)) fail(400, "Choisis un joueur.");
+    return json(await history(env, n, url));
   }
 
   /* ---- qui suis-je ---- */
@@ -604,6 +628,43 @@ async function syncProjetUsine(env, pfId) {
   if (pf && !pf.deleted && pf.usine_id) {
     await env.DB.prepare("INSERT OR IGNORE INTO usine_choix (faction_id, usine_id, projet_faction_id) VALUES (?, ?, ?)").bind(pf.faction_id, pf.usine_id, pfId).run();
   }
+}
+
+const hex = (u8) => [...u8].map((b) => b.toString(16).padStart(2, "0")).join("");
+const acc = (v) => (v === null || v === undefined || v === "" ? null : String(v).slice(0, 80).toLowerCase());
+
+/** Range les lignes du journal (montants en centimes), sans doublons ; garde 180 jours. */
+async function ingestJournal(env, lines) {
+  const stmts = [];
+  for (const line of lines) {
+    if (typeof line !== "string" || line.length > 8000) continue;
+    let o;
+    try { o = JSON.parse(line); } catch { continue; }
+    if (!o || !Number.isFinite(Number(o.t)) || !o.type) continue;
+    stmts.push(env.DB.prepare("INSERT OR IGNORE INTO tx (id, t, type, actor, from_acc, to_acc, item, data) VALUES (?,?,?,?,?,?,?,?)")
+      .bind(hex(await sha256(line)), Math.round(Number(o.t)), str(o.type, 40), acc(o.actor), acc(o.from), acc(o.to), o.item ? str(o.item, 80) : null, line));
+  }
+  let added = 0;
+  for (let i = 0; i < stmts.length; i += 100) {
+    const res = await env.DB.batch(stmts.slice(i, i + 100));
+    added += res.reduce((a, r) => a + ((r.meta && r.meta.changes) || 0), 0);
+  }
+  await env.DB.prepare("DELETE FROM tx WHERE t < ?").bind(Date.now() - 180 * 86400000).run();
+  return { ok: true, added };
+}
+
+/** Historique d'un joueur : les transactions où il est acheteur, vendeur ou à l'origine de l'action. */
+async function history(env, mcName, url) {
+  const wl = await env.DB.prepare("SELECT mc_name, uuid FROM whitelist WHERE mc_name = ?").bind(mcName).first();
+  if (!wl || !wl.uuid) return { uuid: null, reason: "whitelist", rows: [] };
+  const uuid = wl.uuid.toLowerCase(), account = `joueur:${uuid}`;
+  const before = int(url.searchParams.get("before")) || 9e15;
+  const type = str(url.searchParams.get("type"), 40);
+  const LIMIT = 100;
+  const rows = (await env.DB.prepare(
+    `SELECT data FROM tx WHERE (actor = ? OR from_acc = ? OR to_acc = ?) AND t < ?${type ? " AND type = ?" : ""} ORDER BY t DESC LIMIT ?`
+  ).bind(uuid, account, account, before, ...(type ? [type] : []), LIMIT + 1).all()).results;
+  return { uuid, name: wl.mc_name, rows: rows.slice(0, LIMIT).map((r) => JSON.parse(r.data)), more: rows.length > LIMIT };
 }
 
 async function claim(env, s, name) {

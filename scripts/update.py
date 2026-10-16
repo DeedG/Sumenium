@@ -32,6 +32,15 @@ def keep_previous(reason):
                 prev = json.load(r)
         except Exception as e:  # premier déploiement, site absent...
             log("Pas de données précédentes :", e)
+    # Les autres fichiers du site : on reprend les précédents tels quels
+    for name in ("stats.json", "eco.json"):
+        if not url:
+            break
+        try:
+            with urllib.request.urlopen(url.rstrip("/") + "/" + name, timeout=20) as r, open(os.path.join(SITE, name), "wb") as f:
+                f.write(r.read())
+        except Exception:
+            pass
     data = prev or {}
     data["error"] = reason
     data["checked"] = datetime.now(timezone.utc).isoformat()
@@ -219,6 +228,17 @@ def main():
     except Exception as e:
         notice("warning", f"Classements non mis à jour : {type(e).__name__}: {e}")
     push_whitelist(sftp, j)
+    # Économie (mod Sumenium Economy) : exports publics → site/eco.json, journal privé → Worker
+    try:
+        import eco as eco_mod
+        eco_summary = eco_mod.build(sftp, read, j, log, os.path.join(SITE, "eco.json"))
+    except Exception as e:
+        eco_summary = "économie indisponible"
+        notice("warning", f"Économie non mise à jour : {type(e).__name__}: {e}")
+    try:
+        eco_mod.push_journal(sftp, read, j, log, notice)
+    except Exception as e:
+        notice("warning", f"Journal non envoyé : {type(e).__name__}: {e}")
     sftp.close()
 
     catalog = json.load(open(os.path.join(SITE, "catalog.json"), encoding="utf-8"))
@@ -293,7 +313,7 @@ def main():
     }
     json.dump(data, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     done = sum(1 for r in out.values() if r.get("done"))
-    notice("notice", f"OK : monde {world_size}, {done}/{len(out)} succès obtenus, {len(players)} joueurs")
+    notice("notice", f"OK : monde {world_size}, {done}/{len(out)} succès obtenus, {len(players)} joueurs, {eco_summary}")
 
 
 if __name__ == "__main__":

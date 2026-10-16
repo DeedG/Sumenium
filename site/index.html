@@ -319,6 +319,62 @@ p.cmd{margin:4px 0;overflow-x:auto;white-space:nowrap}
 .card.fac.mine{border-color:var(--sun);box-shadow:0 0 0 2px var(--sun-soft)}
 .metier.muted{font-weight:400;font-style:italic}
 body.busy{cursor:progress}
+/* Économie */
+:root{--c0:#1f7fc9;--c1:#d99a0b;--c2:#7a3fb0;--c3:#3d7f2c}
+@media (prefers-color-scheme:dark){:root{--c0:#3f93d6;--c1:#b38414;--c2:#a874e0;--c3:#4fa83a}}
+.eco-when{margin:-6px 0 12px}
+.eco-ico{width:28px;height:28px;image-rendering:pixelated;vertical-align:middle;flex:none}
+.rank .eco-ico{width:20px;height:20px;margin-right:4px}
+.ph{display:inline-grid;place-items:center;min-width:28px;height:28px;padding:0 3px;border-radius:4px;background:var(--bg);font:600 .55rem/1 var(--body);color:var(--muted);vertical-align:middle;overflow:hidden}
+.ftag{display:inline-block;font:700 .78rem var(--display);padding:2px 8px;border-radius:6px;color:#fff;background:var(--fc,var(--muted));text-shadow:0 1px 1px rgba(0,0,0,.35);vertical-align:1px}
+.ftag.big{font-size:1.05rem;padding:3px 10px}
+.shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.shop{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:6px;align-content:start;min-width:0}
+.shop.out{opacity:.72}
+.shop header{display:flex;gap:10px;align-items:center}
+.shop header b{font:600 1.02rem var(--display)}
+.shop .nom{display:block}
+.shop p{margin:0}
+.price{font:600 1.15rem var(--display);font-variant-numeric:tabular-nums}
+.owner{font-size:.92rem}
+.linkbtn{font:inherit;font-size:.85rem;font-weight:700;color:var(--crystal);background:var(--crystal-soft);border:0;border-radius:8px;padding:4px 8px;cursor:pointer;font-variant-numeric:tabular-nums}
+.linkbtn:hover{filter:brightness(.95)}
+.countdown{font-weight:700;font-variant-numeric:tabular-nums}
+.countdown .soon{color:var(--warn)}
+.roster{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}
+.roster li{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:600}
+.chart-board{margin-bottom:14px;position:relative}
+.chart{display:block;max-width:100%;overflow:visible}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .axis{fill:var(--muted);font:500 11px var(--body)}
+.chart .line{fill:none;stroke:var(--c0);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.chart .cross{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
+.chart .dot{fill:var(--c0);stroke:var(--surface);stroke-width:2}
+.chart .s0,.sw.s0{fill:var(--c0);background:var(--c0)} .chart .s1,.sw.s1{fill:var(--c1);background:var(--c1)}
+.chart .s2,.sw.s2{fill:var(--c2);background:var(--c2)} .chart .s3,.sw.s3{fill:var(--c3);background:var(--c3)}
+.chart .hitbar{cursor:default}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.85rem;color:var(--fg);margin-bottom:6px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:0}
+.ctip{position:absolute;top:4px;z-index:5;background:var(--fg);color:var(--bg);border-radius:10px;padding:8px 10px;font-size:.84rem;display:grid;gap:2px;pointer-events:none;box-shadow:0 8px 20px rgba(0,0,0,.25);min-width:130px}
+.ctip span{white-space:nowrap}
+.chart-board > div{position:relative}
+.tblview{margin-top:8px}
+.tbl.hist td{white-space:normal}.tbl.hist td.nowrap{white-space:nowrap}
+.tbl td.num,.tbl th.num{text-align:right!important;white-space:nowrap}
+.amt-pos{color:var(--leaf-ink)} .amt-neg{color:var(--warn)}
+@media (max-width:640px){
+  .tbl.hist thead{display:none}
+  .tbl.hist,.tbl.hist tbody{display:block}
+  .tbl.hist tr{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:10px 12px;border-bottom:1px solid var(--line)}
+  .tbl.hist td{border:0;padding:0;text-align:left!important}
+  .tbl.hist td:nth-child(1){grid-column:1;grid-row:1;font-size:.8rem;color:var(--muted)}
+  .tbl.hist td:nth-child(2){grid-column:1;grid-row:2;font-weight:700}
+  .tbl.hist td:nth-child(3){grid-column:1/-1;grid-row:3;font-size:.9rem}
+  .tbl.hist td:nth-child(4){grid-column:2;grid-row:1/3;align-self:center;text-align:right!important;font-weight:700}
+  .tbl.hist td:nth-child(5){grid-column:2;grid-row:3;text-align:right!important;font-size:.8rem}
+  .tbl.hist td:nth-child(5):empty{display:none}
+}
+@media (max-width:640px){.shop-grid{grid-template-columns:1fr}}
 /* Infobulle des projets communautaires */
 .ptip{position:relative;display:inline-flex;align-items:center;gap:6px;cursor:help;outline:none}
 .ptip-i{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--crystal-soft);color:var(--crystal);font:700 .72rem var(--body);flex:none}
@@ -445,8 +501,8 @@ body.busy{cursor:progress}
   </section>
   <section class="panel" id="p-economie" hidden>
     <h2 class="ttl">Économie</h2>
-    <p class="sub2" id="ecoSub">Soldes et échanges du serveur.</p>
-    <div class="boards" id="ecoBoards"><p class="empty">Chargement…</p></div>
+    <p class="sub2" id="ecoSub">Boutiques, hôtel des ventes, FISC, factions et argent en circulation (mod Sumenium Economy).</p>
+    <div id="ecoRoot"><p class="empty">Chargement…</p></div>
   </section>
   <section class="panel" id="p-carte" hidden>
   <section class="mapbox" id="mapbox">
@@ -471,6 +527,7 @@ body.busy{cursor:progress}
 </main>
 <div class="toast" id="toast" role="status" hidden></div>
 <script src="espace.js"></script>
+<script src="economie.js"></script>
 <script>
 const TIERS={task:"Tâche",goal:"Objectif",challenge:"Défi",super_challenge:"Super défi",milestone:"Palier",hidden:"Caché",root:"Racine",custom:"Fin de partie"};
 const $=id=>document.getElementById(id);
@@ -700,7 +757,15 @@ function setupMap(){
   const send=()=>{try{f.contentWindow.postMessage({type:"sumenium-spoil",show:box.checked},new URL(MAP_URL).origin)}catch(e){}};
   f.addEventListener("load",()=>{send();setTimeout(send,3000);setTimeout(send,8000)});
   box.addEventListener("change",()=>{try{localStorage.setItem("sumenium-spoil",box.checked?"1":"0")}catch(e){};send()});
-  f.src=MAP_URL+"?v="+Date.now(); $("mapfull").href=MAP_URL;
+  f.src=MAP_URL+"?v="+Date.now()+(mapAt||""); $("mapfull").href=MAP_URL+(mapAt||"");
+}
+let mapAt="";
+// Ouvre l'onglet Carte centré sur une position (boutique, FISC…)
+function showOnMap(x,y,z){
+  mapAt=`#overworld:${Math.round(x)}:${Math.round(y)}:${Math.round(z)}:60:0:0:0:0:perspective`;
+  const f=$("mapframe");
+  if(mapReady){f.src=MAP_URL+"?v="+Date.now()+mapAt;$("mapfull").href=MAP_URL+mapAt}
+  location.hash="carte";
 }
 
 async function loadData(){
@@ -832,7 +897,7 @@ function renderEco(){
 }
 async function loadStats(){
   try{const r=await fetch("stats.json?t="+Date.now());if(r.ok)STATS=await r.json();}catch(e){}
-  renderClassement();setupStats();renderEco();
+  renderClassement();setupStats();
 }
 
 // ---------- Onglets ----------
@@ -843,6 +908,7 @@ function route(){
   document.querySelectorAll(".tabs a").forEach(a=>a.setAttribute("aria-current",a.dataset.tab===t?"page":"false"));
   if(t==="carte"&&!mapReady){mapReady=true;setupMap()}
   if(t==="espace"&&window.Espace)window.Espace.show(parts[1]);
+  if(t==="economie"&&window.Economie)window.Economie.show(parts[1]);
 }
 let lastTab=null;
 window.addEventListener("hashchange",()=>{const t=location.hash.slice(1).split(/[/?]/)[0];route();if(t!==lastTab)window.scrollTo({top:0});lastTab=t});

@@ -2,7 +2,7 @@ name: Mise à jour du site
 
 on:
   schedule:
-    - cron: "*/10 * * * *"   # toutes les 10 min (GitHub peut retarder de quelques minutes)
+    - cron: "*/5 * * * *"    # secours : le Worker Cloudflare déclenche aussi la mise à jour toutes les 5 min
   workflow_dispatch:          # bouton "Run workflow" pour lancer à la main
   push:
     branches: [main]
@@ -45,6 +45,8 @@ jobs:
           PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
           DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
         run: python scripts/update.py
+      - name: Icônes des objets en boutique
+        run: python scripts/icons.py
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site

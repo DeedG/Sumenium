@@ -6,10 +6,12 @@ En boucle :
   2. lit la bordure actuelle et écrit la configuration BlueMap (tracé de la bordure +
      « brouillard » qui masque la zone hors bordure, désactivable) ;
   3. lance BlueMap, qui ne redessine que ce qui a changé.
+En parallèle, toutes les 5 minutes : marqueurs du mod Sumenium Economy (boutiques, FISC, hôtel des ventes)
+fusionnés dans les marqueurs de la carte (seuls les ensembles « sumenium-* » sont remplacés).
 
 Tout se règle dans le fichier .env (voir .env.example).
 """
-import io, math, os, posixpath, re, shutil, stat, subprocess, sys, tempfile, time
+import io, json, math, os, posixpath, re, shutil, stat, subprocess, sys, tempfile, threading, time
 from datetime import datetime
 
 import nbtlib
@@ -30,6 +32,10 @@ XMX = E("JAVA_XMX", "6G")
 MAP_NAME = E("MAP_NAME", "Suménium · Overworld")
 MC_VERSION = E("BLUEMAP_MC_VERSION", "26.3")
 FOG = E("FOG_COLOR", "18,30,22")
+MARKERS_EVERY = int(E("MARKERS_MINUTES", "5")) * 60
+ECO_MARKERS = "sumenium-data/export/bluemap-markers.json"
+LIVE_MARKERS = f"{WEB}/maps/overworld/live/markers.json"
+_eco_sets = {}
 
 
 def log(*a):
@@ -231,6 +237,48 @@ marker-sets: {{{markers}
 ''')
 
 
+def merge_markers():
+    """Remplace les ensembles « sumenium-* » du markers.json de la carte, sans toucher aux autres (bordure, brouillard)."""
+    if not _eco_sets or not os.path.isdir(os.path.dirname(LIVE_MARKERS)):
+        return
+    try:
+        with open(LIVE_MARKERS, encoding="utf-8") as f:
+            cur = json.load(f)
+        if not isinstance(cur, dict):
+            cur = {}
+    except (OSError, ValueError):
+        cur = {}
+    merged = {k: v for k, v in cur.items() if not k.startswith("sumenium-")}
+    merged.update(_eco_sets)
+    tmp = LIVE_MARKERS + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(merged, f, ensure_ascii=False, separators=(",", ":"))
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, LIVE_MARKERS)
+
+
+def markers_loop():
+    """Toutes les 5 minutes : relit les marqueurs du mod en SFTP et les fusionne dans la carte."""
+    global _eco_sets
+    while True:
+        try:
+            sftp = connect()
+            try:
+                root = E("SFTP_ROOT") or "."
+                data = json.loads(read(sftp, posixpath.join(root, ECO_MARKERS)))
+            finally:
+                sftp.close()
+            sets = {k: v for k, v in data.items() if k.startswith("sumenium-") and isinstance(v, dict) and isinstance(v.get("markers"), dict)}
+            if sets:
+                _eco_sets = sets
+                merge_markers()
+        except FileNotFoundError:
+            pass  # le mod n'a pas encore exporté de marqueurs
+        except Exception as e:
+            log("Marqueurs Suménium :", type(e).__name__, e)
+        time.sleep(MARKERS_EVERY)
+
+
 # À changer quand le correctif BlueMap évolue : la carte est alors entièrement redessinée une fois.
 RENDER_VERSION = "bluemap-dev-a61e143"
 
@@ -258,12 +306,14 @@ def render():
     shutil.copy("/app/anti-spoil.js", f"{WEB}/anti-spoil.js")
     res = subprocess.run(cmd, cwd=BM)
     shutil.copy("/app/anti-spoil.js", f"{WEB}/anti-spoil.js")
+    merge_markers()  # BlueMap réécrit markers.json : on remet tout de suite les marqueurs du mod
     log(f"BlueMap terminé (code {res.returncode}) en {int((time.time() - t) / 60)} min")
 
 
 def main():
     if not E("SFTP_HOST"):
         sys.exit("SFTP_HOST manquant dans .env")
+    threading.Thread(target=markers_loop, daemon=True).start()
     while True:
         start = time.time()
         try:

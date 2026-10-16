@@ -77,6 +77,16 @@ Le cron de GitHub Actions est souvent retardé de plusieurs heures (limite de Gi
 2. *Repository access* : seulement `DeedG/Sumenium`. *Permissions → Repository → Actions : Read and write*. Expiration : 1 an.
 3. Copier le jeton dans un secret du dépôt nommé `GH_DISPATCH_TOKEN`, puis relancer *Déployer l'Espace*.
 
+## Économie (mod Sumenium Economy)
+
+Toutes les 5 minutes, la mise à jour lit `sumenium-data/` à la racine du serveur (jamais `sumenium-data/data/`, réservé au mod) :
+
+- `export/*.json` et `masse-monetaire.jsonl` → `site/eco.json` (public) : onglet **Économie** (aperçu, boutiques, hôtel des ventes, FISC, factions, baltop). Montants en Su.
+- `journal/AAAA-MM-JJ.jsonl` → envoyé au Worker (base D1, table `tx`), **jamais publié** : onglet *Espace → Mon historique*, et historique de n'importe quel joueur dans *Outils staff*. Montants en **centimes** dans le journal (÷ 100 à l'affichage). Gardé 180 jours.
+- Un fichier absent ou vide affiche « données indisponibles » à l'endroit concerné.
+- Cache : les fichiers de données sont toujours revalidés, le reste du site est gardé au plus 5 minutes.
+- Carte : le conteneur `carte` du homelab fusionne `export/bluemap-markers.json` dans les marqueurs de la carte toutes les 5 minutes (`MARKERS_MINUTES`), en ne remplaçant que les ensembles `sumenium-*`.
+
 ## Bon à savoir
 
 - Si le SFTP ne répond pas, le site garde les dernières données et affiche un bandeau d'avertissement.
