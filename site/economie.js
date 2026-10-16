@@ -63,7 +63,7 @@ function apercu(view) {
       <div class="stat leaf"><b>${n0(s.nbBoutiques)}</b><span>Boutiques</span></div>
     </div>` : unavailable("statistiques");
   view.innerHTML = `${tiles}
-    <div class="board chart-board"><h3>Argent en circulation<small>un point par heure</small></h3><div id="ecoLine"></div></div>
+    <div class="board chart-board"><h3>Argent en circulation<small>un relevé par heure</small></h3><div id="ecoLine"></div></div>
     <div class="board chart-board"><h3>Volume des échanges<small>7 derniers jours</small></h3><div id="ecoBars"></div></div>
     <div class="boards boards-2">
       <div class="board"><h3>Objets les plus vendus<small>boutiques des joueurs, 7 j</small></h3>${topList(s && s.topVentesJoueurs7j, false)}</div>
@@ -81,42 +81,119 @@ function topList(rows, isItemId) {
     <span class="val">${su(r.montant, 0)}</span><span class="bar2"><s style="width:${Math.max(2, Math.round((r.montant || 0) / max * 100))}%"></s></span></li>`).join("")}</ol></div>`;
 }
 
-// Courbe (une série) : axe Y à 4 graduations, info-bulle au survol
-function lineChart(el, pts) {
-  if (pts) { const i = pts.findIndex((p) => p[1] !== 0); pts = i > 0 ? pts.slice(i) : pts; }
-  if (!pts || pts.length < 2) { el.innerHTML = `<p class="empty">${pts ? "Pas encore assez de points (un par heure)." : "Données indisponibles."}</p>`; return; }
-  const W = Math.max(300, el.clientWidth || 600), H = 220, P = { l: 64, r: 12, t: 12, b: 26 };
-  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
-  const x0 = xs[0], x1 = xs[xs.length - 1];
+// Courbe de l'argent en circulation : plage de temps réglable (boutons, glisser pour zoomer,
+// Ctrl + molette ou pincement du pavé tactile, double-clic pour tout revoir). Axe du temps adaptatif.
+const H_ = 3600000, D_ = 86400000;
+let zoom = null;  // { a, b } en ms, null = tout
+const RANGES = [["24 h", D_], ["3 j", 3 * D_], ["7 j", 7 * D_], ["30 j", 30 * D_], ["Tout", 0]];
+const TSTEPS = [H_, 2 * H_, 3 * H_, 6 * H_, 12 * H_, D_, 2 * D_, 7 * D_, 14 * D_, 30 * D_];
+function timeTicks(a, b, px) {
+  const step = TSTEPS.find((s) => (b - a) / s <= px / 74) || 30 * D_;
+  const out = [], d = new Date(a);
+  if (step >= D_) d.setHours(0, 0, 0, 0); else { d.setMinutes(0, 0, 0); d.setHours(d.getHours() - d.getHours() % (step / H_)); }  // 0 h, 3 h, 6 h…
+  if (step === 7 * D_ || step === 14 * D_) d.setDate(d.getDate() - ((d.getDay() + 6) % 7));  // lundis
+  if (step === 30 * D_) d.setDate(1);
+  for (let t = d.getTime(); t <= b; ) {
+    if (t >= a) out.push(t);
+    const n = new Date(t);
+    if (step === 30 * D_) n.setMonth(n.getMonth() + 1);
+    else if (step >= D_) n.setDate(n.getDate() + step / D_);  // jours calendaires (heure d'été)
+    else n.setTime(t + step);
+    t = n.getTime();
+  }
+  const lab = (t) => {
+    const x = new Date(t);
+    if (step >= 30 * D_) return x.toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
+    if (step >= D_) return x.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+    return x.getHours() === 0 ? x.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" }) : x.getHours() + " h";
+  };
+  return out.map((t) => [t, lab(t), step < D_ && new Date(t).getHours() === 0]);
+}
+const dayOf = (t) => E && E.ouverture && t >= E.ouverture ? ` · jour ${Math.floor((t - E.ouverture) / D_) + 1}` : "";
+
+function lineChart(el, all) {
+  if (!all || all.length < 2) { el.innerHTML = `<p class="empty">${all ? "Pas encore assez de points (un par heure)." : "Données indisponibles."}</p>`; return; }
+  const first = all[0][0], last = all[all.length - 1][0];
+  // Avant le mod : on ne connaît que l'ouverture (0) et le premier relevé, reliés en pointillés
+  const gap = E.ouverture && all[0][0] === E.ouverture && all[0][1] === 0 ? 1 : 0;
+  const clamp = (z) => { if (!z) return null; let { a, b } = z; const w = Math.max(b - a, 2 * H_);
+    a = Math.max(first, Math.min(a, last - w)); b = Math.min(last, a + w); return b - a >= last - first - 60000 ? null : { a, b }; };
+  zoom = clamp(zoom);
+  const a = zoom ? zoom.a : first, b = zoom ? zoom.b : last;
+  const W = Math.max(300, el.clientWidth || 600), H = 230, P = { l: 64, r: 14, t: 12, b: 28 };
+  // Points visibles, plus un de chaque côté pour que la ligne aille jusqu'au bord
+  let i0 = all.findIndex((p) => p[0] >= a); if (i0 < 0) i0 = all.length - 1;
+  let i1 = all.length - 1; while (i1 > 0 && all[i1 - 1][0] > b) i1--;
+  const vis = all.slice(Math.max(0, i0 - 1), Math.min(all.length, i1 + 1));
+  const inView = vis.filter((p) => p[0] >= a && p[0] <= b), ys = (inView.length ? inView : vis).map((p) => p[1]);
   let y0 = Math.min(...ys), y1 = Math.max(...ys);
-  if (y0 === y1) { y0 -= 1; y1 += 1; }
+  if (y0 === y1) { y0 -= Math.max(1, Math.abs(y0) * 0.05); y1 += Math.max(1, Math.abs(y1) * 0.05); }
   const pad = (y1 - y0) * 0.08; y0 = Math.max(0, y0 - pad); y1 += pad;
-  const X = (t) => P.l + (t - x0) / (x1 - x0 || 1) * (W - P.l - P.r), Y = (v) => H - P.b - (v - y0) / (y1 - y0) * (H - P.t - P.b);
+  const iw = W - P.l - P.r, ih = H - P.t - P.b;
+  const X = (t) => P.l + (t - a) / (b - a || 1) * iw, Y = (v) => H - P.b - (v - y0) / (y1 - y0) * ih;
+  const T = (px) => a + (px - P.l) / iw * (b - a);
   const ticks = [0, 1, 2, 3].map((i) => y0 + (y1 - y0) * i / 3);
-  const days = []; const d = new Date(x0); d.setHours(0, 0, 0, 0);
-  for (let t = d.getTime() + 86400000; t < x1; t += 86400000) days.push(t);
-  const step = Math.ceil(days.length / Math.max(1, Math.floor((W - P.l) / 80)));
-  const path = pts.map((p, i) => `${i ? "L" : "M"}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join("");
-  el.innerHTML = `<svg class="chart" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Courbe de l'argent en circulation, de ${su(ys[0], 0)} à ${su(ys[ys.length - 1], 0)}">
+  const seg = (arr) => arr.map((p, i) => `${i ? "L" : "M"}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join("");
+  const gapPath = gap ? seg(all.slice(0, 2)) : "", mainPts = gap ? vis.filter((p) => p[0] !== all[0][0]) : vis;
+  const fmtD = (t, o) => new Date(t).toLocaleString("fr-FR", o);
+  const span = zoom ? `du ${fmtD(a, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} au ${fmtD(b, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+    : `depuis l'ouverture du serveur, le ${fmtD(first, { day: "numeric", month: "long" })} à ${fmtD(first, { hour: "2-digit", minute: "2-digit" })}`;
+  const pressed = (ms) => ms ? !!zoom && Math.abs((b - a) - ms) < H_ && last - b < H_ : !zoom;
+  el.innerHTML = `<div class="chart-tools"><div class="seg" role="group" aria-label="Période">${RANGES.filter(([, ms]) => !ms || ms < last - first)
+      .map(([l, ms]) => `<button type="button" data-r="${ms}" aria-pressed="${pressed(ms)}">${l}</button>`).join("")}</div>
+      <span class="muted small">${E_(span)}</span></div>
+    <svg class="chart zoomable" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Courbe de l'argent en circulation ${E_(span)}, de ${su(ys[0], 0)} à ${su(ys[ys.length - 1], 0)}">
+    <defs><clipPath id="ecoClip"><rect x="${P.l}" y="${P.t - 3}" width="${iw}" height="${ih + 6}"/></clipPath></defs>
     ${ticks.map((v) => `<line class="grid" x1="${P.l}" x2="${W - P.r}" y1="${Y(v)}" y2="${Y(v)}"/><text class="axis" x="${P.l - 8}" y="${Y(v) + 4}" text-anchor="end">${E_(suShort(v))}</text>`).join("")}
-    ${days.filter((_, i) => i % step === 0).map((t) => `<text class="axis" x="${X(t)}" y="${H - 8}" text-anchor="middle">${new Date(t).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</text>`).join("")}
-    <path class="line" d="${path}"/>
+    ${timeTicks(a, b, iw).map(([t, l, strong]) => `<line class="grid tick" x1="${X(t)}" x2="${X(t)}" y1="${H - P.b}" y2="${H - P.b + 4}"/><text class="axis${strong ? " strong" : ""}" x="${X(t)}" y="${H - 8}" text-anchor="middle">${E_(l)}</text>`).join("")}
+    <g clip-path="url(#ecoClip)">${gapPath ? `<path class="line gap" d="${gapPath}"/>` : ""}<path class="line" d="${seg(mainPts)}"/></g>
+    <rect class="sel" id="ecoSel" y="${P.t}" height="${ih}" visibility="hidden"/>
     <line class="cross" id="ecoCross" y1="${P.t}" y2="${H - P.b}" visibility="hidden"/><circle class="dot" id="ecoDot" r="5" visibility="hidden"/>
-    <rect x="${P.l}" y="${P.t}" width="${W - P.l - P.r}" height="${H - P.t - P.b}" fill="transparent" id="ecoHit"/></svg>
-    <div class="ctip" id="ecoTipL" hidden></div>`;
-  const hit = $("ecoHit"), tip = $("ecoTipL"), cross = $("ecoCross"), dot = $("ecoDot");
+    <rect x="${P.l}" y="${P.t}" width="${iw}" height="${ih}" fill="transparent" id="ecoHit"/></svg>
+    <div class="ctip" id="ecoTipL" hidden></div>
+    <p class="muted small chart-help">${gap && a < all[1][0] ? "Pointillés : avant l'installation du mod d'économie, pas de relevé. " : ""}Glisse sur la courbe pour zoomer sur une période${zoom ? " · double-clic pour tout revoir" : ""}.</p>`;
+  const redraw = (z) => { zoom = z; lineChart(el, all); };
+  el.querySelectorAll("[data-r]").forEach((btn) => (btn.onclick = () => { const ms = +btn.dataset.r; redraw(ms ? { a: last - ms, b: last } : null); }));
+  const hit = $("ecoHit"), tip = $("ecoTipL"), cross = $("ecoCross"), dot = $("ecoDot"), sel = $("ecoSel");
+  const svgX = (clientX) => { const r = hit.getBoundingClientRect(); return P.l + (clientX - r.left) / r.width * iw; };
+  const hide = () => { tip.hidden = true; cross.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); };
   const move = (clientX) => {
-    const r = hit.getBoundingClientRect(), t = x0 + (clientX - r.left) / r.width * (x1 - x0);
-    let best = 0; for (let i = 1; i < pts.length; i++) if (Math.abs(pts[i][0] - t) < Math.abs(pts[best][0] - t)) best = i;
-    const [bt, bv] = pts[best], px = X(bt);
+    const t = T(svgX(clientX));
+    let best = -1; vis.forEach((p, i) => { if (p[0] >= a && p[0] <= b && (best < 0 || Math.abs(p[0] - t) < Math.abs(vis[best][0] - t))) best = i; });
+    if (best < 0) return hide();
+    const [bt, bv] = vis[best], px = X(bt);
     cross.setAttribute("x1", px); cross.setAttribute("x2", px); cross.setAttribute("visibility", "visible");
     dot.setAttribute("cx", px); dot.setAttribute("cy", Y(bv)); dot.setAttribute("visibility", "visible");
-    tip.innerHTML = `<b>${E_(su(bv, 0))}</b><span>${new Date(bt).toLocaleString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>`;
-    tip.hidden = false; tip.style.left = Math.min(Math.max(px - 60, 0), W - 140) + "px";
+    const what = gap && bt === all[0][0] ? "Ouverture du serveur" : gap && bt === all[1][0] ? "Premier relevé du mod" : "";
+    tip.innerHTML = `<b>${E_(su(bv, 0))}</b><span>${E_(fmtD(bt, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + dayOf(bt))}</span>${what ? `<span>${what}</span>` : ""}`;
+    tip.hidden = false; tip.style.left = Math.min(Math.max(px / W * el.clientWidth - 70, 0), el.clientWidth - 170) + "px";
   };
-  hit.addEventListener("pointermove", (e) => move(e.clientX));
-  hit.addEventListener("pointerdown", (e) => move(e.clientX));
-  hit.addEventListener("pointerleave", () => { tip.hidden = true; cross.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); });
+  let drag = null;
+  hit.addEventListener("pointerdown", (e) => { drag = { x: svgX(e.clientX), id: e.pointerId, moved: false }; move(e.clientX); });
+  hit.addEventListener("pointermove", (e) => {
+    if (drag && e.pointerId === drag.id) {
+      const x = svgX(e.clientX);
+      if (!drag.moved && Math.abs(x - drag.x) > 8) { drag.moved = true; try { hit.setPointerCapture(e.pointerId); } catch (_) {} }
+      if (drag.moved) { const l = Math.max(P.l, Math.min(x, drag.x)), r = Math.min(P.l + iw, Math.max(x, drag.x));
+        sel.setAttribute("x", l); sel.setAttribute("width", r - l); sel.setAttribute("visibility", "visible"); hide(); return; }
+    }
+    move(e.clientX);
+  });
+  const end = (e) => {
+    if (!drag) return;
+    const d = drag; drag = null; sel.setAttribute("visibility", "hidden");
+    if (d.moved) { const ta = T(Math.min(d.x, svgX(e.clientX))), tb = T(Math.max(d.x, svgX(e.clientX))); redraw({ a: ta, b: tb }); }
+  };
+  hit.addEventListener("pointerup", end); hit.addEventListener("pointercancel", () => { drag = null; sel.setAttribute("visibility", "hidden"); });
+  hit.addEventListener("pointerleave", () => { if (!drag) hide(); });
+  hit.addEventListener("dblclick", () => redraw(null));
+  // Ctrl + molette (ou pincement sur pavé tactile) : zoom centré sur le curseur ; la molette seule fait défiler la page
+  hit.addEventListener("wheel", (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    const t = T(svgX(e.clientX)), k = Math.exp(Math.max(-1, Math.min(1, e.deltaY / 200)));
+    redraw({ a: t - (t - a) * k, b: t + (b - t) * k });
+  }, { passive: false });
 }
 
 // Barres empilées par jour : 4 séries (couleurs validées clair/sombre), légende + tableau

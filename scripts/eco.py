@@ -13,7 +13,8 @@ from datetime import datetime, timezone, timedelta
 
 EXPORT = "sumenium-data/export"
 JOURNAL = "sumenium-data/journal"
-MAX_POINTS = 2000          # points gardés pour la courbe de la masse monétaire
+MAX_POINTS = 6000          # points gardés pour la courbe de la masse monétaire (≈ 8 mois à un par heure)
+OUVERTURE = "2026-10-09T21:00:00+02:00"  # ouverture de la saison 7 : le 0 de la courbe
 CHUNK = 400                # lignes de journal par envoi au Worker
 
 
@@ -132,13 +133,25 @@ def build(sftp, read, j, log, out_path):
             if t and v is not None:
                 points.append([t, v])
         points.sort()
-        # Les heures d'avant les premiers comptes valent 0 : on commence la courbe au premier montant réel
-        while len(points) > 1 and points[0][1] == 0:
+        ouv = _ms(OUVERTURE)
+        eco["ouverture"] = ouv
+        points = [p for p in points if p[0] >= ouv]
+        # Les heures d'avant l'installation du mod valent 0 : la courbe part de l'ouverture (0),
+        # puis passe directement au premier relevé réel (le site relie les deux en pointillés)
+        while points and points[0][1] == 0:
             points.pop(0)
         if len(points) > MAX_POINTS:
-            step = len(points) / MAX_POINTS
-            points = [points[int(i * step)] for i in range(MAX_POINTS - 1)] + [points[-1]]
-        eco["masse"] = points or None
+            # Les 14 derniers jours gardent tous leurs points, le reste est allégé
+            recent = [p for p in points if p[0] >= points[-1][0] - 14 * 86_400_000]
+            old = points[:len(points) - len(recent)]
+            keep = max(2, MAX_POINTS - len(recent))
+            if len(old) > keep:
+                step = len(old) / keep
+                old = [old[int(i * step)] for i in range(keep)]
+            points = old + recent
+        if points and points[0][0] > ouv:
+            points.insert(0, [ouv, 0])
+        eco["masse"] = points if len(points) > 1 else None
     except Exception as e:
         log(f"Économie : masse-monetaire.jsonl indisponible ({type(e).__name__})")
         eco["masse"] = None
