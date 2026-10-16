@@ -123,7 +123,9 @@ const MC_NAME = /^[A-Za-z0-9_]{3,16}$/;
 
 async function proxy(req, env, url) {
   if (req.method !== "GET" && req.method !== "HEAD") return new Response("Méthode non autorisée", { status: 405 });
-  const target = env.SITE_ORIGIN.replace(/\/$/, "") + url.pathname + url.search;
+  // GitHub Pages garde ses fichiers 10 min en cache : on force une copie fraîche chaque minute
+  const bust = (url.search ? "&" : "?") + "_v=" + Math.floor(Date.now() / 60000);
+  const target = env.SITE_ORIGIN.replace(/\/$/, "") + url.pathname + url.search + bust;
   const res = await fetch(target, { headers: { "user-agent": "sumenium-worker" }, redirect: "follow" });
   const out = new Response(res.body, res);
   securityHeaders(out.headers);

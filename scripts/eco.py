@@ -132,6 +132,9 @@ def build(sftp, read, j, log, out_path):
             if t and v is not None:
                 points.append([t, v])
         points.sort()
+        # Les heures d'avant les premiers comptes valent 0 : on commence la courbe au premier montant réel
+        while len(points) > 1 and points[0][1] == 0:
+            points.pop(0)
         if len(points) > MAX_POINTS:
             step = len(points) / MAX_POINTS
             points = [points[int(i * step)] for i in range(MAX_POINTS - 1)] + [points[-1]]

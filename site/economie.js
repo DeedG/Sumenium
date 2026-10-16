@@ -83,6 +83,7 @@ function topList(rows, isItemId) {
 
 // Courbe (une série) : axe Y à 4 graduations, info-bulle au survol
 function lineChart(el, pts) {
+  if (pts) { const i = pts.findIndex((p) => p[1] !== 0); pts = i > 0 ? pts.slice(i) : pts; }
   if (!pts || pts.length < 2) { el.innerHTML = `<p class="empty">${pts ? "Pas encore assez de points (un par heure)." : "Données indisponibles."}</p>`; return; }
   const W = Math.max(300, el.clientWidth || 600), H = 220, P = { l: 64, r: 12, t: 12, b: 26 };
   const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
