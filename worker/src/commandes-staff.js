@@ -26,6 +26,9 @@ export const COMMANDES_STAFF = {
     ] },
     { titre: "Outils", lignes: [
       ["/sumeco bypass", "Mode gestion : ouvrir, casser et gérer toutes les boutiques. Retaper pour l'arrêter (s'arrête aussi au redémarrage)"],
+      ["/sumeco surnom <joueur> <surnom>", "Donne un surnom affiché dans le chat et le tab, le pseudo réel ne change pas (espaces acceptés, 32 caractères max). Ex. /sumeco surnom Bidule42 DeedG (2e compte)"],
+      ["/sumeco surnom <joueur> retirer", "Enlève le surnom"],
+      ["/sumeco surnom", "Liste des joueurs qui ont un surnom"],
       ["/sumeco stats", "Argent en circulation, nombre de boutiques et factions"],
       ["/sumeco exporter", "Sauvegarde et réécrit tout de suite les fichiers pour le site"],
       ["/sumeco recharger", "Recharge config/sumenium-economy.json"],
