@@ -42,7 +42,7 @@ La carte 3D est hébergée sur le homelab et intégrée au site : voir [homelab/
 
 ## Espace joueurs (sumenium.alheon.fr)
 
-Remplace le Google Sheet de la saison : fiches RP, factions, usines, élections, prix du FISC et tailles RP. Connexion avec Discord ; les droits viennent des rôles du serveur Discord :
+Remplace le Google Sheet de la saison : fiches RP, factions, projets, usines, élections et tailles RP (les prix du FISC sont dans l'onglet Économie, lus sur le serveur). Connexion avec Discord ; les droits viennent des rôles du serveur Discord :
 
 | Rôle | Droits |
 |---|---|

@@ -1,4 +1,4 @@
-/* Espace Suménium : fiches joueurs, factions, projets communautaires, usines, élections, prix, outils staff.
+/* Espace Suménium : fiches joueurs, factions, projets communautaires, usines, élections, outils staff.
    Fonctionne uniquement sur sumenium.alheon.fr (l'API et la connexion Discord y sont servies). */
 (() => {
 const HOST = "sumenium.alheon.fr";
@@ -19,13 +19,14 @@ const TAILLE_MOT = { grosse: "grosse", moyenne: "moyenne", petite: "petite" };
 // Sous-onglets, regroupés : ce qui me concerne / la vie du serveur / le staff
 const GROUPS = [
   ["Moi", [["fiche", "Ma fiche"], ["historique", "Mon historique"]]],
-  ["Serveur", [["factions", "Factions"], ["projets", "Projets"], ["usines", "Usines"], ["joueurs", "Joueurs"], ["elections", "Élections"], ["prix", "Prix du FISC"]]],
+  ["Serveur", [["factions", "Factions"], ["projets", "Projets"], ["usines", "Usines"], ["joueurs", "Joueurs"], ["elections", "Élections"]]],
   ["Staff", [["staff", "Outils staff"]]],
 ];
 const SUBS = GROUPS.flatMap(([, l]) => l);
 // Échelle RP : 1,87 m IRL = taille normale (1), comme dans l'ancien tableau
 const scaleOf = (cm) => (cm ? Math.round((cm / 187) * 10000) / 10000 : null);
 
+let ECO = null;  // site/eco.json (mod Sumenium Economy) : soldes et banques, pour relier l'Espace à l'onglet Économie
 let ME = null, D = null, checking = true, sub = "fiche", busy = false, staffFaction = null, auditRows = [], auditEnd = false, WORLD = null;
 
 /* ---------- API ---------- */
@@ -54,12 +55,37 @@ async function act(fn, ok) {
   finally { busy = false; document.body.classList.remove("busy"); }
 }
 async function reload() {
+  const eco = fetch("eco.json?t=" + Date.now()).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   D = await call("GET", "/api/data");
+  ECO = await eco;
   ME = D.user || ME;
   render();
 }
 
 /* ---------- helpers ---------- */
+const norm = (x) => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+// Faction du mod reliée à une faction de l'Espace : même nom ou même tag (accents, espaces et majuscules ignorés),
+// sinon début du nom (« Ordo » ↔ « Ordo Lupuli »), sinon celle qui a le plus de membres en commun (2 au moins)
+const _ecoFac = new Map();
+function ecoFac(f) {
+  if (!f || !ECO || !ECO.factions) return null;
+  if (_ecoFac.has(f.id) && _ecoFac.get(f.id)[0] === ECO) return _ecoFac.get(f.id)[1];
+  const n = norm(f.name), keys = (x) => [x.tag, x.id].map(norm).filter(Boolean);
+  let hit = ECO.factions.find((x) => keys(x).includes(n))
+    || ECO.factions.find((x) => keys(x).some((k) => k.length >= 3 && (n.startsWith(k) || k.startsWith(n))));
+  if (!hit) {
+    const mine = new Set(members(f.id).map((p) => norm(p.mc_name)));
+    let best = 0;
+    for (const x of ECO.factions) { const c = x.membres.filter((m) => mine.has(norm(m.nom))).length; if (c >= 2 && c > best) { best = c; hit = x; } }
+  }
+  _ecoFac.set(f.id, [ECO, hit || null]);
+  return hit || null;
+}
+const ecoPlayer = (name) => ECO && ECO.joueurs ? ECO.joueurs.find((j) => norm(j.nom) === norm(name)) || null : null;
+const suE = (v) => Number(v || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + "\u00a0" + ((ECO && ECO.monnaie) || "Su");
+const facStyle = (f) => { const e = ecoFac(f); const c = e && typeof col === "function" ? col(e.couleur) : null; return c ? ` style="--fc:${esc(c)}"` : ""; };
+const facLabel = (fid) => { const f = fac(fid); return f ? `<span class="ftag"${facStyle(f)}>${esc(f.name)}</span>` : '<span class="chip muted">Solo</span>'; };
+const ROLE_MOD = { chef: "Chef", tresorier: "Trésorier" };
 const isStaff = () => ME && ME.level === "staff";
 const canWrite = () => ME && ME.level !== "attente";
 const me = () => D && D.players.find((p) => p.id === D.meId);
@@ -113,7 +139,7 @@ function render() {
     <nav class="subtabs" aria-label="Espace joueurs">${GROUPS.filter(([g]) => g !== "Staff" || isStaff()).map(([g, items]) =>
       `<span class="grp">${g}</span>` + items.map(([k, l]) => `<a href="#espace/${k}" aria-current="${k === sub ? "page" : "false"}">${l}${badge[k] ? ` <span class="badge">${badge[k]}</span>` : ""}</a>`).join("")).join("")}</nav>
     <div id="espView"></div>`;
-  ({ fiche, historique, joueurs, factions, projets, usines, elections, prix, staff })[sub]();
+  ({ fiche, historique, joueurs, factions, projets, usines, elections, staff })[sub]();
 }
 const view = (h) => ($("espView").innerHTML = h);
 
@@ -135,14 +161,17 @@ function fiche() {
   const f = p.faction_id ? fac(p.faction_id) : null;
   view(head("Ma fiche", "Ce que les autres joueurs voient de toi, et ce dont le staff a besoin.") + `<div class="fiche-grid">
     <aside class="card profile">
-      <div class="profile-id">${face(p.mc_name, 64)}<div><b>${esc(p.mc_name)}</b><span class="muted small">${f ? esc(f.name) : "Solo"}</span></div></div>
+      <div class="profile-id">${face(p.mc_name, 64)}<div><b>${esc(p.mc_name)}</b>${facLabel(p.faction_id)}</div></div>
       <ul class="status">
         <li>${p.whitelisted ? '<span class="chip ok">✓ Whitelisté</span>' : '<span class="chip warn">Pas encore whitelisté</span>'}</li>
         <li>${ficheOk(p) ? '<span class="chip ok">✓ Fiche complète</span>' : `<span class="chip warn">À compléter : ${[!p.metier && "métier", !p.mort && "mourir ou survivre"].filter(Boolean).join(", ")}</span>`}</li>
         <li>${sc ? (applied != null && Math.abs(applied - sc) < 0.0005 ? '<span class="chip ok">✓ Taille RP appliquée</span>' : '<span class="chip warn">Taille RP à appliquer par le staff</span>') : '<span class="chip muted">Taille RP non renseignée</span>'}</li>
       </ul>
       ${!p.whitelisted ? `<p class="small muted">${ficheOk(p) ? "Ta fiche est complète : le staff t'ajoute à la whitelist une fois ta candidature validée." : "Complète ta fiche : le staff t'ajoute à la whitelist une fois ta candidature validée."}</p>` : ""}
+      ${(() => { const e = ecoPlayer(p.mc_name), ef = ecoFac(f); return e || ef ? `<dl class="account">
+        ${e ? `<dt>Mon solde</dt><dd>${suE(e.solde)}</dd>` : ""}${ef ? `<dt>Banque de ${esc(f.name)}</dt><dd>${suE(ef.banque)}</dd>` : ""}</dl>` : ""; })()}
       <div class="profile-links">
+        <a class="btn small ghost" href="#espace/historique">Mon historique</a>
         <a class="btn small ghost" href="#succes" data-my-succes>Mes succès</a>
         ${f ? `<a class="btn small ghost" href="#espace/factions">Ma faction</a>` : ""}
       </div>
@@ -243,23 +272,20 @@ function joueurs() {
       <input type="search" id="jq" placeholder="Chercher un joueur, un métier…" value="${esc(jq)}" aria-label="Chercher un joueur">
       <select id="jf" aria-label="Faction"><option value="">Toutes les factions</option><option value="none"${jf === "none" ? " selected" : ""}>Solo</option>
       ${D.factions.map((f) => `<option value="${f.id}"${String(f.id) === jf ? " selected" : ""}>${esc(f.name)}</option>`).join("")}</select>
-      ${isStaff() ? '<button class="btn small" id="addPlayer">Ajouter une fiche</button>' : ""}</div>
+      ${isStaff() ? '<form class="inline" id="addPlayer"><input name="mc_name" required maxlength="16" pattern="[A-Za-z0-9_]{3,16}" placeholder="Pseudo Minecraft" aria-label="Pseudo de la fiche à ajouter"><button class="btn small">Ajouter une fiche</button></form>' : ""}</div>
     <p class="count">${plural(list.length, "joueur", "joueurs")}</p>
     <div class="cards">${list.map(playerCard).join("") || '<p class="empty">Aucun joueur ne correspond.</p>'}</div>`);
   $("jq").oninput = (e) => { jq = e.target.value; const pos = e.target.selectionStart; joueurs(); $("jq").focus(); $("jq").setSelectionRange(pos, pos); };
   $("jf").onchange = (e) => { jf = e.target.value; joueurs(); };
   if (isStaff()) {
-    $("addPlayer").onclick = () => {
-      const n = prompt("Pseudo Minecraft du joueur à ajouter :");
-      if (n) act(() => call("POST", "/api/admin/players", { mc_name: n.trim() }), "Fiche ajoutée");
-    };
+    $("addPlayer").onsubmit = (e) => { e.preventDefault(); act(() => call("POST", "/api/admin/players", { mc_name: e.target.mc_name.value.trim() }), "Fiche ajoutée"); };
   }
   bindPlayerEditors();
 }
 function playerCard(p) {
   const mine = p.id === D.meId;
   return `<article class="pcard${mine ? " mine" : ""}">
-    <header>${face(p.mc_name)}<div><b>${esc(p.mc_name)}</b>${p.faction_id ? `<span class="chip">${esc(facName(p.faction_id))}</span>` : '<span class="chip muted">Solo</span>'}</div></header>
+    <header>${face(p.mc_name)}<div><b>${esc(p.mc_name)}</b>${facLabel(p.faction_id)}</div></header>
     ${p.metier ? `<p class="metier">${esc(p.metier)}</p>` : '<p class="metier muted">Métier non renseigné</p>'}
     <div class="tags">${p.mort ? `<span class="chip m-${esc(p.mort)}" title="${esc(MORT[p.mort])}">${esc(MORT_COURT[p.mort])}</span>` : ""}
       ${p.activite ? `<span class="chip">${esc(ACT_COURT[p.activite])}</span>` : ""}
@@ -300,9 +326,9 @@ function factions() {
   const myF = me() && me().faction_id;
   const list = [...D.factions].sort((a, b) => (b.id === myF) - (a.id === myF) || a.name.localeCompare(b.name));
   view(head("Factions", "De 3 à 8 joueurs par faction. Les coordonnées ne sont visibles que par les membres de la faction et le staff.") +
-    `${isStaff() ? '<div class="bar"><button class="btn small" id="addFac">Créer une faction</button></div>' : ""}
+    `${isStaff() ? '<form class="bar inline" id="addFac"><input name="name" required maxlength="40" placeholder="Nom de la faction" aria-label="Nom de la nouvelle faction"><button class="btn small">Créer une faction</button></form>' : ""}
     <div class="fac-grid">${list.map(facCard).join("") || '<p class="empty">Aucune faction.</p>'}</div>`);
-  if (isStaff()) $("addFac").onclick = () => { const n = prompt("Nom de la nouvelle faction :"); if (n) act(() => call("POST", "/api/factions", { name: n.trim() }), "Faction créée"); };
+  if (isStaff()) $("addFac").onsubmit = (e) => { e.preventDefault(); act(() => call("POST", "/api/factions", { name: e.target.name.value.trim() }), "Faction créée"); };
   document.querySelectorAll("[data-fac-edit]").forEach((b) => (b.onclick = () => facEdit(+b.dataset.facEdit)));
   document.querySelectorAll("[data-fac-del]").forEach((b) => (b.onclick = () => {
     const f = fac(+b.dataset.facDel);
@@ -326,10 +352,13 @@ function facCard(f) {
   const bases = D.bases.filter((b) => b.faction_id === f.id);
   const mine = me() && me().faction_id === f.id;
   const showBases = isStaff() || mine;
+  const ef = ecoFac(f);
   const row = (l, v) => (v ? `<dt>${l}</dt><dd>${esc(v)}</dd>` : "");
   return `<article class="card fac${mine ? " mine" : ""}" id="fac-${f.id}">
-    <header><h3>${esc(f.name)}${mine ? ' <span class="chip ok">Ma faction</span>' : ""}</h3><span class="chip ${ok ? "ok" : "warn"}">${ms.length}/8 · ${ok ? "valide" : ms.length < 3 ? "3 minimum" : "trop de joueurs"}</span></header>
-    <p class="members">${ms.map((p) => `<span>${esc(p.mc_name)}</span>`).join("") || '<span class="muted">Aucun membre</span>'}</p>
+    <header><h3><span class="ftag big"${facStyle(f)}>${esc(f.name)}</span>${mine ? ' <span class="chip ok">Ma faction</span>' : ""}</h3><span class="chip ${ok ? "ok" : "warn"}">${ms.length}/8 · ${ok ? "valide" : ms.length < 3 ? "3 minimum" : "trop de joueurs"}</span></header>
+    <p class="members">${ms.map((p) => { const r = ef && (ef.membres.find((m) => norm(m.nom) === norm(p.mc_name)) || {}).role;
+      return `<span>${esc(p.mc_name)}${ROLE_MOD[r] ? ` <small class="muted">${ROLE_MOD[r]}</small>` : ""}</span>`; }).join("") || '<span class="muted">Aucun membre</span>'}</p>
+    ${ef ? `<p class="fac-bank"><b>${suE(ef.banque)}</b> <span class="muted small">en banque · <a href="#economie/factions">Économie</a></span></p>` : ""}
     <dl>${row("Thème", f.theme)}${row("Hub et usines prévues", f.hub)}${row("Projet communautaire prévu", f.projet_commu)}${row("Autres projets", f.autres_projets)}${row("Recrutement", f.recrutement)}
       ${f.tirage ? `<dt>Tirage des usines</dt><dd>${f.tirage}ᵉ</dd>` : ""}
       ${ch.length ? `<dt>Usines</dt><dd>${ch.map(usineChip).join(" ")}</dd>` : ""}
@@ -408,7 +437,7 @@ function projetListEditor() {
       <td><input type="checkbox" name="unique_srv"${pr.unique_srv ? " checked" : ""} aria-label="Unique"></td><td><input type="checkbox" name="illimite"${pr.illimite ? " checked" : ""} aria-label="Sans limite"></td>
       <td><button type="button" class="btn small ghost" data-pr-save="${pr.id}">Enregistrer</button> <button type="button" class="x" data-pr-del="${pr.id}" aria-label="Supprimer">✕</button></td></tr>`).join("")}
     </tbody></table></div>
-    <div class="actions"><button type="button" class="btn small ghost" id="prAdd">Ajouter un projet</button></div></details>`;
+    <form class="actions inline" id="prAdd"><input name="nom" required maxlength="80" placeholder="Nom du nouveau projet" aria-label="Nom du nouveau projet"><button class="btn small ghost">Ajouter un projet</button></form></details>`;
 }
 function bindProjets() {
   document.querySelectorAll("[data-pf-del]").forEach((b) => (b.onclick = () => confirm("Retirer ce projet à la faction ? L'usine qu'il a débloquée sera retirée aussi.")
@@ -433,7 +462,7 @@ function bindProjets() {
   }));
   document.querySelectorAll("[data-pr-del]").forEach((b) => (b.onclick = () => confirm("Supprimer ce projet de la liste ?") && act(() => call("DELETE", `/api/projets/${b.dataset.prDel}`), "Projet supprimé")));
   const add = $("prAdd");
-  if (add) add.onclick = () => { const n = prompt("Nom du nouveau projet :"); if (n) act(() => call("POST", "/api/projets", { nom: n.trim(), tailles: "petite" }), "Projet ajouté"); };
+  if (add) add.onsubmit = (e) => { e.preventDefault(); act(() => call("POST", "/api/projets", { nom: e.target.nom.value.trim(), tailles: "petite" }), "Projet ajouté"); };
 }
 
 /* ---------- Usines ---------- */
@@ -484,7 +513,8 @@ function elections() {
   const res = (cid, t) => { const r = (D.results || []).find((x) => x.candidat_id === cid && x.tour === t); return r ? r.n : 0; };
   const total = (t) => (D.results || []).filter((x) => x.tour === t).reduce((a, x) => a + x.n, 0);
   const shown = D.candidats.filter((c) => tour !== 2 || c.tour2);
-  view(head("Élection du maire", `<span class="chip">${esc(ELECTION[st])}</span>${tour ? " Un vote par compte et par tour ; tu peux changer ton vote tant que le tour est ouvert. Le vote est secret." : ""}`) + `
+  view(head("Élection du maire", tour ? "Un vote par compte et par tour ; tu peux changer ton vote tant que le tour est ouvert. Le vote est secret." : "Les candidats et leur programme.") + `
+    <div class="card status-line"><span class="chip ${st === "fermee" ? "muted" : st === "resultats" ? "ok" : "warn"}">${esc(ELECTION[st])}</span></div>
     ${st === "candidatures" && canWrite() && p ? candForm(mine) : ""}
     <div class="cards">${shown.map((c) => {
       const voted = tour && D.myVotes[tour] === c.id;
@@ -514,32 +544,6 @@ function candForm(c) {
     <div class="wide actions"><button class="btn">${c ? "Mettre à jour" : "Déposer ma candidature"}</button>${c ? '<button type="button" class="btn ghost danger" id="candWithdraw">Retirer</button>' : ""}</div></form>`;
 }
 
-/* ---------- Prix du FISC ---------- */
-function prix() {
-  const h = head("Prix du FISC", "Ce que le FISC paie, en suméniens, pour chaque minerai brut.");
-  if (!isStaff()) {
-    return view(h + `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Minerai</th><th>Roche</th><th>Prix (suméniens)</th></tr></thead><tbody>
-      ${D.prix.map((r) => `<tr><td>${esc(r.minerai)}</td><td>${esc(r.roche)}</td><td>${fmt(r.prix)}</td></tr>`).join("")}</tbody></table></div>`);
-  }
-  const line = (r) => `<tr data-id="${r.id || ""}"><td><input name="minerai" value="${esc(r.minerai)}" aria-label="Minerai"></td><td><input name="roche" value="${esc(r.roche)}" aria-label="Roche"></td>
-    <td><input name="prix" type="number" step="0.01" min="0" value="${r.prix ?? ""}" aria-label="Prix"></td><td><button type="button" class="x" aria-label="Supprimer la ligne">✕</button></td></tr>`;
-  view(h + `<form id="prixForm"><div class="tbl-wrap"><table class="tbl edit"><thead><tr><th>Minerai</th><th>Roche</th><th>Prix</th><th></th></tr></thead>
-    <tbody id="prixBody">${D.prix.map(line).join("")}</tbody></table></div>
-    <div class="actions"><button type="button" class="btn small ghost" id="prixAdd">Ajouter une ligne</button><button class="btn small">Enregistrer les prix</button></div></form>`);
-  const body = $("prixBody");
-  body.onclick = (e) => { if (e.target.closest(".x")) e.target.closest("tr").remove(); };
-  $("prixAdd").onclick = () => body.insertAdjacentHTML("beforeend", line({ minerai: "", roche: "", prix: "" }));
-  $("prixForm").onsubmit = (e) => {
-    e.preventDefault();
-    const rows = [...body.querySelectorAll("tr")].map((tr) => ({ id: +tr.dataset.id || null,
-      minerai: tr.querySelector('[name="minerai"]').value, roche: tr.querySelector('[name="roche"]').value, prix: tr.querySelector('[name="prix"]').value }));
-    act(() => call("PUT", "/api/prix", { rows }), "Prix enregistrés");
-  };
-}
-
-/* ---------- Staff ---------- */
-// Suggestion de pseudo whitelisté proche (fautes de frappe, majuscules, _ ajoutés…)
-const norm = (n) => n.toLowerCase().replace(/[^a-z0-9]/g, "");
 function lev(a, b) {
   const d = Array.from({ length: b.length + 1 }, (_, i) => i);
   for (let i = 1; i <= a.length; i++) {
