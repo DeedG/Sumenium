@@ -36,6 +36,7 @@ MARKERS_EVERY = int(E("MARKERS_MINUTES", "5")) * 60
 ECO_MARKERS = "sumenium-data/export/bluemap-markers.json"
 LIVE_MARKERS = f"{WEB}/maps/overworld/live/markers.json"
 _eco_sets = {}
+MARKERS_MAX_DISTANCE = int(E("MARKERS_MAX_DISTANCE") or 100000)  # distance de caméra au-delà de laquelle un marqueur de boutique disparaît
 
 
 def log(*a):
@@ -266,6 +267,31 @@ marker-sets: {{{markers}
 ''')
 
 
+def _camel(k):
+    return re.sub(r"-([a-z])", lambda m: m.group(1).upper(), k)
+
+
+def _bluemap_live(sets):
+    """Le mod écrit les clés comme dans la config BlueMap (« default-hidden », « max-distance »), mais la carte web lit
+    markers.json avec les noms de BlueMap (« defaultHidden », « maxDistance ») : on convertit. Les marqueurs restent visibles
+    même carte dézoomée (MARKERS_MAX_DISTANCE), chacun peut masquer le calque dans le menu de la carte."""
+    out = {}
+    for sid, st in sets.items():
+        ns = {_camel(k): v for k, v in st.items() if k != "markers"}
+        ns.setdefault("toggleable", True)
+        ns.setdefault("defaultHidden", False)
+        ns["markers"] = {}
+        for mid, m in (st.get("markers") or {}).items():
+            if not isinstance(m, dict):
+                continue
+            nm = {_camel(k): v for k, v in m.items()}
+            nm["minDistance"] = 0
+            nm["maxDistance"] = MARKERS_MAX_DISTANCE
+            ns["markers"][mid] = nm
+        out[sid] = ns
+    return out
+
+
 def merge_markers():
     """Remplace les ensembles « sumenium-* » du markers.json de la carte, sans toucher aux autres (bordure, brouillard)."""
     if not _eco_sets or not os.path.isdir(os.path.dirname(LIVE_MARKERS)):
@@ -295,6 +321,9 @@ def markers_loop():
                 data = json.loads(read(sftp, posixpath.join(E("SFTP_ROOT") or ".", ECO_MARKERS)))
             sets = {k: v for k, v in data.items() if k.startswith("sumenium-") and isinstance(v, dict) and isinstance(v.get("markers"), dict)}
             if sets:
+                sets = _bluemap_live(sets)
+                if sets != _eco_sets:
+                    log("Marqueurs Suménium :", ", ".join(f"{v.get('label', k)} {len(v['markers'])}" for k, v in sets.items()))
                 _eco_sets = sets
                 merge_markers()
         except FileNotFoundError:
