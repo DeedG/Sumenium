@@ -285,6 +285,15 @@ def _bluemap_live(sets):
             if not isinstance(m, dict):
                 continue
             nm = {_camel(k): v for k, v in m.items()}
+            # La carte web plante sur un marqueur sans « classes » (elle fait classList.add(...classes)) et le saute :
+            # on remet les champs que BlueMap écrit toujours lui-même
+            nm.setdefault("classes", [])
+            nm.setdefault("listed", True)
+            nm.setdefault("sorting", 0)
+            if nm.get("type", "poi") == "poi":
+                nm.setdefault("type", "poi")
+                nm.setdefault("icon", "assets/poi.svg")
+                nm.setdefault("anchor", {"x": 25, "y": 45})
             nm["minDistance"] = 0
             nm["maxDistance"] = MARKERS_MAX_DISTANCE
             ns["markers"][mid] = nm
