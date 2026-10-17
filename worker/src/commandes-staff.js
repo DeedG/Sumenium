@@ -6,6 +6,8 @@ export const COMMANDES_STAFF = {
       ["/fisc rachat <prix unitaire>", "Le coffre devient un point de rachat de l'item en main (ex. /fisc rachat 70 avec un minerai de diamant)"],
       ["/fisc vente <prix> <quantité>", "Le FISC vend l'item en main, stock infini (ex. hopper filtre à 1500)"],
       ["/fisc prix <prix>", "Change le prix d'une boutique du FISC"],
+      ["/fisc cacher", "En regardant le coffre : la boutique (du FISC ou d'un joueur) disparaît de l'annuaire, du site et de la carte, mais reste utilisable par qui la trouve. Ex. shop d'items cheat : /fisc vente <prix> <quantité> puis /fisc cacher. Le panneau affiche toujours « FISC » : le casser en /sumeco bypass, la boutique marche sans"],
+      ["/fisc montrer", "Rend de nouveau visible une boutique cachée"],
     ] },
     { titre: "Argent", lignes: [
       ["/eco voir <joueur>", "Solde d'un joueur et de sa faction"],

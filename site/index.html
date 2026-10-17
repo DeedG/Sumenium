@@ -353,6 +353,15 @@ body.busy{cursor:progress}
 .chart .s0,.sw.s0{fill:var(--c0);background:var(--c0)} .chart .s1,.sw.s1{fill:var(--c1);background:var(--c1)}
 .chart .s2,.sw.s2{fill:var(--c2);background:var(--c2)} .chart .s3,.sw.s3{fill:var(--c3);background:var(--c3)}
 .chart .hitbar{cursor:default}
+.idet{display:grid;gap:4px;margin:-2px 0 2px}
+.idet .ench{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px}
+.idet .ench li{font-size:.8rem;font-weight:700;padding:2px 8px;border-radius:999px;background:color-mix(in srgb,var(--c2) 16%,transparent);color:var(--fg)}
+.idet .ench li.curse{background:color-mix(in srgb,#d33 18%,transparent)}
+.idet .potion,.idet .lore{margin:0;font-size:.84rem}
+.idet .lore{font-style:italic;color:var(--muted)}
+.idet .dura{margin:0;display:flex;align-items:center;gap:8px}
+.idet .dbar{flex:1;max-width:120px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.idet .dbar s{display:block;height:100%;background:hsl(var(--h) 65% 45%)}
 .chart .line.gap{stroke-dasharray:4 5;opacity:.6}
 .chart .axis.strong{fill:var(--fg);font-weight:700}
 .chart .sel{fill:var(--c0);opacity:.15}

@@ -37,6 +37,28 @@ def _ms(v):
         return None
 
 
+def _details(d):
+    """Bloc « details » du mod (v2.2) : enchantements, potion, nom perso, lore, durabilité.
+    Le champ « composants » (item complet au format /give) n'est pas publié : trop lourd pour le site."""
+    if not isinstance(d, dict):
+        return None
+    out = {}
+    if d.get("nomPerso"):
+        out["nomPerso"] = str(d["nomPerso"])[:80]
+    ench = [{"id": e.get("id"), "niveau": e.get("niveau") or 1, "nom": e.get("nom")}
+            for e in (d.get("enchantements") or []) if isinstance(e, dict) and e.get("id")]
+    if ench:
+        out["enchantements"] = ench
+    for k in ("resume", "potion"):
+        if d.get(k):
+            out[k] = str(d[k])[:200]
+    if isinstance(d.get("lore"), list) and d["lore"]:
+        out["lore"] = [str(x)[:120] for x in d["lore"][:6]]
+    if d.get("durabiliteMax"):
+        out["durabilite"], out["durabiliteMax"] = d.get("durabilite"), d.get("durabiliteMax")
+    return out or None
+
+
 def _load(sftp, read, j, name, log):
     try:
         raw = read(sftp, j(EXPORT, name))
@@ -89,7 +111,7 @@ def build(sftp, read, j, log, out_path):
                           "service": s.get("service"), "quantite": s.get("quantite") or 1, "prix": _num(s.get("prix")),
                           "stock": s.get("stock"), "rupture": bool(s.get("rupture")), "ventes": s.get("ventes") or 0,
                           "itemsEchanges": s.get("itemsEchanges") or 0, "chiffreAffaires": _num(s.get("chiffreAffaires")) or 0,
-                          "creeLe": s.get("creeLe")})
+                          "creeLe": s.get("creeLe"), "details": _details(s.get("details"))})
         eco["boutiques"] = shops
     else:
         eco["boutiques"] = None
@@ -115,7 +137,7 @@ def build(sftp, read, j, log, out_path):
                               "quantite": a.get("quantite") or 1, "prixDepart": _num(a.get("prixDepart")),
                               "achatImmediat": _num(a.get("achatImmediat")), "offreActuelle": _num(a.get("offreActuelle")),
                               "meilleurEncherisseur": a.get("meilleurEncherisseur"), "nbOffres": a.get("nbOffres") or 0,
-                              "fin": _ms(a.get("fin"))} for a in hdv["annonces"]), key=lambda a: a["fin"] or 0)
+                              "fin": _ms(a.get("fin")), "details": _details(a.get("details"))} for a in hdv["annonces"]), key=lambda a: a["fin"] or 0)
     else:
         eco["hdv"] = None
 

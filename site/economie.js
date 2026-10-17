@@ -5,7 +5,7 @@ const $ = (id) => document.getElementById(id);
 const E_ = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 let E = null, loaded = false, sub = "apercu", timer = null, tick = null;
 const SUBS = [["apercu", "Aperçu"], ["boutiques", "Boutiques"], ["hdv", "Hôtel des ventes"], ["fisc", "FISC"], ["factions", "Factions"], ["baltop", "Baltop"], ["commandes", "Commandes"]];
-const f = { q: "", owner: "", fac: "", type: "", stock: false, sort: "recent" };
+const f = { q: "", owner: "", fac: "", type: "", stock: false, sort: "recent" };  // type : "" | "item" | "service"
 
 const SYM = () => (E && E.monnaie) || "Su";
 const su = (v, dec = 2) => v === null || v === undefined || isNaN(v) ? "—"
@@ -19,6 +19,37 @@ const itemName = (item, nom) => {
 };
 const ico = (item) => { const id = idOf(item); const label = itemName(item).slice(0, 10);
   return `<img class="eco-ico" src="icons/${E_(id)}.png" alt="" loading="lazy" data-ph="${E_(label)}" onerror="iconFail(this)">`; };
+// Détails d'un item (mod v2.2) : enchantements, potion, nom perso, lore, durabilité
+const ENCH = { protection: "Protection", fire_protection: "Protection contre le feu", feather_falling: "Chute amortie", blast_protection: "Protection contre les explosions",
+  projectile_protection: "Protection contre les projectiles", respiration: "Apnée", aqua_affinity: "Affinité aquatique", thorns: "Épines", depth_strider: "Agilité aquatique",
+  frost_walker: "Semelles givrantes", binding_curse: "Malédiction du lien éternel", soul_speed: "Agilité des âmes", swift_sneak: "Furtivité rapide", sharpness: "Tranchant",
+  smite: "Châtiment", bane_of_arthropods: "Fléau des arthropodes", knockback: "Recul", fire_aspect: "Aura de feu", looting: "Butin", sweeping_edge: "Affilage",
+  efficiency: "Efficacité", silk_touch: "Toucher de soie", unbreaking: "Solidité", fortune: "Fortune", power: "Puissance", punch: "Frappe", flame: "Flamme",
+  infinity: "Infinité", luck_of_the_sea: "Chance de la mer", lure: "Appât", loyalty: "Loyauté", impaling: "Empalement", riptide: "Impulsion", channeling: "Canalisation",
+  multishot: "Tir multiple", quick_charge: "Charge rapide", piercing: "Perforation", mending: "Raccommodage", vanishing_curse: "Malédiction de disparition",
+  density: "Densité", breach: "Brèche", wind_burst: "Rafale", lunge: "Fente" };
+const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+const POT = { water: "Eau", mundane: "Banale", thick: "Épaisse", awkward: "Étrange", night_vision: "Vision nocturne", invisibility: "Invisibilité", leaping: "Saut",
+  fire_resistance: "Résistance au feu", swiftness: "Rapidité", slowness: "Lenteur", turtle_master: "Maître tortue", water_breathing: "Respiration aquatique",
+  healing: "Soin instantané", harming: "Dégâts instantanés", poison: "Poison", regeneration: "Régénération", strength: "Force", weakness: "Faiblesse", luck: "Chance",
+  slow_falling: "Chute lente", wind_charged: "Charge de vent", weaving: "Tissage", oozing: "Suintement", infested: "Infestation" };
+const enchName = (e) => { const id = String(e.id || "").replace(/^minecraft:/, ""); const n = ENCH[id] || e.nom || id.replace(/_/g, " ");
+  const lv = e.niveau || 1; return n + (lv > 1 || !/curse|mending|silk_touch|infinity|flame|aqua_affinity|channeling|multishot/.test(id) ? " " + (ROMAN[lv] || lv) : ""); };
+const potName = (p) => { const id = String(p || "").replace(/^minecraft:/, ""); const m = id.match(/^(long|strong)_(.+)$/);
+  const base = POT[m ? m[2] : id] || (m ? m[2] : id).replace(/_/g, " "); return m ? base + (m[1] === "long" ? " (prolongée)" : " II") : base; };
+const detText = (d) => !d ? "" : [d.nomPerso, ...(d.enchantements || []).map(enchName), d.resume, d.potion && potName(d.potion), ...(d.lore || [])].filter(Boolean).join(" ");
+function det(d) {
+  if (!d) return "";
+  const ench = (d.enchantements || []).map((e) => `<li class="${/curse/.test(e.id) ? "curse" : ""}">${E_(enchName(e))}</li>`).join("")
+    || (d.resume ? `<li>${E_(d.resume)}</li>` : "");
+  const dur = d.durabiliteMax ? Math.max(0, Math.min(1, (d.durabilite ?? d.durabiliteMax) / d.durabiliteMax)) : null;
+  return `<div class="idet">${ench ? `<ul class="ench">${ench}</ul>` : ""}
+    ${d.potion ? `<p class="potion">🧪 ${E_(potName(d.potion))}</p>` : ""}
+    ${d.lore ? `<p class="lore">${d.lore.map(E_).join("<br>")}</p>` : ""}
+    ${dur !== null ? `<p class="dura" title="Durabilité ${n0(d.durabilite)} / ${n0(d.durabiliteMax)}"><span class="dbar"><s style="width:${Math.round(dur * 100)}%;--h:${Math.round(dur * 120)}"></s></span><span class="muted small">${n0(d.durabilite)} / ${n0(d.durabiliteMax)}</span></p>` : ""}</div>`;
+}
+const nomPerso = (o) => { const d = o.details; const n = d ? d.nomPerso : o.nom; const base = itemName(o.item, o.nom);  // avec details (v2.2), seul le vrai renommage compte
+  return n && n !== base && n.toLowerCase() !== idOf(o.item).replace(/_/g, " ") ? `<span class="muted small nom">« ${E_(n)} »</span>` : ""; };
 const facById = (id) => (E && E.factions || []).find((x) => x.id === id);
 const facColor = (c) => (typeof col === "function" ? col(c) : null) || (/^#[0-9a-f]{3,8}$/i.test(c || "") ? c : null) || "var(--muted)";
 const facTag = (id) => { const x = facById(id); if (!x) return id ? `<span class="chip">${E_(id)}</span>` : "";
@@ -240,14 +271,17 @@ function barChart(el, days) {
 
 /* ---------------- Boutiques ---------------- */
 function boutiques(view) {
-  const all = E.boutiques;
-  if (!all) { view.innerHTML = unavailable("boutiques"); return; }
+  if (!E.boutiques) { view.innerHTML = unavailable("boutiques"); return; }
+  // Le FISC a son propre onglet : ici, seulement les boutiques des joueurs et des factions
+  const all = E.boutiques.filter((s) => s.proprietaireType !== "fisc");
   const owners = [...new Set(all.map((s) => s.proprietaire).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const facs = [...new Set(all.map((s) => s.faction).filter(Boolean))];
   const q = f.q.toLowerCase();
-  let list = all.filter((s) => (!q || [itemName(s.item, s.nom), s.nom, s.service, s.item, s.proprietaire].join(" ").toLowerCase().includes(q))
+  const match = (s) => !q || [itemName(s.item, s.nom), s.nom, s.service, s.item, s.proprietaire, detText(s.details)].join(" ").toLowerCase().includes(q);
+  const fq = q && E.fisc ? [...(E.fisc.rachat || []), ...(E.fisc.vente || [])].filter((r) => [itemName(r.item, r.nom), r.nom, r.item].join(" ").toLowerCase().includes(q)).length : 0;
+  let list = all.filter((s) => match(s)
     && (!f.owner || s.proprietaire === f.owner) && (!f.fac || s.faction === f.fac)
-    && (f.type === "*" || (f.type === "fisc" ? s.proprietaireType === "fisc" : f.type === "service" ? s.type === "service" : s.proprietaireType !== "fisc"))
+    && (!f.type || (f.type === "service" ? s.type === "service" : s.type !== "service"))
     && (!f.stock || !s.rupture));
   const by = { recent: (a, b) => String(b.creeLe || "").localeCompare(String(a.creeLe || "")), prix: (a, b) => unit(a) - unit(b),
     ventes: (a, b) => (b.ventes || 0) - (a.ventes || 0), az: (a, b) => itemName(a.item, a.nom).localeCompare(itemName(b.item, b.nom)) }[f.sort];
@@ -257,10 +291,10 @@ function boutiques(view) {
       <input type="search" id="bq" placeholder="Chercher un objet, un service, un vendeur…" value="${E_(f.q)}" aria-label="Chercher une boutique">
       <select id="bo" aria-label="Propriétaire"><option value="">Tous les vendeurs</option>${owners.map((o) => `<option${o === f.owner ? " selected" : ""}>${E_(o)}</option>`).join("")}</select>
       <select id="bf" aria-label="Faction"><option value="">Toutes les factions</option>${facs.map((x) => `<option value="${E_(x)}"${x === f.fac ? " selected" : ""}>${E_((facById(x) || {}).tag || x)}</option>`).join("")}</select>
-      <select id="bt" aria-label="Type"><option value="">Boutiques des joueurs</option><option value="service"${f.type === "service" ? " selected" : ""}>Services</option><option value="fisc"${f.type === "fisc" ? " selected" : ""}>FISC</option><option value="*"${f.type === "*" ? " selected" : ""}>Tout (FISC compris)</option></select>
+      <select id="bt" aria-label="Type"><option value="">Objets et services</option><option value="item"${f.type === "item" ? " selected" : ""}>Objets</option><option value="service"${f.type === "service" ? " selected" : ""}>Services</option></select>
       <select id="bs" aria-label="Tri"><option value="recent">Tri : plus récentes</option><option value="prix"${f.sort === "prix" ? " selected" : ""}>Tri : prix à l'unité</option><option value="ventes"${f.sort === "ventes" ? " selected" : ""}>Tri : plus vendues</option><option value="az"${f.sort === "az" ? " selected" : ""}>Tri : A → Z</option></select>
       <label class="chk"><input type="checkbox" id="bk"${f.stock ? " checked" : ""}> En stock</label></div>
-    <p class="count">${n0(list.length)} boutique${list.length > 1 ? "s" : ""}${rupt ? ` · ${n0(rupt)} en rupture sur le serveur` : ""}</p>
+    <p class="count">${n0(list.length)} boutique${list.length > 1 ? "s" : ""}${rupt ? ` · ${n0(rupt)} en rupture sur le serveur` : ""} · <a href="#economie/fisc">${fq ? `${n0(fq)} prix du FISC pour « ${E_(f.q)} »` : "prix du FISC"} dans l'onglet FISC</a></p>
     <div class="shop-grid">${list.map(shopCard).join("") || '<p class="empty">Aucune boutique ne correspond.</p>'}</div>`;
   const keep = (id, k, val) => { $(id).oninput = $(id).onchange = (e) => { f[k] = val ? val(e.target) : e.target.value; const pos = id === "bq" ? e.target.selectionStart : null; render();
     if (pos !== null) { const el = $("bq"); el.focus(); el.setSelectionRange(pos, pos); } }; };
@@ -275,7 +309,8 @@ function shopCard(s) {
   const label = fiscS ? (s.type === "fisc_rachat" ? "Le FISC rachète" : "Le FISC vend") : "";
   return `<article class="shop${s.rupture ? " out" : ""}">
     <header>${ico(s.item)}<div><b>${E_(name)}</b>${s.quantite > 1 ? `<span class="muted small"> × ${n0(s.quantite)}</span>` : ""}
-      ${!svc && s.nom && s.nom !== name && s.nom.toLowerCase() !== idOf(s.item).replace(/_/g, " ") ? `<span class="muted small nom">« ${E_(s.nom)} »</span>` : ""}</div></header>
+      ${svc ? "" : nomPerso(s)}</div></header>
+    ${svc ? "" : det(s.details)}
     <p class="price">${label ? `<span class="muted small">${label} </span>` : ""}${su(s.prix)}${s.quantite > 1 ? `<span class="muted small"> · ${su(unit(s))} l'unité</span>` : ""}</p>
     <div class="tags">${stock}${s.ventes ? `<span class="chip muted">${n0(s.ventes)} vente${s.ventes > 1 ? "s" : ""}</span>` : ""}</div>
     <p class="owner">${fiscS ? "<b>FISC</b>" : `<b>${E_(s.proprietaire)}</b>`} ${s.proprietaireType === "faction" ? '<span class="muted small">boutique de faction</span>' : ""} ${facTag(s.faction)}</p>
@@ -292,7 +327,8 @@ function hdv(view) {
     <p class="count">${n0(open.length)} annonce${open.length > 1 ? "s" : ""} en cours</p>
     <div class="shop-grid">${open.map((a) => `<article class="shop hdv">
       <header>${ico(a.item)}<div><b>${E_(itemName(a.item, a.nom))}</b>${a.quantite > 1 ? `<span class="muted small"> × ${n0(a.quantite)}</span>` : ""}
-        ${a.nom && a.nom !== itemName(a.item, a.nom) && a.nom.toLowerCase() !== idOf(a.item).replace(/_/g, " ") ? `<span class="muted small nom">« ${E_(a.nom)} »</span>` : ""}</div></header>
+        ${nomPerso(a)}</div></header>
+      ${det(a.details)}
       <p class="price">${a.offreActuelle ? su(a.offreActuelle) : su(a.prixDepart)}<span class="muted small"> ${a.offreActuelle ? `offre de ${E_(a.meilleurEncherisseur || "?")} · ${n0(a.nbOffres)} offre${a.nbOffres > 1 ? "s" : ""}` : "prix de départ, aucune offre"}</span></p>
       <div class="tags">${a.achatImmediat ? `<span class="chip ok">Achat immédiat ${su(a.achatImmediat)}</span>` : '<span class="chip muted">Pas d\'achat immédiat</span>'}</div>
       <p class="owner">Vendu par <b>${E_(a.vendeur)}</b></p>
@@ -347,7 +383,7 @@ function baltop(view) {
   </div>`;
 }
 
-/* ---------------- Commandes (doc « Commandes Suménium Economy », v2.0.0) ---------------- */
+/* ---------------- Commandes (doc « Commandes Suménium Economy », v2.2.0) ---------------- */
 const SANS_COMMANDE = [
   ["Acheter dans une boutique", "Clic droit sur le coffre ou son panneau. Le chat affiche l'item (survolable), le prix et le stock. Taper ensuite la quantité dans le chat : un nombre, « tout » ou « annuler » (30 s pour répondre, invisible pour les autres)."],
   ["Vendre au FISC", "Clic droit sur le coffre du FISC, puis taper la quantité à vendre ou « tout »."],
@@ -358,7 +394,7 @@ const SANS_COMMANDE = [
   ["Dépôt de service (optionnel)", "Un coffre ou tonneau relié à un service avec /boutique depot. Le client y pose son bon et referme le coffre : si le bon est valide pour ce service, il est consommé (un par fermeture) et le coffre émet un signal de redstone d'1 seconde pour lancer l'usine ou ouvrir une porte. Un bon déjà utilisé ou d'un autre service est refusé et reste dans le coffre. Tout le monde peut ouvrir un dépôt ; seuls les membres du service le cassent."],
   ["Hôtel des ventes", "Clic droit sur le PNJ du spawn : un menu affiche toutes les annonces (45 par page, survolables). Clic sur un item puis taper son offre dans le chat, « achat » pour l'achat immédiat ou « annuler ». L'argent de l'offre est bloqué et rendu si quelqu'un surenchérit. Une offre dans les 5 dernières minutes prolonge l'enchère de 5 minutes."],
   ["Boîte aux lettres", "Clic droit sur la boîte aux lettres du spawn : chacun y retrouve ses items gagnés aux enchères et ses invendus. On ne peut que retirer, pas déposer."],
-  ["Annuaire", "Le livre sur le lutrin de l'entrée de la zone commerciale liste toutes les boutiques (propriétaire, item, prix, rupture, coordonnées). Il se met à jour tout seul et revient si quelqu'un le prend."],
+  ["Annuaire", "Le livre sur le lutrin de l'entrée de la zone commerciale liste les boutiques des joueurs (propriétaire, item, prix, rupture, coordonnées), sans le FISC. Il se met à jour tout seul et revient si quelqu'un le prend."],
 ];
 const JOUEURS = [
   { titre: "Compte", lignes: [
