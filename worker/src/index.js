@@ -429,6 +429,40 @@ async function api(req, env, url) {
     if (s.level === "staff" && "tour2" in body) f.tour2 = body.tour2 ? 1 : 0;
     return json({ candidat: await update(env, s, "candidats", c.id, f) });
   }
+  // Affiche de candidature : image stockée dans D1 (réduite à moins de 1 Mo par le navigateur)
+  if ((mm = p.match(/^\/api\/candidats\/(\d+)\/affiche$/))) {
+    const cid = Number(mm[1]);
+    if (m === "GET") {
+      await need(req, env, "attente");
+      const a = await env.DB.prepare("SELECT a.mime, a.data FROM affiches a JOIN candidats c ON c.id = a.candidat_id WHERE a.candidat_id = ? AND c.deleted = 0").bind(cid).first();
+      if (!a) fail(404, "Pas d'affiche.");
+      return new Response(new Uint8Array(a.data), { headers: securityHeaders(new Headers({
+        "content-type": a.mime, "cache-control": "private, max-age=86400", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
+        "content-disposition": "inline" })) });
+    }
+    if (m !== "PUT" && m !== "DELETE") fail(405, "Méthode refusée.");
+    const s = await need(req, env, "sumenien");
+    const c = await row(env, "candidats", cid);
+    if (!c || c.deleted) fail(404, "Candidature introuvable.");
+    if (s.level !== "staff") {
+      const me = await env.DB.prepare("SELECT id FROM players WHERE discord_id = ?").bind(s.id).first();
+      if (!me || me.id !== c.player_id) fail(403, "Tu ne peux modifier que ta candidature.");
+    }
+    if (m === "DELETE") {
+      await env.DB.prepare("DELETE FROM affiches WHERE candidat_id = ?").bind(cid).run();
+      await audit(env, s, "candidats", cid, "update", { affiche_image: "oui" }, { affiche_image: "retirée" });
+      return json({ ok: true });
+    }
+    const mt = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.image || ""));
+    if (!mt) fail(400, "Image invalide (JPEG, PNG ou WebP).");
+    const bytes = Uint8Array.from(atob(mt[2]), (ch) => ch.charCodeAt(0));
+    if (bytes.length > 1_000_000) fail(400, "Image trop lourde (1 Mo maximum).");
+    const magic = { "image/jpeg": [0xff, 0xd8], "image/png": [0x89, 0x50], "image/webp": [0x52, 0x49] }[mt[1]];
+    if (bytes[0] !== magic[0] || bytes[1] !== magic[1]) fail(400, "Le contenu ne correspond pas à une image.");
+    await env.DB.prepare("INSERT OR REPLACE INTO affiches (candidat_id, mime, data, updated) VALUES (?,?,?,?)").bind(cid, mt[1], bytes, now()).run();
+    await audit(env, s, "candidats", cid, "update", null, { affiche_image: `${Math.round(bytes.length / 1024)} ko` });
+    return json({ ok: true });
+  }
   if (p === "/api/votes" && m === "POST") {
     const s = await need(req, env, "sumenien");
     const st = await setting(env, "election");
@@ -769,7 +803,7 @@ async function allData(env, s) {
     // Coordonnées : visibles seulement par la faction concernée et le staff
     staff ? Q("SELECT * FROM bases WHERE deleted = 0 ORDER BY faction_id, type, nom")
       : Q(`SELECT * FROM bases WHERE deleted = 0 AND faction_id = ${myFaction} ORDER BY type, nom`, s.id),
-    Q("SELECT c.*, p.mc_name FROM candidats c JOIN players p ON p.id = c.player_id WHERE c.deleted = 0 ORDER BY c.id"),
+    Q("SELECT c.*, p.mc_name, a.updated AS affiche_v FROM candidats c JOIN players p ON p.id = c.player_id LEFT JOIN affiches a ON a.candidat_id = c.id WHERE c.deleted = 0 ORDER BY c.id"),
     Q("SELECT tour, candidat_id FROM votes WHERE discord_id = ?", s.id),
     Q("SELECT tour, candidat_id, COUNT(*) AS n FROM votes GROUP BY tour, candidat_id"),
     Q("SELECT COUNT(*) AS n FROM whitelist"),

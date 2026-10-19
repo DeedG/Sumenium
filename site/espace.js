@@ -520,16 +520,28 @@ function elections() {
       const voted = tour && D.myVotes[tour] === c.id;
       return `<article class="pcard${voted ? " mine" : ""}"><header>${face(c.mc_name)}
         <div><b>${esc(c.mc_name)}</b>${c.tour2 ? '<span class="chip ok">2nd tour</span>' : ""}</div></header>
+        ${c.affiche_v ? `<a class="affiche" href="${afficheUrl(c)}" target="_blank" rel="noopener" title="Voir l'affiche en grand"><img src="${afficheUrl(c)}" alt="Affiche de ${esc(c.mc_name)}" loading="lazy"></a>` : ""}
         ${para(c.resume)}
         <p class="links">${c.lien ? `<a href="${esc(c.lien)}" target="_blank" rel="noopener noreferrer nofollow">Programme</a>` : ""}
-          ${c.affiche ? `<a href="${esc(c.affiche)}" target="_blank" rel="noopener noreferrer nofollow">Affiche</a>` : ""}</p>
+          ${c.affiche ? `<a href="${esc(c.affiche)}" target="_blank" rel="noopener noreferrer nofollow">${c.affiche_v ? "Autre lien" : "Affiche"}</a>` : ""}</p>
         ${D.results ? `<p class="small">1er tour : <b>${res(c.id, 1)}</b> / ${total(1)}${c.tour2 ? ` · 2nd tour : <b>${res(c.id, 2)}</b> / ${total(2)}` : ""}</p>` : ""}
         <div class="actions">${tour && canWrite() && p ? `<button class="btn small${voted ? " ghost" : ""}" data-vote="${c.id}">${voted ? "Ton vote ✓" : "Voter"}</button>` : ""}
           ${isStaff() ? `<label class="chk"><input type="checkbox" data-t2="${c.id}"${c.tour2 ? " checked" : ""}> Qualifié 2nd tour</label>
           <button class="btn small danger" data-cdel="${c.id}">Retirer</button>` : ""}</div></article>`;
     }).join("") || '<p class="empty">Aucun candidat pour l\'instant.</p>'}</div>`);
   const cf = $("candForm");
-  if (cf) cf.onsubmit = (e) => { e.preventDefault(); act(() => mine ? call("PUT", `/api/candidats/${mine.id}`, formData(cf)) : call("POST", "/api/candidats", formData(cf)), "Candidature enregistrée"); };
+  if (cf) {
+    const file = $("affFile");
+    file.onchange = () => { const f = file.files[0]; if (f) $("affPrev").innerHTML = `<img src="${URL.createObjectURL(f)}" alt="Aperçu de l'affiche">`; };
+    cf.onsubmit = (e) => { e.preventDefault(); act(async () => {
+      const f = file.files[0], image = f ? await shrinkImage(f) : null;  // réduite avant d'enregistrer : une erreur d'image n'enregistre rien
+      const fields = { resume: cf.resume.value, lien: cf.lien.value, affiche: cf.affiche.value };
+      const id = mine ? (await call("PUT", `/api/candidats/${mine.id}`, fields), mine.id) : (await call("POST", "/api/candidats", fields)).id;
+      if (image) await call("PUT", `/api/candidats/${id}/affiche`, { image });
+    }, "Candidature enregistrée"); };
+    const del = $("affDel");
+    if (del) del.onclick = () => confirm("Retirer l'affiche ?") && act(() => call("DELETE", `/api/candidats/${mine.id}/affiche`), "Affiche retirée");
+  }
   const cw = $("candWithdraw");
   if (cw) cw.onclick = () => confirm("Retirer ta candidature ?") && act(() => call("DELETE", `/api/candidats/${mine.id}`), "Candidature retirée");
   document.querySelectorAll("[data-vote]").forEach((b) => (b.onclick = () => act(() => call("POST", "/api/votes", { candidat_id: +b.dataset.vote }), "Vote enregistré")));
@@ -539,9 +551,34 @@ function elections() {
 function candForm(c) {
   return `<form id="candForm" class="card form"><h3>${c ? "Ma candidature" : "Me présenter"}</h3>
     <label class="wide">Résumé du programme<textarea name="resume" rows="4" maxlength="2000">${esc(c && c.resume)}</textarea></label>
+    <div class="wide affiche-edit">
+      <div class="affiche-prev" id="affPrev">${c && c.affiche_v ? `<img src="${afficheUrl(c)}" alt="Ton affiche">` : '<span class="muted small">Pas encore d\'affiche</span>'}</div>
+      <div><label>Affiche (image)<input type="file" id="affFile" accept="image/png,image/jpeg,image/webp"></label>
+        <p class="muted small">PNG, JPEG ou WebP. L'image est réduite automatiquement (1600 px maximum) et visible par tous les joueurs connectés.</p>
+        ${c && c.affiche_v ? '<button type="button" class="btn small ghost" id="affDel">Retirer l\'affiche</button>' : ""}</div>
+    </div>
     <label>Lien vers le programme<input name="lien" type="url" placeholder="https://…" value="${esc(c && c.lien)}"></label>
-    <label>Lien vers l'affiche<input name="affiche" type="url" placeholder="https://…" value="${esc(c && c.affiche)}"></label>
+    <label>Autre lien (facultatif)<input name="affiche" type="url" placeholder="https://…" value="${esc(c && c.affiche)}"></label>
     <div class="wide actions"><button class="btn">${c ? "Mettre à jour" : "Déposer ma candidature"}</button>${c ? '<button type="button" class="btn ghost danger" id="candWithdraw">Retirer</button>' : ""}</div></form>`;
+}
+const afficheUrl = (c) => `/api/candidats/${c.id}/affiche?v=${c.affiche_v}`;
+// Réduit l'image dans le navigateur (1600 px max, WebP ou JPEG) pour rester sous ~900 ko
+async function shrinkImage(file) {
+  if (!/^image\/(png|jpeg|webp)$/.test(file.type)) throw new Error("Choisis une image PNG, JPEG ou WebP.");
+  const img = await new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ko(new Error("Image illisible."));
+    i.src = URL.createObjectURL(file); });
+  let side = 1600, q = 0.85;
+  for (let tries = 0; tries < 8; tries++) {
+    const k = Math.min(1, side / Math.max(img.naturalWidth, img.naturalHeight));
+    const cv = document.createElement("canvas");
+    cv.width = Math.max(1, Math.round(img.naturalWidth * k)); cv.height = Math.max(1, Math.round(img.naturalHeight * k));
+    cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+    let url = cv.toDataURL("image/webp", q);
+    if (!url.startsWith("data:image/webp")) url = cv.toDataURL("image/jpeg", q);
+    if (url.length * 0.75 < 900_000) { URL.revokeObjectURL(img.src); return url; }
+    if (q > 0.6) q -= 0.1; else side = Math.round(side * 0.8);
+  }
+  throw new Error("Image trop lourde, même réduite.");
 }
 
 function lev(a, b) {
