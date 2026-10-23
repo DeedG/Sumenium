@@ -456,7 +456,7 @@ function cmdTable(sec, withWho) {
     ${sec.note ? `<p class="small muted">${E_(sec.note)}</p>` : ""}</section>`;
 }
 function commandes(view) {
-  const live = /(^|\.)alheon\.fr$|(^|\.)sumenium\.com$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
+  const live = /(^|\.)sumenium\.com$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
   if (live && !staffTried) {
     staffTried = true;  // réservé au staff : le Worker ne renvoie la liste qu'aux comptes Discord staff
     fetch("/api/admin/commandes", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).then((d) => { STAFF_CMD = d; if (sub === "commandes") render(); }).catch(() => {});

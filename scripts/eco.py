@@ -2,7 +2,7 @@
 
 - sumenium-data/export/*.json → site/eco.json (public) : boutiques, factions, baltop, FISC, HDV, statistiques.
   Les montants des exports sont déjà en Su (décimales).
-- sumenium-data/journal/AAAA-MM-JJ.jsonl → envoyé au Worker (sumenium.alheon.fr), JAMAIS publié :
+- sumenium-data/journal/AAAA-MM-JJ.jsonl → envoyé au Worker (sumenium.com), JAMAIS publié :
   c'est l'historique de chaque joueur. Montants en CENTIMES dans le journal.
 - sumenium-data/data/ : données internes du mod, jamais lues.
 
@@ -214,7 +214,7 @@ def push_journal(sftp, read, j, log, notice):
     secret = os.environ.get("DISCORD_CLIENT_SECRET")
     if not secret:
         return
-    base = (os.environ.get("ESPACE_URL") or "https://sumenium.alheon.fr").rstrip("/") + "/api/ingest/journal"
+    base = (os.environ.get("ESPACE_URL") or "https://sumenium.com").rstrip("/") + "/api/ingest/journal"
     headers = {"content-type": "application/json", "authorization": f"Bearer {_token(secret)}", "user-agent": "sumenium-update/1.0"}
     try:
         with urllib.request.urlopen(urllib.request.Request(base, headers=headers), timeout=20) as r:

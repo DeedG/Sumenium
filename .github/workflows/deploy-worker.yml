@@ -1,4 +1,4 @@
-name: Déployer l'Espace (sumenium.alheon.fr)
+name: Déployer l'Espace (sumenium.com)
 
 on:
   push:
@@ -57,6 +57,21 @@ jobs:
           sed -i "s/D1_DATABASE_ID/$id/; s/GUILD_ID = \"A_REMPLIR\"/GUILD_ID = \"$GUILD_ID\"/" wrangler.toml
           npx wrangler d1 migrations apply sumenium --remote
 
+      - name: Libérer sumenium.com (enregistrements de la page d'attente IONOS)
+        # Le Worker crée lui-même les enregistrements de sumenium.com et www : ceux de la page « domaine non utilisé »
+        # d'IONOS, importés par Cloudflare, bloqueraient le déploiement. On ne supprime que ceux-là.
+        run: |
+          api() { curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" "$@"; }
+          zone=$(api "https://api.cloudflare.com/client/v4/zones?name=sumenium.com" | jq -r '.result[0].id // empty')
+          [ -n "$zone" ] || { echo "::warning::Zone sumenium.com introuvable avec ce jeton."; exit 0; }
+          for name in sumenium.com www.sumenium.com; do
+            api "https://api.cloudflare.com/client/v4/zones/$zone/dns_records?name=$name&per_page=50" \
+              | jq -r '.result[] | select((.type=="A" and .content=="217.160.0.66") or (.type=="AAAA" and (.content|startswith("2001:8d8:100f:f000"))) or (.type=="CNAME" and (.content|test("ionos"))) ) | .id + " " + .type + " " + .content' \
+              | while read -r id type content; do
+                  api -X DELETE "https://api.cloudflare.com/client/v4/zones/$zone/dns_records/$id" >/dev/null && echo "Supprimé : $name $type $content"
+                done
+          done
+
       - name: Déployer le Worker
         run: |
           umask 077
@@ -71,4 +86,4 @@ jobs:
             exit 1
           fi
           [ -n "$GITHUB_DISPATCH_TOKEN" ] || echo "::warning::Secret GH_DISPATCH_TOKEN absent : la mise à jour du site dépend du cron de GitHub (souvent en retard)."
-          echo "::notice::Espace déployé sur https://sumenium.alheon.fr"
+          echo "::notice::Espace déployé sur https://sumenium.com"

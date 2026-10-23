@@ -17,7 +17,7 @@ Toutes les 10 minutes, GitHub Actions lit le serveur en SFTP, calcule les donné
    | `SFTP_ROOT` | *(facultatif)* le dossier du serveur, si `server.properties` n'est pas à la racine du SFTP |
 
 2. **Pages** : dans *Settings → Pages*, choisir *Source : GitHub Actions*.
-3. **Premier lancement** : onglet *Actions → Mise à jour du site → Run workflow*. Le site est ensuite à l'adresse `https://sumenium.alheon.fr/` (l'ancienne adresse `deedg.github.io/Sumenium` y renvoie).
+3. **Premier lancement** : onglet *Actions → Mise à jour du site → Run workflow*. Le site est ensuite à l'adresse `https://sumenium.com/` (l'ancienne adresse `deedg.github.io/Sumenium` y renvoie).
 
 ## Ce que le script lit sur le serveur
 
@@ -40,7 +40,7 @@ Le même passage écrit `site/stats.json` (script `scripts/stats.py`) :
 
 La carte 3D est hébergée sur le homelab et intégrée au site : voir [homelab/README.md](homelab/README.md). Son adresse est réglée dans `site/index.html` (`MAP_URL`).
 
-## Espace joueurs (sumenium.alheon.fr)
+## Espace joueurs (sumenium.com)
 
 Remplace le Google Sheet de la saison : fiches RP, factions, projets, usines, élections et tailles RP (les prix du FISC sont dans l'onglet Économie, lus sur le serveur). Connexion avec Discord ; les droits viennent des rôles du serveur Discord :
 
@@ -60,11 +60,11 @@ Fonctionnement :
 
 Mise en route :
 
-1. Application Discord « Sumenium 2 » → *OAuth2* → *Redirects* : ajouter `https://sumenium.alheon.fr/api/auth/callback`.
+1. Application Discord « Sumenium 2 » → *OAuth2* → *Redirects* : ajouter `https://sumenium.com/api/auth/callback`.
 2. Dans GitHub, *Settings → Secrets and variables → Actions* :
    - secret `DISCORD_CLIENT_SECRET` (Discord → *OAuth2* → *Client Secret*) ;
    - secret `CLOUDFLARE_ACCOUNT_ID` (Cloudflare → page d'accueil du compte → *Account ID*) ;
-   - secret `CLOUDFLARE_API_TOKEN` : jeton personnalisé avec *Account › Workers Scripts : Edit*, *Account › D1 : Edit*, *Account › Account Settings : Read*, *Zone (alheon.fr) › Workers Routes : Edit*, *Zone › DNS : Edit*, *Zone › Zone : Read* ;
+   - secret `CLOUDFLARE_API_TOKEN` : jeton personnalisé avec *Account › Workers Scripts : Edit*, *Account › D1 : Edit*, *Account › Account Settings : Read*, *Zone (sumenium.com) › Workers Routes : Edit*, *Zone › DNS : Edit*, *Zone › Zone : Read* ;
    - onglet *Variables* : `DISCORD_GUILD_ID` (clic droit sur le serveur Discord → *Copier l'identifiant du serveur*, mode développeur activé).
 3. *Actions → Déployer l'Espace → Run workflow*. La base, le domaine et le Worker sont créés automatiquement.
 4. Import du Google Sheet : télécharger le sheet en `.xlsx`, puis `python tools/import_sheet.py Saison.xlsx import.json`, et envoyer `import.json` depuis l'onglet *Staff → Importer*. Ce fichier contient des données personnelles : ne pas le commiter.

@@ -33,7 +33,7 @@ export default {
 
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
-    // Ancienne adresse (sumenium.alheon.fr) : les pages et la connexion renvoient vers l'adresse officielle (PUBLIC_URL).
+    // Autre adresse (www.sumenium.com, ancienne sumenium.alheon.fr) : les pages et la connexion renvoient vers l'adresse officielle (PUBLIC_URL).
     // Les autres /api/* restent servies sur les deux adresses (scripts de mise à jour, sessions en cours).
     const pub = new URL(env.PUBLIC_URL);
     if (url.host !== pub.host && pub.hostname !== "localhost" && (!url.pathname.startsWith("/api/") || url.pathname === "/api/auth/login")) {

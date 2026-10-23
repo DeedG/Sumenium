@@ -1,8 +1,8 @@
 /* Espace Suménium : fiches joueurs, factions, projets communautaires, usines, élections, outils staff.
    Fonctionne uniquement sur l'adresse officielle (l'API et la connexion Discord y sont servies). */
 (() => {
-const HOST = "sumenium.alheon.fr";  // adresse officielle (l'API et la connexion Discord y sont servies)
-const LIVE = ["sumenium.com", "www.sumenium.com", "sumenium.alheon.fr", "localhost", "127.0.0.1"].includes(location.hostname);
+const HOST = "sumenium.com";  // adresse officielle (l'API et la connexion Discord y sont servies)
+const LIVE = ["sumenium.com", "localhost", "127.0.0.1"].includes(location.hostname);
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmt = (n) => Number(n || 0).toLocaleString("fr-FR", { maximumFractionDigits: 4 });

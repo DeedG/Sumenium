@@ -2,15 +2,15 @@
 <html lang="fr">
 <head>
 <script>
-// Adresse officielle : sumenium.alheon.fr (l'ancienne adresse GitHub y renvoie)
-if(location.hostname==="deedg.github.io")location.replace("https://sumenium.alheon.fr/"+location.search+location.hash);
+// Adresse officielle : sumenium.com (l'ancienne adresse GitHub y renvoie)
+if(location.hostname==="deedg.github.io")location.replace("https://sumenium.com/"+location.search+location.hash);
 </script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Suménium · Saison 7</title>
 <meta name="description" content="Site du serveur Minecraft Suménium (Saison 7) : classements, succès, statistiques, carte et espace joueurs.">
 <link rel="icon" type="image/png" href="favicon.png">
-<link rel="canonical" href="https://sumenium.alheon.fr/">
+<link rel="canonical" href="https://sumenium.com/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Pixelify+Sans:wght@400;600&display=swap">
@@ -785,7 +785,7 @@ $("trophies").onchange=e=>{st.trophies=e.target.checked;lootOptions();set("troph
 $("more").onclick=()=>{st.limit+=300;render()};
 
 // Carte hébergée sur le homelab (via le tunnel Cloudflare)
-const MAP_URL="https://carte.alheon.fr/";
+const MAP_URL="https://carte.sumenium.com/";
 function setupMap(){
   const f=$("mapframe"),box=$("spoil");
   let spoil=false;

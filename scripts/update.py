@@ -171,7 +171,7 @@ def write_progress(catalog, players, teams):
 
 
 def push_whitelist(sftp, j):
-    """Envoie la whitelist à l'Espace (sumenium.alheon.fr) : seuls ces pseudos peuvent être reliés à un compte Discord."""
+    """Envoie la whitelist à l'Espace (sumenium.com) : seuls ces pseudos peuvent être reliés à un compte Discord."""
     secret = os.environ.get("DISCORD_CLIENT_SECRET")
     if not secret:
         return
@@ -184,7 +184,7 @@ def push_whitelist(sftp, j):
     if not players:
         return  # ne jamais vider la liste côté Espace sur une lecture ratée
     token = base64.urlsafe_b64encode(hashlib.sha256(f"sumenium:ingest:{secret}".encode()).digest()).rstrip(b"=").decode()
-    url = (os.environ.get("ESPACE_URL") or "https://sumenium.alheon.fr").rstrip("/") + "/api/ingest/whitelist"
+    url = (os.environ.get("ESPACE_URL") or "https://sumenium.com").rstrip("/") + "/api/ingest/whitelist"
     req = urllib.request.Request(url, data=json.dumps({"players": players}).encode(), method="POST", headers={
         "content-type": "application/json", "authorization": f"Bearer {token}", "user-agent": "sumenium-update/1.0"})
     try:

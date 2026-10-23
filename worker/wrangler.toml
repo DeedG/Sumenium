@@ -4,7 +4,8 @@ compatibility_date = "2026-09-01"
 workers_dev = false
 
 routes = [
-  { pattern = "sumenium.alheon.fr", custom_domain = true }
+  { pattern = "sumenium.com", custom_domain = true },
+  { pattern = "www.sumenium.com", custom_domain = true }
 ]
 
 [triggers]
@@ -12,7 +13,7 @@ crons = ["*/5 * * * *"]
 
 [vars]
 GITHUB_REPO = "DeedG/Sumenium"
-PUBLIC_URL = "https://sumenium.alheon.fr"
+PUBLIC_URL = "https://sumenium.com"
 SITE_ORIGIN = "https://deedg.github.io/Sumenium"
 DISCORD_CLIENT_ID = "1558815844879048734"
 GUILD_ID = "A_REMPLIR"

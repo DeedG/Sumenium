@@ -34,17 +34,17 @@ Pour que le premier rendu gêne moins Jellyfin, baisse `RENDER_THREADS` et `CART
 
 Dans Cloudflare : **Zero Trust → Networks → Tunnels →** ton tunnel **→ Public hostnames → Add a public hostname** :
 
-- Subdomain : `carte`, Domain : `alheon.fr`
+- Subdomain : `carte`, Domain : `sumenium.com`
 - Service : **HTTP**, URL :
   - `localhost:8100` si `cloudflared` est installé directement sur le PC ;
   - `sumenium-carte-web:8080` si `cloudflared` tourne dans Docker. Dans ce cas, relie-le au réseau de la carte une fois : `docker network connect carte <nom du conteneur cloudflared>`.
 
 Puis, conseillé :
 
-1. **Cache** : *Caching → Cache Rules → Create rule*, si *Hostname* égal à `carte.alheon.fr` → *Eligible for cache*, *Edge TTL* 15 minutes. Cloudflare sert alors presque toutes les tuiles sans solliciter ta connexion.
-2. **Limite de requêtes** (facultatif) : *Security → WAF → Rate limiting rules*, sur `carte.alheon.fr`, par exemple 600 requêtes par 10 secondes et par IP.
+1. **Cache** : *Caching → Cache Rules → Create rule*, si *Hostname* égal à `carte.sumenium.com` → *Eligible for cache*, *Edge TTL* 15 minutes. Cloudflare sert alors presque toutes les tuiles sans solliciter ta connexion.
+2. **Limite de requêtes** (facultatif) : *Security → WAF → Rate limiting rules*, sur `carte.sumenium.com`, par exemple 600 requêtes par 10 secondes et par IP.
 
-Vérifie ensuite que `https://carte.alheon.fr` affiche la carte. Le site GitHub l'intègre automatiquement.
+Vérifie ensuite que `https://carte.sumenium.com` affiche la carte. Le site GitHub l'intègre automatiquement.
 
 ## Réglages (`.env`)
 
