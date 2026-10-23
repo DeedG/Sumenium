@@ -50,7 +50,7 @@ Vérifie ensuite que `https://carte.sumenium.com` affiche la carte. Le site GitH
 
 | Variable | Rôle |
 |---|---|
-| `MAP_CENTER_X`, `MAP_CENTER_Z`, `MAP_RADIUS` | Zone dessinée : carré de ±`MAP_RADIUS` autour du centre (10 000 par défaut, comme la prégénération) |
+| `MAP_CENTER_X`, `MAP_CENTER_Z`, `MAP_RADIUS` | Zone dessinée : `auto` (défaut) suit la bordure du monde, 10 000 minimum ; un nombre = carré fixe de ±`MAP_RADIUS` autour du centre. Seules les régions explorées sont copiées et rendues |
 | `INTERVAL_MINUTES` | Fréquence des mises à jour (60 par défaut) |
 | `RENDER_THREADS`, `CARTE_CPUS`, `JAVA_XMX` | Ressources accordées au rendu |
 | `FOG_COLOR` | Couleur de la zone masquée hors bordure |

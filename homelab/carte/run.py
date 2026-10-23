@@ -25,7 +25,11 @@ WEB = f"{DATA}/web"
 
 CENTER_X = float(E("MAP_CENTER_X", "0"))
 CENTER_Z = float(E("MAP_CENTER_Z", "0"))
-RADIUS = int(E("MAP_RADIUS", "10000"))
+# MAP_RADIUS : « auto » = la zone dessinée suit la bordure (au moins 10 000, la prégénération) ; un nombre = zone fixe.
+# Seules les régions qui existent sur le serveur sont copiées : agrandir la zone ne coûte que ce que les joueurs explorent.
+_R = (E("MAP_RADIUS") or "auto").strip().lower()
+RADIUS = None if _R == "auto" else int(_R)
+MIN_RADIUS = 10000
 INTERVAL = int(E("INTERVAL_MINUTES", "60")) * 60
 THREADS = int(E("RENDER_THREADS", "8"))
 XMX = E("JAVA_XMX", "6G")
@@ -143,8 +147,12 @@ def _sync(sftp):
     with open(os.path.join(WORLD, "level.dat"), "wb") as f:
         f.write(read(sftp, w("level.dat")))
 
-    x0, x1 = math.floor(CENTER_X - RADIUS), math.ceil(CENTER_X + RADIUS) - 1
-    z0, z1 = math.floor(CENTER_Z - RADIUS), math.ceil(CENTER_Z + RADIUS) - 1
+    if RADIUS is None and border:
+        cx, cz, r = border[0], border[1], max(MIN_RADIUS, border[2] / 2 + 512)
+    else:
+        cx, cz, r = CENTER_X, CENTER_Z, RADIUS or MIN_RADIUS
+    x0, x1 = math.floor(cx - r), math.ceil(cx + r) - 1
+    z0, z1 = math.floor(cz - r), math.ceil(cz + r) - 1
     wanted = {f"r.{x}.{z}.mca" for x in range(x0 // 512, x1 // 512 + 1) for z in range(z0 // 512, z1 // 512 + 1)}
     remote = {a.filename: a for a in sftp.listdir_attr(w(region_rel)) if stat.S_ISREG(a.st_mode)}
     todo = []
