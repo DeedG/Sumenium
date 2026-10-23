@@ -714,7 +714,7 @@ async function setupWho(){
   const sel=$("who");
   sel.innerHTML='<option value="">Tout le serveur (meilleur joueur)</option>'+list.filter(p=>okName(p.name)).map(p=>`<option value="${esc(p.name)}">${esc(p.name)}${p.team?` · ${esc(p.team)}`:""} (${fmt(p.done)})</option>`).join("");
   let want="";try{want=localStorage.getItem("sumenium-who")||""}catch(e){}
-  if(!want&&location.hostname==="sumenium.alheon.fr"){
+  if(!want&&location.hostname!=="deedg.github.io"){
     try{const me=await (await fetch("/api/me",{credentials:"same-origin"})).json();want=(me.player&&me.player.mc_name)||""}catch(e){}
   }
   if(want&&list.some(p=>p.name.toLowerCase()===want.toLowerCase())){sel.value=list.find(p=>p.name.toLowerCase()===want.toLowerCase()).name;await setWho(sel.value)}

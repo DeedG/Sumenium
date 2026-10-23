@@ -1,8 +1,8 @@
 /* Espace Suménium : fiches joueurs, factions, projets communautaires, usines, élections, outils staff.
-   Fonctionne uniquement sur sumenium.alheon.fr (l'API et la connexion Discord y sont servies). */
+   Fonctionne uniquement sur l'adresse officielle (l'API et la connexion Discord y sont servies). */
 (() => {
-const HOST = "sumenium.alheon.fr";
-const LIVE = location.hostname === HOST || location.hostname === "localhost" || location.hostname === "127.0.0.1";
+const HOST = "sumenium.alheon.fr";  // adresse officielle (l'API et la connexion Discord y sont servies)
+const LIVE = ["sumenium.com", "www.sumenium.com", "sumenium.alheon.fr", "localhost", "127.0.0.1"].includes(location.hostname);
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmt = (n) => Number(n || 0).toLocaleString("fr-FR", { maximumFractionDigits: 4 });
@@ -113,7 +113,7 @@ const ficheOk = (p) => !!(p.metier && p.mort);
 function render() {
   const root = $("espaceRoot");
   if (!LIVE) {
-    root.innerHTML = `<div class="card center"><h3>L'espace joueurs est sur sumenium.alheon.fr</h3>
+    root.innerHTML = `<div class="card center"><h3>L'espace joueurs est sur ${HOST}</h3>
       <p>Fiches, factions, usines et élections se gèrent avec ton compte Discord, sur l'adresse du serveur.</p>
       <a class="btn" href="https://${HOST}/#espace">Ouvrir l'Espace Suménium</a></div>`;
     return;

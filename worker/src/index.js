@@ -33,6 +33,12 @@ export default {
 
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
+    // Ancienne adresse (sumenium.alheon.fr) : les pages et la connexion renvoient vers l'adresse officielle (PUBLIC_URL).
+    // Les autres /api/* restent servies sur les deux adresses (scripts de mise à jour, sessions en cours).
+    const pub = new URL(env.PUBLIC_URL);
+    if (url.host !== pub.host && pub.hostname !== "localhost" && (!url.pathname.startsWith("/api/") || url.pathname === "/api/auth/login")) {
+      return Response.redirect(pub.origin + url.pathname + url.search, 301);
+    }
     if (!url.pathname.startsWith("/api/")) return proxy(req, env, url);
     // sans secret solide, les sessions seraient falsifiables : on refuse tout
     if (!env.DISCORD_CLIENT_SECRET || env.DISCORD_CLIENT_SECRET.length < 16 || !/^\d{15,22}$/.test(env.GUILD_ID || "")) {
