@@ -44,6 +44,25 @@ body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);margin:0}
 .brand img{width:84px;height:84px;border-radius:20px;box-shadow:0 6px 18px rgba(20,60,30,.25);flex:none}
 .brand h1{font:700 2.3rem/1 var(--display);margin:0;letter-spacing:.01em}
 .brand p{margin:6px 0 0;color:var(--muted);font-weight:600}
+.ip-pill{margin-top:12px;display:inline-flex;align-items:center;gap:10px;padding:8px 8px 8px 14px;border:0;border-radius:12px;cursor:pointer;
+  background:#1f2b1c;color:#eaf6e2;font:600 1.02rem var(--pixel,'Pixelify Sans'),monospace;box-shadow:0 4px 0 #0f170d,0 8px 18px rgba(20,60,30,.25);
+  transition:transform .12s,box-shadow .12s}
+.ip-pill:hover{transform:translateY(-1px);box-shadow:0 5px 0 #0f170d,0 10px 22px rgba(20,60,30,.3)}
+.ip-pill:active{transform:translateY(3px);box-shadow:0 1px 0 #0f170d,0 4px 10px rgba(20,60,30,.25)}
+.ip-pill:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.ip-dot{width:9px;height:9px;border-radius:50%;background:#6fdc4b;box-shadow:0 0 0 3px rgba(111,220,75,.25);animation:ipPulse 2s ease-in-out infinite}
+@keyframes ipPulse{50%{box-shadow:0 0 0 6px rgba(111,220,75,0)}}
+@media (prefers-reduced-motion:reduce){.ip-dot{animation:none}}
+.ip-addr{letter-spacing:.02em}
+.ip-act{font:700 .78rem var(--body);text-transform:uppercase;letter-spacing:.06em;background:var(--sun);color:#3b2a00;padding:5px 9px;border-radius:8px;min-width:64px;text-align:center}
+.ip-pill.ok .ip-act{background:#6fdc4b;color:#10300a}
+.brand>div{min-width:0}
+@media (max-width:520px){
+  .brand{gap:12px}.brand img{width:56px;height:56px;border-radius:14px}
+  .brand h1{font-size:1.6rem}.season{font-size:.7rem;padding:4px 7px}
+  .ip-pill{font-size:.88rem;gap:8px;padding:7px 7px 7px 11px}.ip-act{min-width:0;padding:5px 7px;font-size:.7rem}
+}
+.ip-sub{display:block;margin-top:6px;color:var(--muted);font-weight:600;font-size:.8rem}
 .season{display:inline-block;background:var(--sun);color:#3b2a00;font:600 .8rem/1 var(--display);padding:5px 9px;border-radius:999px;margin-left:6px;vertical-align:4px;letter-spacing:.04em}
 .border-card{background:var(--surface);border-radius:18px;padding:14px 22px;box-shadow:0 6px 20px rgba(20,60,30,.12);text-align:center;min-width:220px}
 .border-card small{display:block;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-size:.72rem}
@@ -456,6 +475,12 @@ body.busy{cursor:progress}
       <div>
         <h1>Suménium <span class="season">SAISON 7</span></h1>
         <p>Classements, succès, statistiques, carte et espace joueurs</p>
+        <button type="button" class="ip-pill" id="ipCopy" title="Copier l'adresse du serveur" aria-label="Copier l'adresse du serveur play.sumenium.com">
+          <span class="ip-dot" aria-hidden="true"></span>
+          <span class="ip-addr">play.sumenium.com</span>
+          <span class="ip-act" id="ipAct">Copier</span>
+        </button>
+        <small class="ip-sub">Minecraft Java 26.3</small>
       </div>
     </div>
     <div class="border-card">
@@ -785,6 +810,11 @@ $("trophies").onchange=e=>{st.trophies=e.target.checked;lootOptions();set("troph
 $("more").onclick=()=>{st.limit+=300;render()};
 
 // Carte hébergée sur le homelab (via le tunnel Cloudflare)
+// Adresse du serveur : copie en un clic
+(()=>{const b=document.getElementById("ipCopy"),a=document.getElementById("ipAct");if(!b)return;let t;
+  b.onclick=async()=>{const ip="play.sumenium.com";let ok=false;
+    try{await navigator.clipboard.writeText(ip);ok=true}catch(e){try{const i=document.createElement("input");i.value=ip;document.body.appendChild(i);i.select();ok=document.execCommand("copy");i.remove()}catch(_){}}
+    b.classList.toggle("ok",ok);a.textContent=ok?"Copié ✓":"Ctrl+C";clearTimeout(t);t=setTimeout(()=>{b.classList.remove("ok");a.textContent="Copier"},1800)}})();
 const MAP_URL="https://carte.sumenium.com/";
 function setupMap(){
   const f=$("mapframe"),box=$("spoil");
