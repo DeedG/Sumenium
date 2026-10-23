@@ -207,6 +207,39 @@ scripts: [ "anti-spoil.js" ]
         bx0, bx1, bz0, bz1 = cx - h, cx + h, cz - h, cz + h
         sq = lambda a0, a1, b0, b1: f"[ {{ x: {a0}, z: {b0} }}, {{ x: {a1}, z: {b0} }}, {{ x: {a1}, z: {b1} }}, {{ x: {a0}, z: {b1} }} ]"
         r, g, b = [int(v) for v in FOG.split(",")]
+        # Brouillard = zone rendue moins l'intérieur de la bordure. Le trou doit rester DANS la zone rendue :
+        # une bordure plus grande que la zone rendue donnait un trou plus grand que la forme, et la carte noircissait tout.
+        ox0, ox1, oz0, oz1 = x0 - 64, x1 + 64, z0 - 64, z1 + 64
+        hx0, hx1, hz0, hz1 = max(bx0, ox0 + 1), min(bx1, ox1 - 1), max(bz0, oz0 + 1), min(bz1, oz1 - 1)
+        if bx0 <= ox0 and bx1 >= ox1 and bz0 <= oz0 and bz1 >= oz1:
+            fog_marker = ""  # toute la zone rendue est dans la bordure : rien à masquer
+        elif hx0 >= hx1 or hz0 >= hz1:
+            fog_marker = f"""
+      zone: {{
+        type: "shape"
+        position: {{ x: {cx}, y: 319, z: {cz} }}
+        label: "Hors bordure"
+        shape: {sq(ox0, ox1, oz0, oz1)}
+        shape-y: 319
+        line-width: 0
+        line-color: {{ r: 0, g: 0, b: 0, a: 0.0 }}
+        fill-color: {{ r: {r}, g: {g}, b: {b}, a: 1.0 }}
+        depth-test: false
+      }}"""
+        else:
+            fog_marker = f"""
+      zone: {{
+        type: "shape"
+        position: {{ x: {cx}, y: 319, z: {cz} }}
+        label: "Hors bordure"
+        shape: {sq(ox0, ox1, oz0, oz1)}
+        holes: [ {sq(hx0, hx1, hz0, hz1)} ]
+        shape-y: 319
+        line-width: 0
+        line-color: {{ r: 0, g: 0, b: 0, a: 0.0 }}
+        fill-color: {{ r: {r}, g: {g}, b: {b}, a: 1.0 }}
+        depth-test: false
+      }}"""
         markers = f'''
   bordure: {{
     label: "Bordure actuelle"
@@ -232,19 +265,7 @@ scripts: [ "anti-spoil.js" ]
     toggleable: true
     default-hidden: false
     sorting: 1
-    markers: {{
-      zone: {{
-        type: "shape"
-        position: {{ x: {cx}, y: 319, z: {cz} }}
-        label: "Hors bordure"
-        shape: {sq(x0 - 64, x1 + 64, z0 - 64, z1 + 64)}
-        holes: [ {sq(bx0, bx1, bz0, bz1)} ]
-        shape-y: 319
-        line-width: 0
-        line-color: {{ r: 0, g: 0, b: 0, a: 0.0 }}
-        fill-color: {{ r: {r}, g: {g}, b: {b}, a: 1.0 }}
-        depth-test: false
-      }}
+    markers: {{{fog_marker}
     }}
   }}'''
     start = f"{{ x: {int(border[0])}, z: {int(border[1])} }}" if border else f"{{ x: {int(CENTER_X)}, z: {int(CENTER_Z)} }}"
