@@ -125,7 +125,7 @@ function render() {
       <h3>Connecte-toi avec Discord</h3>
       <p>L'espace est réservé aux membres du Discord Suménium. Tu restes connecté 30 jours sur cet appareil.</p>
       <a class="btn discord" href="/api/auth/login" onclick="if(this.dataset.go)return false;this.dataset.go=1;this.textContent='Redirection vers Discord…';this.classList.add('wait')">Se connecter avec Discord</a>
-      <p class="muted small">On lit seulement ton pseudo Discord et tes rôles sur le serveur Suménium. Rien n'est publié sur Discord.</p></div>`;
+      <p class="muted small">Tu passes par la page officielle <b>discord.com</b> : vérifie l'adresse, et ne donne jamais ton mot de passe ailleurs. Le site reçoit seulement ton pseudo Discord et tes rôles sur le serveur Suménium, rien n'est publié sur Discord. <a href="confidentialite.html">Ce qu'on enregistre</a></p></div>`;
     return;
   }
   if (!D) { root.innerHTML = '<p class="empty">Chargement…</p>'; return; }

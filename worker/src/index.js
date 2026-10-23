@@ -39,6 +39,10 @@ export default {
     if (url.host !== pub.host && pub.hostname !== "localhost" && (!url.pathname.startsWith("/api/") || url.pathname === "/api/auth/login")) {
       return Response.redirect(pub.origin + url.pathname + url.search, 301);
     }
+    if (url.pathname === "/.well-known/security.txt") {
+      return new Response(`Contact: ${pub.origin}/confidentialite.html\nPreferred-Languages: fr, en\nCanonical: ${pub.origin}/.well-known/security.txt\nExpires: ${new Date(Date.now() + 300 * 86400000).toISOString()}\n`,
+        { headers: securityHeaders(new Headers({ "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=86400" })) });
+    }
     if (!url.pathname.startsWith("/api/")) return proxy(req, env, url);
     // sans secret solide, les sessions seraient falsifiables : on refuse tout
     if (!env.DISCORD_CLIENT_SECRET || env.DISCORD_CLIENT_SECRET.length < 16 || !/^\d{15,22}$/.test(env.GUILD_ID || "")) {
