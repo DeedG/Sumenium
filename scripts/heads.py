@@ -65,13 +65,14 @@ def main():
             meta[uuid] = {"name": name, "t": now, "skin": skin}
         except urllib.error.HTTPError as e:
             if e.code == 429:
-                print("Têtes : limite de l'API Mojang atteinte, suite au prochain passage.")
+                print("::notice title=Têtes des skins::limite de l'API Mojang atteinte, suite au prochain passage")
                 break
             meta[uuid] = {**m, "t": now - REFRESH + 3600}   # nouvel essai dans une heure
         except Exception as e:
             print("Tête non générée pour", name, ":", type(e).__name__, e)
     json.dump(meta, open(META, "w", encoding="utf-8"))
-    print(f"Têtes : {done} skins relus, {made} têtes mises à jour, {len(os.listdir(OUT))} au total.")
+    msg = f"{done} skins relus, {made} têtes mises à jour, {len(os.listdir(OUT))} au total"
+    print(f"::notice title=Têtes des skins::{msg}" if os.environ.get("GITHUB_ACTIONS") else "Têtes : " + msg)
 
 
 if __name__ == "__main__":
