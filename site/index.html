@@ -86,6 +86,7 @@ body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);margin:0}
 .ip-players li,.ip-players a{display:flex;align-items:center;gap:6px;min-width:0;color:inherit;text-decoration:none}
 .ip-players img{width:20px;height:20px;border-radius:3px;image-rendering:pixelated;flex:none}
 @media (max-width:560px){.ip-tip{left:auto;right:0}.ip-tip::before{left:auto;right:22px}}
+@media (max-width:400px){.ip-act{display:none}.ip-pill{padding-right:11px}}
 .ip-players.inline{display:flex;flex-wrap:wrap;gap:6px}
 .ip-players.inline a{background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 10px 3px 4px;font-weight:700;font-size:.88rem}
 .ip-players.inline a:hover{border-color:var(--grass)}
@@ -255,6 +256,10 @@ footer{margin-top:32px;color:var(--muted);font-size:.86rem;max-width:75ch}
 .cmd-list{list-style:none;padding:0;margin:8px 0;display:grid;gap:4px}
 .cmd-list code{word-break:break-all}
 .cmds-box{margin:6px 0}
+.pd-imgs{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.pd-img{position:relative;display:block;width:120px;height:90px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--bg)}
+.pd-img img{width:100%;height:100%;object-fit:cover;display:block}
+.pd-img .x{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);color:#fff;border-radius:50%}
 .acct a.tabs-me,.acct a.tabs-login{display:inline-flex;align-items:center;gap:8px;border:0;padding:6px 10px;border-radius:999px;font:600 .92rem var(--display);text-decoration:none;white-space:nowrap}
 .acct a.tabs-login{background:#5865f2;color:#fff}
 .acct a.tabs-login:hover{background:#4752c4}
@@ -1076,7 +1081,8 @@ function motdHtml(c,inh){
   });
   return out+(c.extra||[]).map(x=>motdHtml(x,cur)).join("");
 }
-const headImg=(n,s=24)=>`<img class="face" src="https://mc-heads.net/avatar/${encodeURIComponent(n)}/${s}" alt="" width="${s}" height="${s}" loading="lazy">`;
+// Têtes des skins : générées par la mise à jour du site (heads/<pseudo>.png), mc-heads.net en secours si elle manque
+const headImg=(n,s=24)=>`<img class="face" src="heads/${encodeURIComponent(String(n).toLowerCase())}.png" data-n="${esc(n)}" data-s="${s}" onerror="headFail(this)" alt="" width="${s}" height="${s}" loading="lazy">`;
 function statusTip(){
   const s=STATUS;
   if(!s)return '<p class="muted small">Statut du serveur en cours de lecture…</p>';
@@ -1204,6 +1210,7 @@ function slot(it,ci,kind,j){
     :`<img src="icons/${esc(it.id)}.png" alt="" loading="lazy" data-ph="${esc(iname(it.id).slice(0,10))}" onerror="iconFail(this)">`;
   return `<button class="slot${it.glint?" glint":""}${kind==="tr"?" trophy":""}${st.loot==="i:"+it.id?" hl":""}" data-c="${ci}" data-k="${kind}" data-j="${j}" aria-label="${esc((it.name&&it.name.t)||iname(it.id))}">${pic}${it.n>1?`<span class="cnt">${it.n}</span>`:""}</button>`;
 }
+function headFail(img){if(img.dataset.fb)return;img.dataset.fb="1";img.src="https://mc-heads.net/avatar/"+encodeURIComponent(img.dataset.n||"MHF_Steve")+"/"+(img.dataset.s||32)}
 function iconFail(img){const sp=document.createElement("span");sp.className="ph";sp.textContent=img.dataset.ph||"";img.replaceWith(sp)}
 function lootHtml(e){
   const b=(DATA&&DATA.bac)||{};const on=k=>b[k]===undefined||b[k]===null||b[k]!==0;

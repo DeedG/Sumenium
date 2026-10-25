@@ -242,6 +242,20 @@ def main():
     except IOError:
         pass
 
+    # Pseudos et UUID pour les têtes des skins (scripts/heads.py) : usercache + whitelist
+    try:
+        known = dict(names)
+        try:
+            for e in json.loads(read(sftp, j("whitelist.json"))):
+                if e.get("uuid") and e.get("name"):
+                    known.setdefault(e["uuid"], e["name"])
+        except Exception:
+            pass
+        os.makedirs("work", exist_ok=True)
+        json.dump(known, open("work/joueurs.json", "w", encoding="utf-8"), ensure_ascii=False)
+    except Exception as e:
+        log("Liste des joueurs pour les têtes non écrite :", e)
+
     # Progression de chaque joueur
     adv_dir = None
     for cand in (w("players/advancements"), w("advancements")):

@@ -526,7 +526,7 @@ async function api(req, env, url, ctx) {
     if (!pr || pr.deleted) fail(400, "Projet introuvable.");
     if (pr.unique_srv && await env.DB.prepare("SELECT 1 FROM projet_faction WHERE projet_id = ? AND deleted = 0").bind(pr.id).first()) fail(400, "Ce projet unique a déjà été réalisé.");
     if (!pr.unique_srv && !pr.illimite && await env.DB.prepare("SELECT 1 FROM projet_faction WHERE projet_id = ? AND faction_id = ? AND deleted = 0").bind(pr.id, me.faction_id).first()) fail(400, "Ta faction a déjà réalisé ce projet.");
-    if (await env.DB.prepare("SELECT 1 FROM projet_demandes WHERE projet_id = ? AND faction_id = ? AND statut = 'attente'").bind(pr.id, me.faction_id).first()) fail(400, "Une demande est déjà en attente pour ce projet.");
+    if (await env.DB.prepare("SELECT 1 FROM projet_demandes WHERE projet_id = ? AND faction_id = ? AND statut IN ('attente','a_completer')").bind(pr.id, me.faction_id).first()) fail(400, "Une demande est déjà en cours pour ce projet.");
     const note = str(body.note, 1000).trim();
     if (note.length < 5) fail(400, "Décris en quelques mots ce qui a été fait (et où : coordonnées).");
     return json({ id: await insert(env, s, "projet_demandes", { projet_id: pr.id, faction_id: me.faction_id, player_id: me.id, note, statut: "attente", ts: now(), updated: now() }) });
@@ -534,20 +534,62 @@ async function api(req, env, url, ctx) {
   if ((mm = p.match(/^\/api\/projets\/demandes\/(\d+)$/)) && m === "PUT") {
     const s = await need(req, env, "sumenien");
     const d = await row(env, "projet_demandes", Number(mm[1]));
-    if (!d || d.statut !== "attente") fail(404, "Demande introuvable ou déjà traitée.");
+    if (!d || !["attente", "a_completer"].includes(d.statut)) fail(404, "Demande introuvable ou déjà traitée.");
     const action = String(body.action || "");
+    const mine = s.level === "staff" || (await sameFaction(env, s, d.faction_id));
     if (action === "annuler") {
-      const me = await env.DB.prepare("SELECT faction_id FROM players WHERE discord_id = ? AND deleted = 0").bind(s.id).first();
-      if (s.level !== "staff" && (!me || me.faction_id !== d.faction_id)) fail(403, "Seule la faction concernée peut annuler sa demande.");
+      if (!mine) fail(403, "Seule la faction concernée peut annuler sa demande.");
       await update(env, s, "projet_demandes", d.id, { statut: "annulee", updated: now() });
       return json({ ok: true });
     }
+    // La faction complète sa demande (texte, images) et la renvoie au staff
+    if (action === "completer") {
+      if (!mine) fail(403, "Seule la faction concernée peut compléter sa demande.");
+      const note = str(body.note, 1000).trim();
+      if (note.length < 5) fail(400, "Décris en quelques mots ce qui a été fait (et où : coordonnées).");
+      await update(env, s, "projet_demandes", d.id, { note, statut: "attente", updated: now() });
+      return json({ ok: true });
+    }
     if (s.level !== "staff") fail(403, "Réservé au staff.");
+    // Le staff renvoie la demande à la faction : projet pas assez complet, preuve manquante…
+    if (action === "renvoyer") {
+      const why = str(body.reponse, 500).trim();
+      if (!why) fail(400, "Dis à la faction ce qu'il manque.");
+      await update(env, s, "projet_demandes", d.id, { statut: "a_completer", reponse: why, updated: now() });
+      return json({ ok: true });
+    }
     if (action === "refuser") { await update(env, s, "projet_demandes", d.id, { statut: "refusee", reponse: str(body.reponse, 500), updated: now() }); return json({ ok: true }); }
     if (action !== "accepter") fail(400, "Action inconnue.");
     await addProjet(env, s, { projet_id: d.projet_id, faction_id: d.faction_id, usine_id: body.usine_id, note: str(body.note, 500) || d.note });
     await update(env, s, "projet_demandes", d.id, { statut: "acceptee", reponse: str(body.reponse, 500), updated: now() });
     return json({ ok: true });
+  }
+
+  // Images d'une demande (3 au plus, 1 Mo chacune) : envoyées par la faction, vues par elle et le staff
+  if ((mm = p.match(/^\/api\/projets\/demandes\/(\d+)\/images(?:\/(\d+))?$/))) {
+    const s = await need(req, env, m === "GET" ? "attente" : "sumenien");
+    const d = await row(env, "projet_demandes", Number(mm[1]));
+    if (!d) fail(404, "Demande introuvable.");
+    if (s.level !== "staff" && !(await sameFaction(env, s, d.faction_id))) fail(403, "Réservé à la faction concernée et au staff.");
+    if (m === "GET" && mm[2]) {
+      const im = await env.DB.prepare("SELECT mime, data FROM projet_images WHERE id = ? AND demande_id = ?").bind(Number(mm[2]), d.id).first();
+      if (!im) fail(404, "Image introuvable.");
+      return new Response(new Uint8Array(im.data), { headers: securityHeaders(new Headers({ "content-type": im.mime, "cache-control": "private, max-age=86400",
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'", "content-disposition": "inline" })) });
+    }
+    if (!["attente", "a_completer"].includes(d.statut) && s.level !== "staff") fail(400, "Cette demande est déjà traitée.");
+    if (m === "DELETE" && mm[2]) {
+      await env.DB.prepare("DELETE FROM projet_images WHERE id = ? AND demande_id = ?").bind(Number(mm[2]), d.id).run();
+      await audit(env, s, "projet_demandes", d.id, "update", { image: Number(mm[2]) }, { image: "retirée" });
+      return json({ ok: true });
+    }
+    if (m !== "POST" || mm[2]) fail(405, "Méthode refusée.");
+    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM projet_images WHERE demande_id = ?").bind(d.id).first();
+    if (n.n >= 3) fail(400, "3 images maximum par demande.");
+    const img = imageFrom(body.image);
+    const res = await env.DB.prepare("INSERT INTO projet_images (demande_id, mime, data, ts) VALUES (?,?,?,?)").bind(d.id, img.mime, img.bytes, now()).run();
+    await audit(env, s, "projet_demandes", d.id, "update", null, { image: `${Math.round(img.bytes.length / 1024)} ko` });
+    return json({ id: res.meta.last_row_id });
   }
 
   /* ---- bases ---- */
@@ -633,13 +675,8 @@ async function api(req, env, url, ctx) {
       await audit(env, s, "candidats", cid, "update", { affiche_image: "oui" }, { affiche_image: "retirée" });
       return json({ ok: true });
     }
-    const mt = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.image || ""));
-    if (!mt) fail(400, "Image invalide (JPEG, PNG ou WebP).");
-    const bytes = Uint8Array.from(atob(mt[2]), (ch) => ch.charCodeAt(0));
-    if (bytes.length > 1_000_000) fail(400, "Image trop lourde (1 Mo maximum).");
-    const magic = { "image/jpeg": [0xff, 0xd8], "image/png": [0x89, 0x50], "image/webp": [0x52, 0x49] }[mt[1]];
-    if (bytes[0] !== magic[0] || bytes[1] !== magic[1]) fail(400, "Le contenu ne correspond pas à une image.");
-    await env.DB.prepare("INSERT OR REPLACE INTO affiches (candidat_id, mime, data, updated) VALUES (?,?,?,?)").bind(cid, mt[1], bytes, now()).run();
+    const { mime, bytes } = imageFrom(body.image);
+    await env.DB.prepare("INSERT OR REPLACE INTO affiches (candidat_id, mime, data, updated) VALUES (?,?,?,?)").bind(cid, mime, bytes, now()).run();
     await audit(env, s, "candidats", cid, "update", null, { affiche_image: `${Math.round(bytes.length / 1024)} ko` });
     return json({ ok: true });
   }
@@ -814,6 +851,20 @@ async function sameSecret(a, b) {
   const [x, y] = await Promise.all([h(a), h(b)]);
   let d = 0; for (let i = 0; i < x.length; i++) d |= x[i] ^ y[i];
   return d === 0;
+}
+// Image envoyée en data URL (déjà réduite par le navigateur) : JPEG, PNG ou WebP, 1 Mo au plus, contenu vérifié
+function imageFrom(dataUrl) {
+  const mt = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ""));
+  if (!mt) fail(400, "Image invalide (JPEG, PNG ou WebP).");
+  const bytes = Uint8Array.from(atob(mt[2]), (ch) => ch.charCodeAt(0));
+  if (bytes.length > 1_000_000) fail(400, "Image trop lourde (1 Mo maximum).");
+  const magic = { "image/jpeg": [0xff, 0xd8], "image/png": [0x89, 0x50], "image/webp": [0x52, 0x49] }[mt[1]];
+  if (bytes[0] !== magic[0] || bytes[1] !== magic[1]) fail(400, "Le contenu ne correspond pas à une image.");
+  return { mime: mt[1], bytes };
+}
+async function sameFaction(env, s, fid) {
+  const me = await env.DB.prepare("SELECT faction_id FROM players WHERE discord_id = ? AND deleted = 0").bind(s.id).first();
+  return !!(me && me.faction_id === fid);
 }
 async function canEditFaction(env, s, fid) {
   const f = fid ? await row(env, "factions", fid) : null;
@@ -1148,7 +1199,7 @@ async function allData(env, s) {
   const staff = s.level === "staff";
   const Q = (sql, ...a) => env.DB.prepare(sql).bind(...a);
   const myFaction = "(SELECT faction_id FROM players WHERE discord_id = ? AND deleted = 0)";
-  const [meR, playersR, factionsR, usinesR, choixR, projetsR, realisesR, prixR, settingsR, basesR, candidatsR, votesR, resultsR, wlCountR, wlFreeR, finiR, facDemR, projDemR] = await env.DB.batch([
+  const [meR, playersR, factionsR, usinesR, choixR, projetsR, realisesR, prixR, settingsR, basesR, candidatsR, votesR, resultsR, wlCountR, wlFreeR, finiR, facDemR, projDemR, projImgR] = await env.DB.batch([
     Q("SELECT * FROM players WHERE discord_id = ? AND deleted = 0", s.id),
     Q("SELECT p.*, u.discord_name, (w.mc_name IS NOT NULL) AS wl FROM players p LEFT JOIN users u ON u.discord_id = p.discord_id LEFT JOIN whitelist w ON w.mc_name = p.mc_name WHERE p.deleted = 0 ORDER BY p.mc_name"),
     Q("SELECT * FROM factions WHERE deleted = 0 ORDER BY name"),
@@ -1169,8 +1220,10 @@ async function allData(env, s) {
     Q("SELECT w.mc_name FROM whitelist w WHERE NOT EXISTS (SELECT 1 FROM players p WHERE p.mc_name = w.mc_name AND p.deleted = 0) ORDER BY w.mc_name"),
     Q("SELECT faction_id, tour FROM usine_fini"),
     Q("SELECT d.*, p.mc_name AS auteur FROM faction_demandes d JOIN players p ON p.id = d.player_id WHERE d.statut = 'attente' OR d.updated > ? ORDER BY d.id DESC", now() - 30 * 86400),
-    staff ? Q("SELECT d.*, p.mc_name AS auteur FROM projet_demandes d JOIN players p ON p.id = d.player_id WHERE d.statut = 'attente' OR d.updated > ? ORDER BY d.id DESC", now() - 30 * 86400)
-      : Q(`SELECT d.*, p.mc_name AS auteur FROM projet_demandes d JOIN players p ON p.id = d.player_id WHERE d.faction_id = ${myFaction} AND (d.statut = 'attente' OR d.updated > ?) ORDER BY d.id DESC`, s.id, now() - 30 * 86400),
+    staff ? Q("SELECT d.*, p.mc_name AS auteur FROM projet_demandes d JOIN players p ON p.id = d.player_id WHERE d.statut IN ('attente','a_completer') OR d.updated > ? ORDER BY d.id DESC", now() - 30 * 86400)
+      : Q(`SELECT d.*, p.mc_name AS auteur FROM projet_demandes d JOIN players p ON p.id = d.player_id WHERE d.faction_id = ${myFaction} AND (d.statut IN ('attente','a_completer') OR d.updated > ?) ORDER BY d.id DESC`, s.id, now() - 30 * 86400),
+    staff ? Q("SELECT id, demande_id FROM projet_images ORDER BY id")
+      : Q(`SELECT i.id, i.demande_id FROM projet_images i JOIN projet_demandes d ON d.id = i.demande_id WHERE d.faction_id = ${myFaction} ORDER BY i.id`, s.id),
   ]);
   const me = meR.results[0] || null;
   const players = playersR.results.map((p) => {
@@ -1188,7 +1241,7 @@ async function allData(env, s) {
     players, factions: factionsR.results, usines: usinesR.results, choix: choixR.results, projets: projetsR.results,
     usineTours: USINE_TOURS, usineMax: USINE_MAX, usineFini: finiR.results, saisonDebut: SAISON_DEBUT, mcColors: MC_COLORS,
     factionDemandes: pub ? [] : facDemR.results.map((d) => ({ ...d, membres: JSON.parse(d.membres || "[]") })),
-    projetDemandes: pub ? [] : projDemR.results,
+    projetDemandes: pub ? [] : projDemR.results.map((d) => ({ ...d, images: projImgR.results.filter((i) => i.demande_id === d.id).map((i) => i.id) })),
     realises: staff ? realisesR.results : realisesR.results.map(({ note, ...r }) => r), settings, bases: basesR.results, candidats: candidatsR.results,
     myVotes: Object.fromEntries(votesR.results.map((v) => [v.tour, v.candidat_id])),
     results: staff || settings.election === "resultats" ? resultsR.results : null,

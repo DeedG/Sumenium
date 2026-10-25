@@ -36,6 +36,14 @@ jobs:
           restore-keys: icons-v2-
       - name: Extraction des icônes manquantes
         run: python scripts/icons.py
+      - name: Têtes des skins (en cache)
+        uses: actions/cache@v4
+        with:
+          path: |
+            site/heads
+            work/heads-meta.json
+          key: heads-v1-${{ github.run_id }}
+          restore-keys: heads-v1-
       - name: Lecture du serveur en SFTP
         env:
           SFTP_HOST: ${{ secrets.SFTP_HOST }}
@@ -46,6 +54,8 @@ jobs:
           PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
           DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
         run: python scripts/update.py
+      - name: Têtes des skins (API Mojang, une fois par jour et par joueur)
+        run: python scripts/heads.py || echo "::warning::Têtes des skins non mises à jour"
       - name: Icônes des objets en boutique
         run: python scripts/icons.py
       - name: Version des scripts (le navigateur prend la nouvelle version tout de suite)

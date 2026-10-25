@@ -119,7 +119,8 @@ const facOpts = (cur, none = "Sans faction (solo)") => `<option value="">${none}
 const formData = (form) => Object.fromEntries(new FormData(form).entries());
 const para = (t) => (t ? `<p class="txt">${esc(t)}</p>` : "");
 const head = (title, sub2) => `<div class="sec-head"><h3>${title}</h3>${sub2 ? `<p class="sub2">${sub2}</p>` : ""}</div>`;
-const face = (n, size = 32) => `<img class="face" src="https://mc-heads.net/avatar/${encodeURIComponent(n)}/${size}" alt="" width="${size}" height="${size}" loading="lazy">`;
+// Tête du skin : générée par la mise à jour du site, mc-heads.net en secours (headFail, dans index.html)
+const face = (n, size = 32) => `<img class="face" src="heads/${encodeURIComponent(String(n).toLowerCase())}.png" data-n="${esc(n)}" data-s="${size}" onerror="headFail(this)" alt="" width="${size}" height="${size}" loading="lazy">`;
 const plink = (n) => `<a class="plink" href="#communaute/joueur/${encodeURIComponent(n)}">${esc(n)}</a>`;
 const flink = (f) => `<a class="faclink" href="#communaute/faction/${f.id}"><span class="ftag"${facStyle(f)}>${esc(f.name)}</span></a>`;
 const plural = (n, one, many) => `${fmt(n)} ${n > 1 ? many : one}`;
@@ -199,6 +200,8 @@ function notifs() {
   // Réponses du staff aux demandes
   (D.factionDemandes || []).filter((d) => p && d.player_id === p.id && (d.statut === "acceptee" || d.statut === "refusee"))
     .forEach((d) => add(`fdem:${d.id}:${d.statut}`, d.statut === "acceptee" ? "✅" : "❌", `Ta demande de faction « ${d.name} » a été ${d.statut === "acceptee" ? "acceptée" : "refusée"}${d.reponse ? " : " + d.reponse : ""}.`, "#communaute/factions"));
+  (D.projetDemandes || []).filter((d) => p && d.faction_id === p.faction_id && d.statut === "a_completer")
+    .forEach((d) => add(`pdem:${d.id}:a_completer:${d.updated}`, "✏️", `Le staff demande de compléter « ${(projet(d.projet_id) || {}).nom || "?"} » : ${d.reponse}`, "#communaute/projets", "warn"));
   (D.projetDemandes || []).filter((d) => p && d.faction_id === p.faction_id && (d.statut === "acceptee" || d.statut === "refusee"))
     .forEach((d) => add(`pdem:${d.id}:${d.statut}`, d.statut === "acceptee" ? "✅" : "❌", `Projet « ${(projet(d.projet_id) || {}).nom || "?"} » ${d.statut === "acceptee" ? "validé" : "refusé"}${d.reponse ? " : " + d.reponse : ""}.`, "#communaute/projets"));
   // Staff : ce qui attend une action
@@ -630,8 +633,8 @@ function projets() {
       return `<tr><td>${projetNom(pr)}</td><td>${esc(taillesTxt(pr.tailles))}</td><td>${reglesProjet(pr)}</td>
         <td>${done.map((r) => `<a href="#communaute/faction/${r.faction_id}" class="chip${r.faction_id === myF ? " ok" : ""}" title="${esc(r.note || "")}">${esc(facName(r.faction_id))}${r.usine_id ? ` → ${esc((usine(r.usine_id) || {}).nom || "")}` : ""}</a>`).join(" ") || '<span class="muted">—</span>'}
           ${isStaff() ? done.map((r) => `<button class="x" data-pf-del="${r.id}" title="Retirer ce projet de ${esc(facName(r.faction_id))}" aria-label="Retirer">✕</button>`).join("") : ""}</td>
-        ${myF ? `<td>${c === true ? (() => { const pd = (D.projetDemandes || []).find((d) => d.projet_id === pr.id && d.faction_id === myF && d.statut === "attente");
-          return pd ? `<span class="chip warn">Demande envoyée</span> <button class="x" data-pd-cancel="${pd.id}" title="Annuler la demande" aria-label="Annuler la demande">✕</button>`
+        ${myF ? `<td>${c === true ? (() => { const pd = (D.projetDemandes || []).find((d) => d.projet_id === pr.id && d.faction_id === myF && PD_OPEN.includes(d.statut));
+          return pd ? (pd.statut === "a_completer" ? `<span class="chip warn">À compléter</span> <button class="btn small" data-pd-edit="${pd.id}">Compléter</button>` : '<span class="chip warn">Demande envoyée</span>')
             : `<span class="chip ok">Disponible</span>${canWrite() ? ` <button class="btn small ghost" data-pd-ask="${pr.id}">Demander la validation</button>` : ""}`; })()
           : pr.unique_srv ? '<span class="chip muted">Déjà pris</span>' : '<span class="chip muted">Déjà fait</span>'}</td>` : ""}</tr>`;
     }).join("") || '<tr><td colspan="5" class="empty">Aucun projet.</td></tr>'}</tbody></table></div>
@@ -644,38 +647,85 @@ function projetNom(pr) {
     <span class="ptip-box" role="tooltip"><b>${esc(pr.nom)}</b>${esc(pr.description)}
       <span class="ptip-meta">Débloque une usine ${esc(taillesTxt(pr.tailles))} · ${pr.unique_srv ? "unique sur le serveur" : pr.illimite ? "sans limite" : "1 fois par faction"}</span></span></span>`;
 }
-// Demandes de validation : en attente (staff : toutes ; joueur : celles de sa faction) et réponses récentes
+// Demandes de validation : en cours (staff : toutes ; joueur : celles de sa faction) et réponses récentes
+const PD_OPEN = ["attente", "a_completer"];
+const pdImg = (d, id) => `/api/projets/demandes/${d.id}/images/${id}`;
+let pdForm = null;  // { projet: id, demande: id|null } : formulaire de demande ouvert
 function projDemCard() {
-  const L = D.projetDemandes || [], pend = L.filter((d) => d.statut === "attente"), done = L.filter((d) => d.statut === "acceptee" || d.statut === "refusee");
-  if (!pend.length && !done.length) return "";
-  return `<section class="card" id="projDem"><h3>${isStaff() ? "Demandes de validation" : "Demandes de ta faction"}</h3>
-    ${pend.length ? `<ul class="dem-list">${pend.map(projDemItem).join("")}</ul>` : '<p class="muted small">Aucune demande en attente.</p>'}
+  const L = D.projetDemandes || [], pend = L.filter((d) => PD_OPEN.includes(d.statut)), done = L.filter((d) => d.statut === "acceptee" || d.statut === "refusee");
+  const form = pdForm ? projDemForm() : "";
+  if (!pend.length && !done.length && !form) return "";
+  return `${form}<section class="card" id="projDem"><h3>${isStaff() ? "Demandes de validation" : "Demandes de ta faction"}</h3>
+    ${pend.length ? `<ul class="dem-list">${pend.map(projDemItem).join("")}</ul>` : '<p class="muted small">Aucune demande en cours.</p>'}
     ${done.length ? `<details><summary>Réponses récentes (${done.length})</summary><ul class="dem-list">${done.map((d) => `<li class="dem small">${d.statut === "acceptee" ? "✅" : "❌"} <b>${esc((projet(d.projet_id) || {}).nom || "?")}</b> · ${esc(facName(d.faction_id))}${d.reponse ? ` : ${esc(d.reponse)}` : ""}</li>`).join("")}</ul></details>` : ""}</section>`;
+}
+// Formulaire de la faction : description + jusqu'à 3 images (captures d'écran du projet)
+function projDemForm() {
+  const pr = projet(pdForm.projet) || { nom: "?" }, d = pdForm.demande ? (D.projetDemandes || []).find((x) => x.id === pdForm.demande) : null;
+  const imgs = d ? d.images || [] : [];
+  return `<form class="card form" id="pdFormEl"><h3>${d ? "Compléter la demande" : "Demander la validation"} : ${esc(pr.nom)}</h3>
+    ${d && d.reponse ? `<p class="banner info">Message du staff : ${esc(d.reponse)}</p>` : ""}
+    <label class="wide">Ce qui a été fait<textarea name="note" rows="4" maxlength="1000" required placeholder="Description, coordonnées (x / y / z), usine souhaitée…">${esc(d ? d.note : "")}</textarea></label>
+    <div class="wide"><b class="small">Images (3 au plus)</b>
+      <div class="pd-imgs" id="pdImgs">${imgs.map((id) => `<span class="pd-img"><img src="${pdImg(d, id)}" alt="Image jointe"><button type="button" class="x" data-pd-imgdel="${id}" aria-label="Retirer l'image">✕</button></span>`).join("")}</div>
+      ${imgs.length < 3 ? `<input type="file" id="pdFiles" accept="image/*" multiple aria-label="Ajouter des images"><p class="muted small">Captures d'écran du projet en jeu. Les images sont réduites automatiquement et visibles seulement par ta faction et le staff.</p>` : ""}
+      <div class="pd-imgs" id="pdPrev"></div></div>
+    <div class="wide actions"><button class="btn small">${d ? "Renvoyer au staff" : "Envoyer la demande"}</button><button type="button" class="btn small ghost" id="pdClose">Fermer</button></div></form>`;
 }
 function projDemItem(d) {
   const pr = projet(d.projet_id) || { nom: "?", tailles: "" }, ok = pr.tailles.split(",");
+  const mineF = me() && me().faction_id === d.faction_id;
   return `<li class="dem" data-pd="${d.id}"><div><b>${esc(pr.nom)}</b> · <a href="#communaute/faction/${d.faction_id}">${esc(facName(d.faction_id))}</a>
+      ${d.statut === "a_completer" ? '<span class="chip warn">À compléter</span>' : '<span class="chip">En attente du staff</span>'}
       <span class="muted small">demandé par ${plink(d.auteur)} · ${new Date(d.ts * 1000).toLocaleDateString("fr-FR")}</span></div>
     <p class="small">${esc(d.note)}</p>
-    ${isStaff() ? `<div class="actions inline"><select data-pd-usine aria-label="Usine débloquée"><option value="">Aucune usine pour l'instant</option>${D.usines.filter((u) => ok.includes(u.taille)
+    ${d.reponse && d.statut === "a_completer" ? `<p class="small"><b>Le staff demande :</b> ${esc(d.reponse)}</p>` : d.reponse ? `<p class="small muted">Message précédent du staff : ${esc(d.reponse)}</p>` : ""}
+    ${(d.images || []).length ? `<div class="pd-imgs">${d.images.map((id) => `<a class="pd-img" href="${pdImg(d, id)}" target="_blank" rel="noopener" title="Voir en grand"><img src="${pdImg(d, id)}" alt="Image jointe" loading="lazy"></a>`).join("")}</div>` : ""}
+    ${isStaff() ? `<div class="actions inline">${d.statut === "attente" ? `<select data-pd-usine aria-label="Usine débloquée"><option value="">Aucune usine pour l'instant</option>${D.usines.filter((u) => ok.includes(u.taille)
         && !D.choix.some((c) => c.faction_id === d.faction_id && c.usine_id === u.id)).map((u) => { const n = D.choix.filter((c) => c.usine_id === u.id).length;
           return `<option value="${u.id}">${esc(u.nom)} (${u.taille}, ${n}/${TAILLE_USINE[u.taille][1]})</option>`; }).join("")}</select>
-      <button class="btn small" data-pd-ok="${d.id}">Valider</button><button class="btn small ghost danger" data-pd-no="${d.id}">Refuser</button></div>`
-      : `<button class="btn small ghost" data-pd-cancel="${d.id}">Annuler</button>`}</li>`;
+      <button class="btn small" data-pd-ok="${d.id}">Valider</button><button class="btn small ghost" data-pd-back="${d.id}">Renvoyer à compléter</button>` : '<span class="muted small">En attente de la faction</span>'}
+      <button class="btn small ghost danger" data-pd-no="${d.id}">Refuser</button></div>`
+      : mineF ? `<div class="actions">${d.statut === "a_completer" ? `<button class="btn small" data-pd-edit="${d.id}">Compléter la demande</button>` : `<button class="btn small ghost" data-pd-edit="${d.id}">Modifier</button>`}
+          <button class="btn small ghost" data-pd-cancel="${d.id}">Annuler</button></div>` : ""}</li>`;
 }
 function bindProjDem() {
-  document.querySelectorAll("[data-pd-ask]").forEach((b) => (b.onclick = () => {
-    const pr = projet(+b.dataset.pdAsk), note = prompt(`Demander la validation de « ${pr.nom} »\nDécris ce qui a été fait, où (coordonnées) et l'usine souhaitée :`);
-    if (note !== null) act(() => call("POST", "/api/projets/demandes", { projet_id: pr.id, note }), "Demande envoyée au staff");
-  }));
+  const open = (projetId, demandeId) => { pdForm = { projet: projetId, demande: demandeId || null }; projets();
+    const f = $("pdFormEl"); if (f) { f.scrollIntoView({ behavior: "smooth", block: "start" }); f.note.focus({ preventScroll: true }); } };
+  document.querySelectorAll("[data-pd-ask]").forEach((b) => (b.onclick = () => open(+b.dataset.pdAsk)));
+  document.querySelectorAll("[data-pd-edit]").forEach((b) => (b.onclick = () => { const d = D.projetDemandes.find((x) => x.id === +b.dataset.pdEdit); open(d.projet_id, d.id); }));
   document.querySelectorAll("[data-pd-cancel]").forEach((b) => (b.onclick = () => confirm("Annuler cette demande ?")
     && act(() => call("PUT", `/api/projets/demandes/${b.dataset.pdCancel}`, { action: "annuler" }), "Demande annulée")));
   document.querySelectorAll("[data-pd-ok]").forEach((b) => (b.onclick = () => {
     const li = b.closest("[data-pd]"), u = li.querySelector("[data-pd-usine]").value;
     act(() => call("PUT", `/api/projets/demandes/${b.dataset.pdOk}`, { action: "accepter", usine_id: u ? +u : null }), "Projet validé");
   }));
+  document.querySelectorAll("[data-pd-back]").forEach((b) => (b.onclick = () => { const why = prompt("Ce qu'il manque pour valider le projet (la faction le verra et pourra compléter sa demande) :");
+    if (why && why.trim()) act(() => call("PUT", `/api/projets/demandes/${b.dataset.pdBack}`, { action: "renvoyer", reponse: why.trim() }), "Demande renvoyée à la faction"); }));
   document.querySelectorAll("[data-pd-no]").forEach((b) => (b.onclick = () => { const why = prompt("Raison du refus (visible par la faction, facultatif) :");
     if (why !== null) act(() => call("PUT", `/api/projets/demandes/${b.dataset.pdNo}`, { action: "refuser", reponse: why }), "Demande refusée"); }));
+  const f = $("pdFormEl");
+  if (!f) return;
+  const d = pdForm.demande ? D.projetDemandes.find((x) => x.id === pdForm.demande) : null, files = $("pdFiles");
+  let picked = [];
+  if (files) files.onchange = () => {
+    const room = 3 - (d ? (d.images || []).length : 0);
+    picked = [...files.files].slice(0, room);
+    if (files.files.length > room) toast(`${room} image${room > 1 ? "s" : ""} au plus : les suivantes sont ignorées.`, true);
+    $("pdPrev").innerHTML = picked.map((x) => `<span class="pd-img"><img src="${URL.createObjectURL(x)}" alt="Aperçu"></span>`).join("");
+  };
+  document.querySelectorAll("[data-pd-imgdel]").forEach((b) => (b.onclick = () => confirm("Retirer cette image ?")
+    && act(() => call("DELETE", `/api/projets/demandes/${d.id}/images/${b.dataset.pdImgdel}`), "Image retirée")));
+  $("pdClose").onclick = () => { pdForm = null; projets(); };
+  f.onsubmit = (e) => { e.preventDefault(); act(async () => {
+    const imgs = [];
+    for (const x of picked) imgs.push(await shrinkImage(x));  // réduites d'abord : une image illisible n'envoie rien
+    const note = f.note.value;
+    const id = d ? (await call("PUT", `/api/projets/demandes/${d.id}`, { action: "completer", note }), d.id)
+      : (await call("POST", "/api/projets/demandes", { projet_id: pdForm.projet, note })).id;
+    for (const image of imgs) await call("POST", `/api/projets/demandes/${id}/images`, { image });
+    pdForm = null;
+  }, d ? "Demande renvoyée au staff" : "Demande envoyée au staff"); };
 }
 function projetStaffForm() {
   return `<form id="pfForm" class="card form compact"><h3>Valider un projet (après le ticket)</h3>
@@ -1060,9 +1110,9 @@ function staff() {
   const fixes = D.players.filter((p) => p.taille_fixe);
   const todo = tailles.filter(({ p, sc }) => p.taille_appliquee == null || Math.abs(p.taille_appliquee - sc) >= 0.0005);
   const aWl = D.wlSynced ? D.players.filter((p) => !p.whitelisted).sort((a, b) => ficheOk(b) - ficheOk(a) || a.mc_name.localeCompare(b.mc_name)) : [];
-  const fDem = (D.factionDemandes || []).filter((d) => d.statut === "attente"), pDem = (D.projetDemandes || []).filter((d) => d.statut === "attente");
+  const fDem = (D.factionDemandes || []).filter((d) => d.statut === "attente"), pDem = (D.projetDemandes || []).filter((d) => PD_OPEN.includes(d.statut));
   const absentes = D.factions.filter((f) => ECO && !ecoFac(f));
-  const nav = [["st-dem", `Demandes (${fDem.length + pDem.length})`], ["st-wl", `À whitelister (${aWl.filter(ficheOk).length})`], ["st-taille", `Tailles RP (${todo.length})`], ["st-bordure", "Bordure"], ["st-hist", "Historique d'un joueur"], ["st-reglages", "Réglages"], ["st-import", "Import"], ["st-histo", "Historique"]];
+  const nav = [["st-dem", `Demandes (${fDem.length + pDem.filter((d) => d.statut === "attente").length})`], ["st-wl", `À whitelister (${aWl.filter(ficheOk).length})`], ["st-taille", `Tailles RP (${todo.length})`], ["st-bordure", "Bordure"], ["st-hist", "Historique d'un joueur"], ["st-reglages", "Réglages"], ["st-import", "Import"], ["st-histo", "Historique"]];
   view(head("Outils staff", "Whitelist, tailles RP, bordure, réglages et historique de toutes les modifications.") +
     `<nav class="anchors">${nav.map(([id, l]) => `<a href="#" data-jump="${id}">${l}</a>`).join("")}</nav>
     <section class="card" id="st-dem"><h3>Demandes des joueurs</h3>

@@ -66,7 +66,7 @@ const facTag = (id) => { const x = facById(id); if (!x) return id ? `<span class
   const tag = `<span class="ftag" style="--fc:${E_(facColor(x.couleur))}">${E_(x.tag)}</span>`, h = facHref(x.id);
   return h ? `<a class="faclink" href="${h}" title="Fiche de la faction">${tag}</a>` : tag; };
 // Petite icône devant le propriétaire : tête du skin pour un joueur, bannière aux couleurs pour une faction
-const headE = (n) => /^[A-Za-z0-9_]{2,16}$/.test(n || "") ? `<img class="own-ico" src="https://mc-heads.net/avatar/${encodeURIComponent(n)}/20" alt="" width="20" height="20" loading="lazy">` : "";
+const headE = (n) => /^[A-Za-z0-9_]{2,16}$/.test(n || "") ? `<img class="own-ico" src="heads/${encodeURIComponent(n.toLowerCase())}.png" data-n="${E_(n)}" data-s="20" onerror="headFail(this)" alt="" width="20" height="20" loading="lazy">` : "";
 const facIco = (id) => { const x = facById(id); return `<span class="own-ico fac-ico" style="--fc:${E_(facColor(x && x.couleur))}" aria-hidden="true"></span>`; };
 const unavailable = (what) => `<div class="card center muted">Données indisponibles${what ? ` (${E_(what)})` : ""}. Elles reviendront à la prochaine synchronisation du serveur.</div>`;
 const mapLink = (o) => (o && o.x !== undefined && o.x !== null && (!o.monde || o.monde === "minecraft:overworld"))
