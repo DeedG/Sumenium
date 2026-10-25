@@ -468,9 +468,12 @@ body.busy{cursor:progress}
 .rules-list li.cur{color:var(--fg)}
 .ip-players a:hover{text-decoration:underline}
 .ph{display:inline-grid;place-items:center;min-width:28px;height:28px;padding:0 3px;border-radius:4px;background:var(--bg);font:600 .55rem/1 var(--body);color:var(--muted);vertical-align:middle;overflow:hidden}
-.ftag{display:inline-block;font:700 .78rem var(--display);padding:2px 8px;border-radius:6px;color:#fff;background:var(--fc,var(--muted));white-space:nowrap;vertical-align:1px;
-  /* léger contour sombre : lisible sur les couleurs claires (jaune, cyan, vert clair) */
-  text-shadow:-1px -1px 0 rgba(0,0,0,.55),1px -1px 0 rgba(0,0,0,.55),-1px 1px 0 rgba(0,0,0,.55),1px 1px 0 rgba(0,0,0,.55),0 1px 2px rgba(0,0,0,.4)}
+.ftag{display:inline-block;font:700 .78rem var(--display);padding:1px 8px;border-radius:6px;white-space:nowrap;vertical-align:1px;
+  /* teinte douce de la couleur de l'équipe en jeu (comme les pastilles du site) plutôt qu'un aplat vif */
+  color:color-mix(in srgb,var(--fc,var(--muted)) 45%,#000);background:color-mix(in srgb,var(--fc,var(--muted)) 15%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--fc,var(--muted)) 38%,transparent)}
+@media (prefers-color-scheme:dark){.ftag{color:color-mix(in srgb,var(--fc,var(--muted)) 72%,#fff);background:color-mix(in srgb,var(--fc,var(--muted)) 16%,var(--surface));
+  border-color:color-mix(in srgb,var(--fc,var(--muted)) 32%,transparent)}}
 .ftag.big{font-size:1.05rem;padding:3px 10px}
 .shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
 .shop{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:6px;align-content:start;min-width:0}

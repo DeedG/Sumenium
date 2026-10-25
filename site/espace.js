@@ -404,10 +404,10 @@ function facCard(f) {
     <p class="members">${ms.map((p) => { const r = ef && (ef.membres.find((m) => norm(m.nom) === norm(p.mc_name)) || {}).role;
       return `<span>${plink(p.mc_name)}${ROLE_MOD[r] ? ` <small class="muted">${ROLE_MOD[r]}</small>` : ""}</span>`; }).join("") || '<span class="muted">Aucun membre</span>'}</p>
     ${ef ? `<p class="fac-bank"><b>${suE(ef.banque)}</b> <span class="muted small">en banque</span></p>` : ""}
-    <dl>${row("Thème", f.theme)}${row("Hub et usines prévues", f.hub)}${row("Projet communautaire prévu", f.projet_commu)}${row("Autres projets", f.autres_projets)}${row("Recrutement", f.recrutement)}
+    <dl>${row("Thème", f.theme)}${row("Hub et usines prévues", f.hub)}${row("Autres projets", f.autres_projets)}${row("Recrutement", f.recrutement)}
       ${f.tirage ? `<dt>Tirage des usines</dt><dd>${f.tirage}ᵉ</dd>` : ""}
       ${ch.length ? `<dt>Usines</dt><dd>${ch.map(usineChip).join(" ")}</dd>` : ""}
-      ${pr.length ? `<dt>Projets réalisés</dt><dd>${pr.map((r) => `<span class="chip">${esc((projet(r.projet_id) || {}).nom || "?")}</span>`).join(" ")}</dd>` : ""}</dl>
+      <dt>Projets communautaires validés</dt><dd>${pr.length ? pr.map((r) => `<a class="chip" href="#communaute/projets">${esc((projet(r.projet_id) || {}).nom || "?")}</a>`).join(" ") : '<span class="muted">Aucun pour l\'instant</span>'}</dd></dl>
     ${showBases ? `<details class="bases"><summary>Coordonnées (${bases.length})</summary>
       <table class="mini"><tbody>${bases.map((b) => `<tr><td>${esc({ hub: "Hub", usine: "Usine", base: "Base" }[b.type])}</td><td>${esc(b.nom)}</td>
         <td class="num">${b.x != null && b.z != null ? mapBtn(b) : `${b.x ?? "?"} / ${b.y ?? "?"} / ${b.z ?? "?"}`}</td>
@@ -425,7 +425,6 @@ function facEdit(fid) {
     ${isStaff() ? `<label>Nom<input name="name" value="${esc(f.name)}" maxlength="40"></label><label>Ordre au tirage<input name="tirage" type="number" min="1" value="${f.tirage ?? ""}"></label>` : ""}
     <label class="wide">Thème<textarea name="theme" rows="2">${esc(f.theme)}</textarea></label>
     <label class="wide">Hub et usines prévues<textarea name="hub" rows="2">${esc(f.hub)}</textarea></label>
-    <label class="wide">Projet communautaire prévu<textarea name="projet_commu" rows="2">${esc(f.projet_commu)}</textarea></label>
     <label class="wide">Autres projets<textarea name="autres_projets" rows="2">${esc(f.autres_projets)}</textarea></label>
     <label class="wide">Recrutement (contact)<input name="recrutement" value="${esc(f.recrutement)}"></label>
     <div class="wide actions"><button class="btn small">Enregistrer</button><button type="button" class="btn small ghost" id="facCancel">Annuler</button></div></form>`;
