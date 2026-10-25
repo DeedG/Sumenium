@@ -119,6 +119,7 @@ a.stat:hover{transform:translateY(-2px)}
 .fac-grid.one .members{display:none}
 .join-hero h3{font:700 1.6rem/1.2 var(--display);margin:0 0 8px}
 .join-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.join-grid .wide{grid-column:1/-1}
 @media (max-width:640px){.join-grid{grid-template-columns:1fr}}
 #join-how a{color:var(--crystal);font-weight:700}
 .join-grid .card{margin:0}
@@ -716,6 +717,9 @@ body.busy{cursor:progress}
         <section class="card"><h3>🎭 Le semi-RP</h3>
           <p>Rien d'obligatoire : on parle de semi-RP, pas de RP complet. Chaque joueur choisit un <b>métier</b> (il peut en changer à tout moment) et s'en sert pour jouer sur le serveur.</p>
           <p><a href="#communaute/joueurs">Voir les métiers des joueurs</a></p></section>
+        <section class="card wide"><h3>💰 L'économie</h3>
+          <p>Le serveur a sa propre monnaie, le <b>suménien (Su)</b>, et son propre mod d'économie. Chaque joueur peut ouvrir une <b>boutique</b> sur un coffre au spawn : objets, lots ou services (avec des bons). Les factions ont une <b>banque commune</b>, l'<b>hôtel des ventes</b> organise des enchères de 7 jours, et le <b>FISC</b> rachète certains minerais. Tout se fait en cliquant sur les coffres et avec quelques commandes simples (<code>/boutique</code>, <code>/compte</code>, <code>/faction</code>, <code>/hdv</code>).</p>
+          <p><a href="#marche/boutiques">Voir le marché</a> · <a href="#aide/commandes">Toutes les commandes</a></p></section>
         <section class="card"><h3>🎉 Les events</h3>
           <p>Des events originaux sont organisés par le staff ou par les joueurs, presque chaque semaine !</p>
           <p>Le serveur a été choisi solide pour que l'expérience de jeu soit la plus agréable possible, et la survie est accompagnée d'un <b>monde créatif</b> en flatworld.</p></section>
@@ -1068,7 +1072,7 @@ function renderHome(){
     try{await navigator.clipboard.writeText(ip);ok=true}catch(e){try{const i=document.createElement("input");i.value=ip;document.body.appendChild(i);i.select();ok=document.execCommand("copy");i.remove()}catch(_){}}
     b.classList.toggle("ok",ok);a.textContent=ok?"Copié ✓":"Ctrl+C";clearTimeout(t);t=setTimeout(()=>{b.classList.remove("ok");a.textContent="Copier"},1800)}})();
 // Invitation Discord (page Aide › Rejoindre). Vide = bouton caché.
-const DISCORD_INVITE="";
+const DISCORD_INVITE="https://discord.gg/EQHgAvQbjA";
 (()=>{if(!DISCORD_INVITE)return;const b=$("joinDiscord");b.href=DISCORD_INVITE;b.hidden=false;
   $("joinDiscordTxt").innerHTML=` (<a href="${esc(DISCORD_INVITE)}" target="_blank" rel="noopener">${esc(DISCORD_INVITE.replace(/^https?:\/\//,""))}</a>)`})();
 document.addEventListener("click",e=>{const a=e.target.closest("[data-jump]");if(!a)return;const t=document.getElementById(a.dataset.jump);if(t){e.preventDefault();t.scrollIntoView({behavior:"smooth",block:"start"})}});

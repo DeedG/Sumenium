@@ -142,9 +142,15 @@ async function proxy(req, env, url) {
   // Jamais plus de 5 minutes de cache ; les données (JSON) sont toujours revalidées
   out.headers.set("cache-control", /\.json$/.test(url.pathname) ? "no-cache" : "public, max-age=300");
   out.headers.delete("access-control-allow-origin");
+  // Pages HTML : seules les sources connues du site peuvent charger du contenu (scripts du site, polices Google,
+  // têtes de skin, avatars Discord, carte). Bloque l'injection de scripts tiers et l'affichage du site dans un cadre étranger.
+  if ((res.headers.get("content-type") || "").includes("text/html")) out.headers.set("content-security-policy", CSP);
   return out;
 }
 
+const CSP = ["default-src 'self'", "script-src 'self' 'unsafe-inline'", "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src https://fonts.gstatic.com", "img-src 'self' data: https://mc-heads.net https://textures.minecraft.net https://cdn.discordapp.com", "connect-src 'self'",
+  "frame-src https://carte.sumenium.com", "frame-ancestors 'self'", "base-uri 'self'", "form-action 'self'", "object-src 'none'"].join("; ");
 function securityHeaders(h) {
   h.set("strict-transport-security", "max-age=31536000");
   h.set("x-content-type-options", "nosniff");
@@ -888,7 +894,7 @@ async function allData(env, s) {
   return {
     user: pub ? null : { id: s.id, name: s.name, avatar: s.avatar, level: s.level },
     players, factions: factionsR.results, usines: usinesR.results, choix: choixR.results, projets: projetsR.results,
-    realises: realisesR.results, settings, bases: basesR.results, candidats: candidatsR.results,
+    realises: staff ? realisesR.results : realisesR.results.map(({ note, ...r }) => r), settings, bases: basesR.results, candidats: candidatsR.results,
     myVotes: Object.fromEntries(votesR.results.map((v) => [v.tour, v.candidat_id])),
     results: staff || settings.election === "resultats" ? resultsR.results : null,
     meId: me ? me.id : null, wlSynced: !pub && wlCountR.results[0].n > 0, wlFree: staff ? wlFreeR.results.map((r) => r.mc_name) : null,
