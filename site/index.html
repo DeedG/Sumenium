@@ -8,7 +8,7 @@ if(location.hostname==="deedg.github.io")location.replace("https://sumenium.com/
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Suménium · Saison 7</title>
-<meta name="description" content="Site du serveur Minecraft Suménium (Saison 7) : classements, succès, statistiques, carte et espace joueurs.">
+<meta name="description" content="Suménium, serveur Minecraft Java 26.3 semi-RP en UHC : factions PvE, zone commerciale au spawn, métiers, events chaque semaine, bordure qui grandit avec les succès. Carte, classements et comment nous rejoindre.">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="canonical" href="https://sumenium.com/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -117,6 +117,16 @@ a.stat:hover{transform:translateY(-2px)}
 .faclink{text-decoration:none}
 .fac-grid.one{grid-template-columns:1fr}
 .fac-grid.one .members{display:none}
+.join-hero h3{font:700 1.6rem/1.2 var(--display);margin:0 0 8px}
+.join-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:640px){.join-grid{grid-template-columns:1fr}}
+#join-how a{color:var(--crystal);font-weight:700}
+.join-grid .card{margin:0}
+.join-grid .card p:last-child{margin-bottom:0}
+.join-grid a,.join-list a,.join-end a{color:var(--crystal);font-weight:700}
+.join-grid+.card{margin-top:14px}
+.join-list{margin:0;padding-left:20px;display:grid;gap:6px}
+#join-how{scroll-margin-top:70px}
 .plink{color:inherit;text-decoration:none;border-bottom:1px dotted currentColor}
 .plink:hover{color:var(--crystal)}
 .ip-sub{display:block;margin-top:6px;color:var(--muted);font-weight:600;font-size:.8rem}
@@ -690,13 +700,43 @@ body.busy{cursor:progress}
       <a href="#aide/rejoindre" data-sub="rejoindre">Rejoindre le serveur</a><a href="#aide/commandes" data-sub="commandes">Commandes</a><a href="confidentialite.html">Confidentialité</a>
     </nav>
     <div class="subpanel" data-sub="rejoindre">
-      <div class="sec-head"><h3>Rejoindre le serveur</h3><p class="sub2">Serveur Minecraft Java sur liste blanche, pour les joueurs du Discord Suménium.</p></div>
-      <div class="card steps"><ol>
-        <li><b>Rejoins le Discord Suménium</b> et passe la candidature avec le staff.</li>
-        <li><b>Connecte-toi ici avec Discord</b> (bouton en haut à droite), puis relie ton pseudo Minecraft Java dans <a href="#espace/fiche">Ma fiche</a> et remplis-la.</li>
+      <section class="card join-hero">
+        <h3>Suménium vous ouvre ses portes !</h3>
+        <p>Suménium est un serveur Minecraft dans la même veine que le concept d'Holycube, mais avec ses propres spécificités. On joue en <b>26.3</b>, en <b>UHC</b>, avec une vingtaine de datapacks.</p>
+        <p>En 2026, les serveurs full Vanilla sans travail de fond peuvent séduire, mais on aime bien un petit plus, une différence. Sans parler des datapacks, voici notre concept.</p>
+        <div class="home-actions"><a class="btn discord" id="joinDiscord" href="#" target="_blank" rel="noopener" hidden>Rejoindre le Discord</a><a class="btn ghost" href="#aide/rejoindre" data-jump="join-how">Comment nous rejoindre</a></div>
+      </section>
+      <div class="join-grid">
+        <section class="card"><h3>🏰 Les factions</h3>
+          <p>Les factions (PvE) sont le cœur du serveur. Les joueurs les ont créées en proposant un projet de faction, qui a réuni les joueurs intéressés. En plus du projet de faction, chacun reste libre de réaliser ses projets persos !</p>
+          <p><a href="#communaute/factions">Voir les factions</a></p></section>
+        <section class="card"><h3>🛒 Le spawn</h3>
+          <p>Contrairement à beaucoup de serveurs, le spawn n'est pas le village où chacun construit sa maison avant de partir : c'est la <b>zone commerciale</b>, où se créent les boutiques et les bâtiments RP du serveur.</p>
+          <p><a href="#marche/boutiques">Voir les boutiques</a></p></section>
+        <section class="card"><h3>🎭 Le semi-RP</h3>
+          <p>Rien d'obligatoire : on parle de semi-RP, pas de RP complet. Chaque joueur choisit un <b>métier</b> (il peut en changer à tout moment) et s'en sert pour jouer sur le serveur.</p>
+          <p><a href="#communaute/joueurs">Voir les métiers des joueurs</a></p></section>
+        <section class="card"><h3>🎉 Les events</h3>
+          <p>Des events originaux sont organisés par le staff ou par les joueurs, presque chaque semaine !</p>
+          <p>Le serveur a été choisi solide pour que l'expérience de jeu soit la plus agréable possible, et la survie est accompagnée d'un <b>monde créatif</b> en flatworld.</p></section>
+      </div>
+      <section class="card"><h3>🧩 Les datapacks</h3>
+        <p>Le serveur veut rester Vanilla : les blocs, les mobs, etc. restent Vanilla. On se permet malgré tout une vingtaine de datapacks de confort, de collection, et certains qui apportent du nouveau. Quelques-uns :</p>
+        <ul class="join-list">
+          <li><b>Têtes</b> : les mobs et les joueurs lâchent leur tête, et les marchands ambulants vendent des mini-blocs.</li>
+          <li><b>Simple Voice Chat</b> : parler avec les joueurs qu'on croise en jeu, sans passer par Discord.</li>
+          <li><b>Blaze and Cave Advancements</b> : énormément de nouveaux succès… et chacun agrandit la <a href="#monde/succes">bordure du monde</a>.</li>
+          <li><b>Terralith</b> : de magnifiques biomes, pour trouver l'endroit parfait pour n'importe quelle base.</li>
+          <li><b>Nullscape</b> : un End bien plus intéressant.</li>
+        </ul></section>
+      <section class="card steps" id="join-how"><h3>Comment nous rejoindre ?</h3><ol>
+        <li><b>Rejoins le Discord Suménium</b><span id="joinDiscordTxt"></span> : tu arrives « en attente de vérification ». Présente-toi brièvement (ou pas) dans le salon prévu et on viendra te trouver.</li>
+        <li><b>Connecte-toi ici avec Discord</b> (bouton en haut à droite), puis relie ton pseudo Minecraft Java dans <a href="#espace/fiche">Ma fiche</a> et remplis-la (métier, faction ou solo…).</li>
         <li><b>Le staff t'ajoute à la liste blanche</b> une fois ta candidature validée.</li>
         <li><b>En jeu</b> : Multijoueur → Ajouter un serveur → adresse <code>play.sumenium.com</code>, version <span id="joinVer">Java 26.3</span>.</li>
-      </ol></div>
+      </ol>
+      <p class="muted small">On préfère des joueurs de 18 ans et plus, vu les sujets qui peuvent être abordés, mais on n'est pas fermés : quelques joueurs de moins de 18 ans sont déjà là, alors venez !</p></section>
+      <section class="card join-end"><p><b>Voilà !</b> Si vous cherchez un serveur organisé, propre, qui est là pour durer et avec des règles innovantes… venez nous trouver !</p><p class="muted small">— Le staff de Suménium</p></section>
     </div>
     <div class="subpanel" data-sub="commandes"><div id="cmdRoot"></div></div>
   </section>
@@ -1027,6 +1067,11 @@ function renderHome(){
   b.onclick=async()=>{const ip="play.sumenium.com";let ok=false;
     try{await navigator.clipboard.writeText(ip);ok=true}catch(e){try{const i=document.createElement("input");i.value=ip;document.body.appendChild(i);i.select();ok=document.execCommand("copy");i.remove()}catch(_){}}
     b.classList.toggle("ok",ok);a.textContent=ok?"Copié ✓":"Ctrl+C";clearTimeout(t);t=setTimeout(()=>{b.classList.remove("ok");a.textContent="Copier"},1800)}})();
+// Invitation Discord (page Aide › Rejoindre). Vide = bouton caché.
+const DISCORD_INVITE="";
+(()=>{if(!DISCORD_INVITE)return;const b=$("joinDiscord");b.href=DISCORD_INVITE;b.hidden=false;
+  $("joinDiscordTxt").innerHTML=` (<a href="${esc(DISCORD_INVITE)}" target="_blank" rel="noopener">${esc(DISCORD_INVITE.replace(/^https?:\/\//,""))}</a>)`})();
+document.addEventListener("click",e=>{const a=e.target.closest("[data-jump]");if(!a)return;const t=document.getElementById(a.dataset.jump);if(t){e.preventDefault();t.scrollIntoView({behavior:"smooth",block:"start"})}});
 const MAP_URL="https://carte.sumenium.com/";
 function setupMap(){
   const f=$("mapframe"),box=$("spoil");
