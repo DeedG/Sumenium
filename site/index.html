@@ -73,6 +73,12 @@ body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);margin:0}
 .ip-tip::before{content:"";position:absolute;left:22px;top:-6px;border:6px solid transparent;border-top:0;border-bottom-color:#1b2418}
 .ip-wrap:hover .ip-tip,.ip-wrap:focus-within .ip-tip{opacity:1;visibility:visible;transform:none}
 .ip-tip p{margin:6px 0 0}.ip-tip .muted{color:#a9b8a4}
+.adv-wrap{position:relative;display:inline-block;cursor:help}
+.adv-name{border-bottom:1px dotted currentColor}
+.adv-tip{position:absolute;left:0;top:calc(100% + 8px);z-index:30;width:max-content;max-width:min(340px,86vw);background:#1b2418;color:#eaf6e2;border-radius:12px;padding:10px 12px;
+  font-size:.86rem;font-weight:400;line-height:1.4;box-shadow:0 10px 28px rgba(0,0,0,.28);opacity:0;visibility:hidden;transform:translateY(-4px);transition:.15s;white-space:normal}
+.adv-tip p{margin:6px 0 0}.adv-tip .muted{color:#a9b8a4}
+.adv-wrap:hover .adv-tip,.adv-wrap:focus .adv-tip,.adv-wrap:focus-within .adv-tip{opacity:1;visibility:visible;transform:none}
 .motd{font:500 .98rem/1.35 "Pixelify Sans",monospace;background:#0e130c;color:#aaa;border-radius:8px;padding:8px 10px;white-space:normal}
 .motd.big{font-size:1.08rem;margin:4px 0}
 .ip-line{color:#eaf6e2}
@@ -337,6 +343,8 @@ table.tbl{width:100%;border-collapse:collapse;font-size:.95rem}
 .form{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px 16px;align-items:start}
 .form h3,.form .wide{grid-column:1/-1}
 .form label{display:grid;gap:4px;font-size:.85rem;font-weight:700;color:var(--muted)}
+.form label.chk{display:flex;align-items:center;gap:8px;white-space:normal;padding:0}
+.form label.chk input[type=checkbox]{width:auto;margin:0;flex:none}
 .form input,.form select,.form textarea,.inline input,.inline select,.bar input,.tbl.edit input{font:inherit;font-size:.95rem;font-weight:400;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0;width:100%}
 .form textarea{resize:vertical}
 .form.compact{margin-top:10px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
@@ -442,6 +450,17 @@ body.busy{cursor:progress}
 .eco-when{margin:-6px 0 12px}
 .eco-ico{width:28px;height:28px;image-rendering:pixelated;vertical-align:middle;flex:none}
 .rank .eco-ico{width:20px;height:20px;margin-right:4px}
+.own-ico{width:20px;height:20px;border-radius:3px;image-rendering:pixelated;vertical-align:-5px;margin-right:6px;display:inline-block;flex:none}
+.fac-ico{width:16px;height:20px;border-radius:2px 2px 0 0;background:var(--fc,var(--muted));clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%);box-shadow:inset 0 0 0 1px rgba(0,0,0,.3)}
+.card.live{border:2px solid var(--sun,#e6a700)}
+.card.live.me{border-color:var(--grass);box-shadow:0 0 0 4px var(--leaf-soft)}
+.card.live.done{border-color:var(--line)}
+.live-head{display:flex;align-items:center;gap:8px}
+.live-dot{width:10px;height:10px;border-radius:50%;background:#e5484d;animation:livepulse 1.4s infinite}
+@keyframes livepulse{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.live-dot{animation:none}}
+.live-now{font-size:1.15rem;margin:8px 0}
+.tirage tr.turn td{background:color-mix(in srgb,var(--sun,#e6a700) 14%,transparent)}
 .shops-mini .shop-name{display:flex;align-items:center;gap:8px}
 .shops-mini .eco-ico{width:24px;height:24px}
 .rules-list{margin:8px 0 0;padding-left:20px}
@@ -449,7 +468,9 @@ body.busy{cursor:progress}
 .rules-list li.cur{color:var(--fg)}
 .ip-players a:hover{text-decoration:underline}
 .ph{display:inline-grid;place-items:center;min-width:28px;height:28px;padding:0 3px;border-radius:4px;background:var(--bg);font:600 .55rem/1 var(--body);color:var(--muted);vertical-align:middle;overflow:hidden}
-.ftag{display:inline-block;font:700 .78rem var(--display);padding:2px 8px;border-radius:6px;color:#fff;background:var(--fc,var(--muted));text-shadow:0 1px 1px rgba(0,0,0,.35);vertical-align:1px}
+.ftag{display:inline-block;font:700 .78rem var(--display);padding:2px 8px;border-radius:6px;color:#fff;background:var(--fc,var(--muted));white-space:nowrap;vertical-align:1px;
+  /* léger contour sombre : lisible sur les couleurs claires (jaune, cyan, vert clair) */
+  text-shadow:-1px -1px 0 rgba(0,0,0,.55),1px -1px 0 rgba(0,0,0,.55),-1px 1px 0 rgba(0,0,0,.55),1px 1px 0 rgba(0,0,0,.55),0 1px 2px rgba(0,0,0,.4)}
 .ftag.big{font-size:1.05rem;padding:3px 10px}
 .shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
 .shop{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:6px;align-content:start;min-width:0}
@@ -609,7 +630,7 @@ body.busy{cursor:progress}
 
   <section class="panel" id="p-monde" hidden>
     <nav class="subtabs" aria-label="Monde" data-area="monde">
-      <a href="#monde/carte" data-sub="carte">Carte</a><a href="#monde/succes" data-sub="succes">Bordure &amp; succès</a><a href="#monde/projets" data-sub="projets">Projets communautaires</a>
+      <a href="#monde/carte" data-sub="carte">Carte</a><a href="#monde/succes" data-sub="succes">Bordure &amp; succès</a>
     </nav>
     <div class="subpanel" data-sub="carte">
   <section class="mapbox" id="mapbox">
@@ -664,7 +685,6 @@ body.busy{cursor:progress}
     Les données sont relues sur le serveur toutes les 10 minutes environ, et Minecraft les enregistre toutes les 5 minutes.
   </footer>
     </div>
-    <div class="subpanel" data-sub="projets"><div id="projRoot"></div></div>
   </section>
 
   <section class="panel" id="p-communaute" hidden>
@@ -764,6 +784,16 @@ const fmtB=n=>n>=10000?Number(n).toLocaleString("fr-FR",{notation:"compact",maxi
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 // Recherche sans accents ni majuscules ; « iron_ingot » et « iron ingot » se valent
 const fold=t=>String(t??"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[_:]/g," ");
+// Nom d'un succès avec le détail au survol (ou au toucher) : description, catégorie, conditions, récompenses
+function advTip(e){
+  const n=e.req.length,shown=e.req.slice(0,8).map(g=>g.map(crit).join(" ou "));
+  const rw=[...(e.rw||[]).map(it=>`${it.n>1?it.n+" × ":""}${iname(it.id)}`),...(e.tr||[]).map(it=>`trophée ${(it.name&&it.name.t)||iname(it.id)}`)];
+  return `<span class="adv-wrap" tabindex="0"><b class="adv-name">${esc(e.title)}</b><span class="adv-tip" role="tooltip">
+    <b>${esc(e.title)}</b><span class="muted"> · ${esc(e.tab)}${TIERS[e.tier]?" · "+esc(TIERS[e.tier]):""}</span>
+    ${e.desc?`<p>${esc(e.desc)}</p>`:""}
+    ${n>1?`<p class="muted">${n} conditions : ${esc(shown.join(", "))}${n>8?"…":""}</p>`:""}
+    ${rw.length||e.xp?`<p>Récompense : ${esc([...rw,e.xp?e.xp+" XP":""].filter(Boolean).join(", "))}</p>`:""}</span></span>`;
+}
 const crit=c=>c.replace(/^[a-z_]+:/,"").replace(/[_/]/g," ");
 let PROG=null,TECH=null,techLoading=null;
 let CAT=[],DATA={adv:{}},NAMES={},st={q:"",tab:"",tier:"",min:0,sort:"blocks",f:"rem",secret:false,loot:"",trophies:true,limit:150};
@@ -1041,7 +1071,7 @@ function renderHome(){
     const h=Math.round((a.fin-Date.now())/3600000);
     now.push(`<li><span class="chip">Enchère</span> <a href="#marche/hdv">${esc(NAMES[String(a.item).replace("minecraft:","")]||a.nom||a.item)}${a.quantite>1?` × ${fmt(a.quantite)}`:""}</a> · finit ${h<1?"dans moins d'une heure":h<48?`dans ${h} h`:`dans ${Math.round(h/24)} jours`}</li>`)})}
   Object.entries(DATA.adv||{}).filter(([,r])=>r.done&&r.at&&r.by).sort((a,b)=>String(b[1].at).localeCompare(String(a[1].at))).slice(0,5).forEach(([id,r])=>{
-    const e=CAT.find(x=>x.id===id);if(e)now.push(`<li><span class="chip ok">Succès</span> ${plink(r.by)} a obtenu <b>${esc(e.title)}</b>${r.b?` (+${fmtB(Math.round(r.b))} blocs)`:""} · ${fdate(r.at)}</li>`)});
+    const e=CAT.find(x=>x.id===id);if(e)now.push(`<li><span class="chip ok">Succès</span> ${plink(r.by)} a obtenu ${advTip(e)}${r.b?` (+${fmtB(Math.round(r.b))} blocs)`:""} · ${fdate(r.at)}</li>`)});
   const p=s&&s.online?s.players:null;
   $("homeRoot").innerHTML=`
     <section class="home-hero card">
@@ -1231,12 +1261,12 @@ async function loadStats(){
 // ---------- Onglets ----------
 // Arborescence : onglet/sous-onglet[/détail]. Les anciens liens (#classement, #economie/boutiques…) renvoient au bon endroit.
 const TABS=["accueil","monde","communaute","marche","classements","espace","aide"];
-const SUBS={monde:["carte","succes","projets"],classements:["tableau","richesse","stats"],aide:["rejoindre","commandes"]};
+const SUBS={monde:["carte","succes"],classements:["tableau","richesse","stats"],aide:["rejoindre","commandes"]};
 const LEGACY={classement:"classements/tableau",succes:"monde/succes",stats:"classements/stats",carte:"monde/carte",
   "economie":"marche","economie/apercu":"marche/economie","economie/boutiques":"marche/boutiques","economie/hdv":"marche/hdv","economie/fisc":"marche/fisc",
   "economie/factions":"communaute/factions","economie/baltop":"classements/richesse","economie/commandes":"aide/commandes",
   "espace/factions":"communaute/factions","espace/joueurs":"communaute/joueurs","espace/usines":"communaute/usines","espace/elections":"communaute/elections",
-  "espace/projets":"monde/projets","espace/prix":"marche/fisc"};
+  "espace/projets":"communaute/projets","monde/projets":"communaute/projets","espace/prix":"marche/fisc"};
 function route(){
   const raw=location.hash.slice(1),q=raw.includes("?")?raw.slice(raw.indexOf("?")):"",path=raw.split("?")[0];
   const parts=path.split("/");
@@ -1254,15 +1284,14 @@ function route(){
   document.title=({accueil:"Suménium · Saison 7",monde:"Monde · Suménium",communaute:"Communauté · Suménium",marche:"Marché · Suménium",classements:"Classements · Suménium",espace:"Mon espace · Suménium",aide:"Aide · Suménium"})[t];
   if(t==="accueil")renderHome();
   if(t==="monde"&&s==="carte"&&!mapReady){mapReady=true;setupMap()}
-  if(t==="monde"&&s==="projets"&&window.Espace)window.Espace.show("projets");
   if(t==="communaute"&&window.Espace)window.Espace.show("communaute",parts[1],decodeURIComponent(parts.slice(2).join("/")));
   if(t==="espace"&&window.Espace)window.Espace.show("espace",parts[1]);
   if(t==="marche"&&window.Economie)window.Economie.show("marche",parts[1]);
   if(t==="classements"&&s==="richesse"&&window.Economie)window.Economie.show("richesse");
-  if(t==="aide"&&s==="commandes"&&window.Economie)window.Economie.show("commandes");
+  if(t==="aide"&&s==="commandes"&&window.Economie)window.Economie.show("commandes",parts[2]);
 }
 let lastTab=null;
-window.addEventListener("hashchange",()=>{const t=location.hash.slice(1).split(/[?]/)[0].split("/").slice(0,3).join("/");route();if(t!==lastTab)window.scrollTo({top:0});lastTab=t});
+window.addEventListener("hashchange",()=>{const t=location.hash.slice(1).split(/[?]/)[0].split("/").slice(0,3).join("/");route();if(t!==lastTab&&!/^aide\/commandes\/./.test(t))window.scrollTo({top:0});lastTab=t});
 
 (async()=>{
   route();

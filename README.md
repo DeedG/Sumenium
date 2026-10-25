@@ -24,8 +24,8 @@ Toutes les 10 minutes, GitHub Actions lit le serveur en SFTP, calcule les donné
 | Onglet | Contenu |
 |---|---|
 | Accueil (`#accueil`, logo et nom) | Statut du serveur (MOTD, joueurs en ligne), chiffres clés, « en ce moment », raccourcis |
-| Monde | `#monde/carte`, `#monde/succes` (bordure et succès), `#monde/projets` |
-| Communauté | `#communaute/joueurs`, `factions`, `usines`, `elections`, fiches `#communaute/joueur/<pseudo>` et `#communaute/faction/<id>` |
+| Monde | `#monde/carte`, `#monde/succes` (bordure et succès) |
+| Communauté | `#communaute/joueurs`, `factions`, `usines` (tirage en direct), `projets`, `elections`, fiches `#communaute/joueur/<pseudo>` et `#communaute/faction/<id>` |
 | Marché | `#marche/boutiques`, `hdv`, `fisc`, `economie` |
 | Classements | `#classements/tableau`, `richesse`, `stats` |
 | Aide | `#aide/rejoindre`, `#aide/commandes`, page Confidentialité |

@@ -19,8 +19,7 @@ const TAILLE_MOT = { grosse: "grosse", moyenne: "moyenne", petite: "petite" };
 // Zones rendues par ce fichier : chacune a sa racine dans la page et ses sous-onglets
 const AREAS = {
   espace: { root: "espaceRoot", subs: [["fiche", "Ma fiche"], ["historique", "Mon historique"], ["staff", "Outils staff"]] },
-  communaute: { root: "comRoot", subs: [["joueurs", "Joueurs"], ["factions", "Factions"], ["usines", "Usines"], ["elections", "Élections"]] },
-  projets: { root: "projRoot", subs: [["projets", "Projets"]] },
+  communaute: { root: "comRoot", subs: [["joueurs", "Joueurs"], ["factions", "Factions"], ["usines", "Usines"], ["projets", "Projets"], ["elections", "Élections"]] },
 };
 // Échelle RP : 1,87 m IRL = taille normale (1), comme dans l'ancien tableau
 const scaleOf = (cm) => (cm ? Math.round((cm / 187) * 10000) / 10000 : null);
@@ -199,7 +198,7 @@ function fiche() {
       <ul class="status">
         <li>${p.whitelisted ? '<span class="chip ok">✓ Whitelisté</span>' : '<span class="chip warn">Pas encore whitelisté</span>'}</li>
         <li>${ficheOk(p) ? '<span class="chip ok">✓ Fiche complète</span>' : `<span class="chip warn">À compléter : ${[!p.metier && "métier", !p.mort && "mourir ou survivre"].filter(Boolean).join(", ")}</span>`}</li>
-        <li>${sc ? (applied != null && Math.abs(applied - sc) < 0.0005 ? '<span class="chip ok">✓ Taille RP appliquée</span>' : '<span class="chip warn">Taille RP à appliquer par le staff</span>') : '<span class="chip muted">Taille RP non renseignée</span>'}</li>
+        <li>${p.taille_fixe ? '<span class="chip muted">Garde la taille normale</span>' : sc ? (applied != null && Math.abs(applied - sc) < 0.0005 ? '<span class="chip ok">✓ Taille RP appliquée</span>' : '<span class="chip warn">Taille RP à appliquer par le staff</span>') : '<span class="chip muted">Taille RP non renseignée</span>'}</li>
       </ul>
       ${!p.whitelisted ? `<p class="small muted">${ficheOk(p) ? "Ta fiche est complète : le staff t'ajoute à la whitelist une fois ta candidature validée." : "Complète ta fiche : le staff t'ajoute à la whitelist une fois ta candidature validée."}</p>` : ""}
       ${(() => { const e = ecoPlayer(p.mc_name), ef = ecoFac(f); return e || ef ? `<dl class="account">
@@ -223,8 +222,9 @@ function fiche() {
         <label class="wide">Description du personnage<textarea name="perso_desc" rows="3" maxlength="2000" placeholder="Qui est ton personnage ?">${esc(p.perso_desc)}</textarea></label>
       </fieldset>
       <fieldset><legend>Taille RP</legend>
-        <label>Taille IRL (cm)<input name="taille_cm" type="number" min="50" max="250" step="1" value="${p.taille_cm ?? ""}" id="tailleIn" placeholder="175"></label>
-        <div class="taille-info" id="tailleInfo">${tailleTxt(sc, applied)}</div>
+        <label class="chk wide"><input type="hidden" name="taille_fixe" value="0"><input type="checkbox" name="taille_fixe" value="1" id="tailleFixe"${p.taille_fixe ? " checked" : ""}> Je ne veux pas changer de taille en jeu (je garde la taille normale)</label>
+        <label>Taille IRL (cm)<input name="taille_cm" type="number" min="50" max="250" step="1" value="${p.taille_cm ?? ""}" id="tailleIn" placeholder="175"${p.taille_fixe ? " disabled" : ""}></label>
+        <div class="taille-info" id="tailleInfo">${p.taille_fixe ? '<span class="muted">Tu gardes la taille normale du jeu.</span>' : tailleTxt(sc, applied)}</div>
         <p class="muted small wide">Visible seulement par toi et le staff. Le staff applique la taille en jeu.</p>
       </fieldset>
       <div class="wide actions save-bar"><button class="btn" id="ficheSave" disabled>Enregistré ✓</button><span class="muted small" id="ficheDirty"></span></div>
@@ -237,6 +237,8 @@ function fiche() {
     $("ficheDirty").textContent = dirty ? "Modifications non enregistrées" : "";
   });
   $("tailleIn").oninput = (e) => ($("tailleInfo").innerHTML = tailleTxt(scaleOf(+e.target.value), applied));
+  $("tailleFixe").onchange = (e) => { $("tailleIn").disabled = e.target.checked;
+    $("tailleInfo").innerHTML = e.target.checked ? '<span class="muted">Tu gardes la taille normale du jeu.</span>' : tailleTxt(scaleOf(+$("tailleIn").value), applied); };
   form.onsubmit = (e) => { e.preventDefault(); act(() => call("PUT", "/api/me/player", formData(form)), "Fiche enregistrée"); };
   document.querySelector("[data-my-succes]").onclick = () => { try { localStorage.setItem("sumenium-who", p.mc_name); } catch (e) {} if (window.setWho) window.setWho(p.mc_name); };
 }
@@ -342,13 +344,16 @@ function bindPlayerEditors() {
       <label>Activité<select name="activite">${opt(ACT, p.activite)}</select></label>
       <label>Mourir ou survivre<select name="mort">${opt(MORT, p.mort)}</select></label>
       <label>Taille IRL (cm)<input name="taille_cm" type="number" min="50" max="250" value="${p.taille_cm ?? ""}"></label>
+      <label>Taille appliquée en jeu<input name="taille_appliquee" type="number" step="0.0001" min="0.05" max="3" value="${p.taille_appliquee ?? ""}" placeholder="vide = pas encore"></label>
+      <label class="chk"><input type="hidden" name="taille_fixe" value="0"><input type="checkbox" name="taille_fixe" value="1"${p.taille_fixe ? " checked" : ""}> Ne veut pas changer de taille</label>
       <label class="wide">Description du métier<textarea name="metier_desc" rows="2">${esc(p.metier_desc)}</textarea></label>
       <label class="wide">Description du personnage<textarea name="perso_desc" rows="2">${esc(p.perso_desc)}</textarea></label>
       <div class="wide actions"><button class="btn small">Enregistrer</button>
         ${p.linked ? '<button type="button" class="btn small ghost" data-act="unlink">Délier Discord</button>' : ""}
         <button type="button" class="btn small danger" data-act="del">Supprimer la fiche</button></div></form>`);
     const f = d.querySelector("form");
-    f.onsubmit = (e) => { e.preventDefault(); act(() => call("PUT", `/api/admin/players/${p.id}`, formData(f)), "Fiche mise à jour"); };
+    f.onsubmit = (e) => { e.preventDefault(); const v = formData(f); v.taille_appliquee = v.taille_appliquee === "" ? null : +v.taille_appliquee;
+      act(() => call("PUT", `/api/admin/players/${p.id}`, v), "Fiche mise à jour"); };
     f.querySelector('[data-act="del"]').onclick = () => confirm(`Supprimer la fiche de ${p.mc_name} ? (annulable depuis l'historique)`)
       && act(() => call("DELETE", `/api/admin/players/${p.id}`), "Fiche supprimée");
     const u = f.querySelector('[data-act="unlink"]');
@@ -364,6 +369,7 @@ function factions() {
     `${isStaff() ? '<form class="bar inline" id="addFac"><input name="name" required maxlength="40" placeholder="Nom de la faction" aria-label="Nom de la nouvelle faction"><button class="btn small">Créer une faction</button></form>' : ""}
     ${loginHint("Pour modifier ta faction ou ajouter ses coordonnées,")}
     <div class="fac-grid">${list.map(facCard).join("") || '<p class="empty">Aucune faction.</p>'}</div>`);
+  bindMap();
   if (isStaff()) $("addFac").onsubmit = (e) => { e.preventDefault(); act(() => call("POST", "/api/factions", { name: e.target.name.value.trim() }), "Faction créée"); };
   bindFac();
 }
@@ -404,7 +410,7 @@ function facCard(f) {
       ${pr.length ? `<dt>Projets réalisés</dt><dd>${pr.map((r) => `<span class="chip">${esc((projet(r.projet_id) || {}).nom || "?")}</span>`).join(" ")}</dd>` : ""}</dl>
     ${showBases ? `<details class="bases"><summary>Coordonnées (${bases.length})</summary>
       <table class="mini"><tbody>${bases.map((b) => `<tr><td>${esc({ hub: "Hub", usine: "Usine", base: "Base" }[b.type])}</td><td>${esc(b.nom)}</td>
-        <td class="num">${b.x ?? "?"} / ${b.y ?? "?"} / ${b.z ?? "?"}</td>
+        <td class="num">${b.x != null && b.z != null ? mapBtn(b) : `${b.x ?? "?"} / ${b.y ?? "?"} / ${b.z ?? "?"}`}</td>
         <td>${canEditFac(f.id) ? `<button class="x" data-base-del="${b.id}" aria-label="Supprimer">✕</button>` : ""}</td></tr>`).join("") || '<tr><td class="muted">Aucune coordonnée.</td></tr>'}</tbody></table>
       ${canEditFac(f.id) ? `<form class="inline coords" data-base-add="${f.id}"><select name="type" aria-label="Type"><option value="base">Base</option><option value="hub">Hub</option><option value="usine">Usine</option></select>
         <input name="nom" placeholder="Nom" maxlength="80" aria-label="Nom"><input name="x" type="number" placeholder="X" required aria-label="X"><input name="y" type="number" placeholder="Y" aria-label="Y"><input name="z" type="number" placeholder="Z" required aria-label="Z">
@@ -606,10 +612,20 @@ const TAILLE_TXT = { grosse: "grosse", moyenne: "moyenne", petite: "petite" };
 const comboTxt = (c) => { const n = {}; c.forEach((t) => (n[t] = (n[t] || 0) + 1));
   return Object.entries(n).map(([t, k]) => `${k} ${TAILLE_TXT[t]}${k > 1 ? "s" : ""}`).join(" + "); };
 const fitsCombo = (sizes, combos) => combos.some((c) => { const left = [...c]; return sizes.every((t) => { const i = left.indexOf(t); if (i < 0) return false; left.splice(i, 1); return true; }); });
+// Ordre de passage : factions par rang au tirage (sans rang à la fin) ; la première qui n'a pas validé a la main
+function turnState(tour) {
+  const order = [...D.factions].sort((a, b) => (a.tirage == null) - (b.tirage == null) || (a.tirage ?? 0) - (b.tirage ?? 0) || a.name.localeCompare(b.name));
+  const done = new Set((D.usineFini || []).filter((x) => x.tour === tour).map((x) => x.faction_id));
+  const cur = order.find((f) => !done.has(f.id)) || null;
+  return { order, done, cur, next: cur ? order.slice(order.indexOf(cur) + 1).find((f) => !done.has(f.id)) : null };
+}
 function usines() {
   const myFid = isStaff() ? staffFaction : me() && me().faction_id;
   const open = D.settings.usines_ouvertes === "1";
   const tour = +D.settings.usine_tour || 1, TOURS = D.usineTours || {}, rules = TOURS[tour];
+  const T = turnState(tour), myTurn = !!myFid && T.cur && T.cur.id === myFid && !T.done.has(myFid);
+  const realFid = me() && me().faction_id, alerte = open && !isStaff() && realFid && T.cur && T.cur.id === realFid;
+  document.title = alerte ? "🔔 À toi de choisir · Suménium" : "Communauté · Suménium";
   const MAX = D.usineMax || { grosse: 3, moyenne: 4, petite: 5 };
   const mineNow = myFid ? D.choix.filter((c) => c.faction_id === myFid && !c.projet_faction_id && (c.tour || 1) === tour) : [];
   const sizesNow = mineNow.map((c) => (usine(c.usine_id) || {}).taille);
@@ -617,14 +633,20 @@ function usines() {
   view(head("Usines", "Résultats du tirage, règles du tour en cours et places restantes. ★ = usine débloquée par un projet communautaire.") + (open ? loginHint("Pour choisir les usines de ta faction,") : "") + `<div class="card rules">
       <h3>Règles</h3>
       <ul class="rules-list">${Object.entries(TOURS).map(([k, r]) => `<li class="${+k === tour ? "cur" : ""}"><b>${esc(r.nom)}</b> (${esc(r.quand)})${+k === tour ? ' <span class="chip ok">tour en cours</span>' : ""} :
-        ${r.combos.map(comboTxt).join(", ou ")}${+k === 1 ? ", dans l'ordre du tirage" : ""}.</li>`).join("")}</ul>
+        ${r.combos.map(comboTxt).join(", ou ")}, dans l'ordre du tirage.</li>`).join("")}</ul>
+      <p class="muted small">Chaque faction choisit à son tour : quand elle a validé ses choix, la main passe à la suivante. La page se met à jour toute seule.</p>
       <p>Chaque usine du même type est limitée sur le serveur : grosses ${MAX.grosse}, moyennes ${MAX.moyenne}, petites ${MAX.petite}.
-        Des usines supplémentaires sont disponibles en accomplissant des <a href="#monde/projets">projets communautaires</a>.</p>
+        Des usines supplémentaires sont disponibles en accomplissant des <a href="#communaute/projets">projets communautaires</a>.</p>
       <p>${open ? `<span class="chip ok">Choix ouverts · ${esc(rules ? rules.nom : "")}</span>` : '<span class="chip warn">Choix fermés</span>'}
       ${isStaff() ? `<label class="chk">Agir pour la faction <select id="usFac">${facOpts(staffFaction, "— choisir —")}</select></label>` : ""}
       ${myFid && rules ? `<span class="muted">${esc(facName(myFid))} · ${esc(rules.nom)} : ${sizesNow.length ? sizesNow.map((t) => TAILLE_TXT[t]).join(" + ") : "rien choisi"}${["grosse", "moyenne", "petite"].some(canAdd) ? ` · encore possible : ${["grosse", "moyenne", "petite"].filter(canAdd).map((t) => TAILLE_TXT[t]).join(", ")}` : " · choix complet"}</span>` : ""}</p>
     </div>
-    ${tirageTable(myFid)}
+    ${open && rules ? liveCard(T, myFid, myTurn, rules, realFid) : ""}
+    ${tirageTable(myFid, open && rules ? T : null)}
+    ${isStaff() ? `<div class="card staff-tirage"><h3>Ordre du tirage (staff)</h3>
+      <p class="muted small">À faire une seule fois en début de saison : l'ordre est tiré au hasard parmi les factions existantes. Pour corriger un rang à la main : « Modifier » sur la fiche de la faction.</p>
+      <div class="actions"><button class="btn small" id="tirageGo">Tirer l'ordre au sort</button>
+        <label class="chk"><input type="checkbox" id="tirageForce"> refaire le tirage (remplace l'ordre actuel)</label></div></div>` : ""}
     <details class="all-usines"${open || isStaff() ? " open" : ""}><summary>Toutes les usines et places restantes</summary>
     ${Object.entries(TAILLE_USINE).map(([t, [label]]) => `<h3 class="sec">${label} <small>${MAX[t]} max par usine sur le serveur</small></h3>
       <div class="usines">${D.usines.filter((u) => u.taille === t).map((u) => {
@@ -632,7 +654,7 @@ function usines() {
         const mineC = myFid && takers.find((c) => c.faction_id === myFid);
         const full = takers.length >= MAX[t];
         const oldTour = mineC && (mineC.tour || 1) !== tour;
-        const can = myFid && canEditFac(myFid) && (open || isStaff()) && !(mineC && mineC.projet_faction_id) && !(oldTour && !isStaff());
+        const can = myFid && canEditFac(myFid) && (open || isStaff()) && !(mineC && mineC.projet_faction_id) && !(oldTour && !isStaff()) && (isStaff() || myTurn);
         const blocked = !mineC && !isStaff() && (full || !canAdd(t));
         return `<div class="usine${mineC ? " has" : ""}${full ? " full" : ""}"><div><b>${esc(u.nom)}</b>
           <span class="muted small">${takers.length}/${MAX[t]}</span></div>
@@ -642,13 +664,54 @@ function usines() {
   if (isStaff()) $("usFac").onchange = (e) => { staffFaction = e.target.value ? +e.target.value : null; usines(); };
   document.querySelectorAll("[data-us]").forEach((b) => (b.onclick = () =>
     act(() => call("POST", `/api/factions/${myFid}/usines`, { usine_id: +b.dataset.us, on: b.dataset.on === "1" }), b.dataset.on === "1" ? "Usine choisie" : "Usine retirée")));
+  document.querySelectorAll("[data-fini]").forEach((b) => (b.onclick = () => {
+    const fid = +b.dataset.fini, on = b.dataset.on !== "0", f = fac(fid);
+    const msg = on ? (isStaff() && fid !== realFid ? `Valider le tour de ${f.name} et passer la main à la faction suivante ?` : "Valider les choix de ta faction ? Tu ne pourras plus les changer, la main passe à la faction suivante.")
+      : `Rendre la main à ${f.name} ? Elle pourra de nouveau choisir.`;
+    if (confirm(msg)) act(() => call("POST", `/api/factions/${fid}/usines/fini`, { tour, on }), on ? "Choix validés" : "Main rendue");
+  }));
+  const tg = $("tirageGo");
+  if (tg) tg.onclick = () => confirm($("tirageForce").checked ? "Refaire le tirage ? L'ordre actuel sera remplacé." : "Tirer au sort l'ordre des factions ?")
+    && act(() => call("POST", "/api/admin/tirage", { force: $("tirageForce").checked }), "Ordre tiré au sort");
+  startLive();
 }
-function tirageTable(myFid) {
+// Carte « en direct » : qui a la main, qui suit, bouton pour valider
+function liveCard(T, myFid, myTurn, rules, realFid) {
+  if (!T.cur) return `<div class="card live done"><h3>${esc(rules.nom)} terminé</h3><p>Toutes les factions ont validé leurs choix.</p></div>`;
+  const mineNow = myFid ? D.choix.filter((c) => c.faction_id === myFid && !c.projet_faction_id && (c.tour || 1) === (+D.settings.usine_tour || 1)) : [];
+  return `<div class="card live${myTurn && !isStaff() ? " me" : ""}">
+    <div class="live-head"><span class="live-dot" aria-hidden="true"></span><span class="muted small">En direct · ${esc(rules.nom)}</span></div>
+    <p class="live-now">${myTurn && !isStaff() ? "<b>C'est à ta faction de choisir !</b>" : `Au tour de ${flink(T.cur)}`}${T.next ? ` <span class="muted small">· ensuite ${flink(T.next)}</span>` : ""}</p>
+    ${myTurn && !isStaff() ? `<p class="small">Choisis tes usines plus bas (${esc(rules.combos.map(comboTxt).join(", ou "))}), puis valide pour passer la main.</p>` : ""}
+    <div class="actions">${(myTurn && canEditFac(myFid)) || isStaff() ? `<button class="btn small" data-fini="${T.cur.id}">${isStaff() && T.cur.id !== realFid ? `Valider le tour de ${esc(T.cur.name)}` : `Valider mes choix${mineNow.length ? ` (${mineNow.length})` : ""}`}</button>` : ""}</div></div>`;
+}
+// Mise à jour en direct de la page Usines (toutes les 4 s quand elle est affichée)
+let liveTimer = null, liveSig = "";
+function startLive() {
+  if (liveTimer) return;
+  liveTimer = setInterval(async () => {
+    if (area !== "communaute" || sub !== "usines") { clearInterval(liveTimer); liveTimer = null; document.title = "Communauté · Suménium"; return; }
+    if (document.hidden || busy || !D) return;
+    try {
+      const L = await call("GET", "/api/usines/live");
+      const sig = JSON.stringify(L);
+      if (sig === liveSig) return;
+      const first = !liveSig; liveSig = sig;
+      D.choix = L.choix; D.usineFini = L.usineFini;
+      D.settings.usine_tour = L.usine_tour; D.settings.usines_ouvertes = L.usines_ouvertes;
+      L.tirage.forEach((t) => { const f = fac(t.id); if (f) f.tirage = t.tirage; });
+      if (!first && !document.querySelector("#espView :focus")) usines();
+    } catch (e) {}
+  }, 4000);
+}
+function tirageTable(myFid, T) {
   const fs = [...D.factions].sort((a, b) => (a.tirage ?? 999) - (b.tirage ?? 999) || a.name.localeCompare(b.name));
+  const state = (f) => !T ? "" : T.done.has(f.id) ? `<td><span class="chip ok">✓ validé</span>${isStaff() ? ` <button class="x" data-fini="${f.id}" data-on="0" title="Rendre la main à ${esc(f.name)}" aria-label="Rendre la main">↺</button>` : ""}</td>`
+    : T.cur && T.cur.id === f.id ? '<td><span class="chip warn">▶ choisit</span></td>' : '<td><span class="muted small">en attente</span></td>';
   const cell = (fid, t) => D.choix.filter((c) => c.faction_id === fid && (usine(c.usine_id) || {}).taille === t).map(usineChip).join(" ") || '<span class="muted">—</span>';
   return `<div class="card"><h3>Résultats du tirage</h3>
-    <div class="tbl-wrap"><table class="tbl left tirage"><thead><tr><th>Ordre</th><th>Faction</th><th>Grosse</th><th>Moyenne</th><th>Petite</th></tr></thead><tbody>
-    ${fs.map((f) => `<tr${f.id === myFid ? ' class="mine"' : ""}><td>${f.tirage ? f.tirage + "ᵉ" : "–"}</td><td><b>${flink(f)}</b></td>
+    <div class="tbl-wrap"><table class="tbl left tirage"><thead><tr><th>Ordre</th><th>Faction</th>${T ? "<th>Tour en cours</th>" : ""}<th>Grosse</th><th>Moyenne</th><th>Petite</th></tr></thead><tbody>
+    ${fs.map((f) => `<tr class="${f.id === myFid ? "mine" : ""}${T && T.cur && T.cur.id === f.id ? " turn" : ""}"><td>${f.tirage ? f.tirage + "ᵉ" : "–"}</td><td><b>${flink(f)}</b></td>${state(f)}
       <td>${cell(f.id, "grosse")}</td><td>${cell(f.id, "moyenne")}</td><td>${cell(f.id, "petite")}</td></tr>`).join("")}</tbody></table></div></div>`;
 }
 
@@ -664,6 +727,10 @@ function elections() {
   view(head("Élection du maire", tour ? "Un vote par compte et par tour ; tu peux changer ton vote tant que le tour est ouvert. Le vote est secret." : "Les candidats et leur programme.") + `
     <div class="card status-line"><span class="chip ${st === "fermee" ? "muted" : st === "resultats" ? "ok" : "warn"}">${esc(ELECTION[st])}</span></div>
     ${st === "candidatures" && canWrite() && p ? candForm(mine) : ""}
+    ${isStaff() ? `<div class="card staff-cand"><h3>Candidature d'un autre joueur (staff)</h3>
+      <p class="muted small">Pour un joueur qui ne peut pas le faire lui-même : choisis sa fiche, puis remplis ou corrige sa candidature et son affiche.</p>
+      <div class="form compact"><label>Joueur<select id="candFor"><option value="">— choisir —</option>${[...D.players].sort((a, b) => a.mc_name.localeCompare(b.mc_name)).map((x) => `<option value="${x.id}"${x.id === candForId ? " selected" : ""}>${esc(x.mc_name)}${D.candidats.some((c) => c.player_id === x.id) ? " (candidat)" : ""}</option>`).join("")}</select></label></div>
+      <div id="candForBox">${candForId ? candForm(D.candidats.find((c) => c.player_id === candForId), D.players.find((x) => x.id === candForId), "cf2") : ""}</div></div>` : ""}
     ${st === "candidatures" ? loginHint("Pour te présenter,") : tour ? loginHint("Pour voter,") : ""}
     <div class="cards">${shown.map((c) => {
       const voted = tour && D.myVotes[tour] === c.id;
@@ -678,43 +745,53 @@ function elections() {
           ${isStaff() ? `<label class="chk"><input type="checkbox" data-t2="${c.id}"${c.tour2 ? " checked" : ""}> Qualifié 2nd tour</label>
           <button class="btn small danger" data-cdel="${c.id}">Retirer</button>` : ""}</div></article>`;
     }).join("") || '<p class="empty">Aucun candidat pour l\'instant.</p>'}</div>`);
-  const cf = $("candForm");
-  if (cf) {
-    const file = $("affFile");
-    file.onchange = () => { const f = file.files[0]; if (f) $("affPrev").innerHTML = `<img src="${URL.createObjectURL(f)}" alt="Aperçu de l'affiche">`; };
-    cf.onsubmit = (e) => { e.preventDefault(); act(async () => {
-      const f = file.files[0], image = f ? await shrinkImage(f) : null;  // réduite avant d'enregistrer : une erreur d'image n'enregistre rien
-      const fields = { resume: cf.resume.value, lien: cf.lien.value, affiche: cf.affiche.value };
-      const id = mine ? (await call("PUT", `/api/candidats/${mine.id}`, fields), mine.id) : (await call("POST", "/api/candidats", fields)).id;
-      if (image) await call("PUT", `/api/candidats/${id}/affiche`, { image });
-    }, "Candidature enregistrée"); };
-    const del = $("affDel");
-    if (del) del.onclick = () => confirm("Retirer l'affiche ?") && act(() => call("DELETE", `/api/candidats/${mine.id}/affiche`), "Affiche retirée");
-  }
-  const cw = $("candWithdraw");
-  if (cw) cw.onclick = () => confirm("Retirer ta candidature ?") && act(() => call("DELETE", `/api/candidats/${mine.id}`), "Candidature retirée");
+  bindCandForm("", mine, null);
+  if (candForId) bindCandForm("cf2", D.candidats.find((c) => c.player_id === candForId), candForId);
+  const cfor = $("candFor");
+  if (cfor) cfor.onchange = () => { candForId = cfor.value ? +cfor.value : null; elections(); };
   document.querySelectorAll("[data-vote]").forEach((b) => (b.onclick = () => act(() => call("POST", "/api/votes", { candidat_id: +b.dataset.vote }), "Vote enregistré")));
   document.querySelectorAll("[data-t2]").forEach((b) => (b.onchange = () => act(() => call("PUT", `/api/candidats/${b.dataset.t2}`, { tour2: b.checked }))));
   document.querySelectorAll("[data-cdel]").forEach((b) => (b.onclick = () => confirm("Retirer ce candidat ?") && act(() => call("DELETE", `/api/candidats/${b.dataset.cdel}`), "Candidat retiré")));
 }
-function candForm(c) {
-  return `<form id="candForm" class="card form"><h3>${c ? "Ma candidature" : "Me présenter"}</h3>
+let candForId = null;
+// Formulaire de candidature : le sien (px = ""), ou celui d'un autre joueur rempli par le staff (px = "cf2", pl = sa fiche)
+function candForm(c, pl, px = "") {
+  const other = !!pl;
+  return `<form id="${px}candForm" class="${other ? "" : "card "}form"><h3>${other ? `Candidature de ${esc(pl.mc_name)}` : c ? "Ma candidature" : "Me présenter"}</h3>
     <label class="wide">Résumé du programme<textarea name="resume" rows="4" maxlength="2000">${esc(c && c.resume)}</textarea></label>
     <div class="wide affiche-edit">
-      <div class="affiche-prev" id="affPrev">${c && c.affiche_v ? `<img src="${afficheUrl(c)}" alt="Ton affiche">` : '<span class="muted small">Pas encore d\'affiche</span>'}</div>
-      <div><label>Affiche (image)<input type="file" id="affFile" accept="image/png,image/jpeg,image/webp"></label>
-        <p class="muted small">PNG, JPEG ou WebP. L'image est réduite automatiquement (1600 px maximum) et visible par tous les joueurs connectés.</p>
-        ${c && c.affiche_v ? '<button type="button" class="btn small ghost" id="affDel">Retirer l\'affiche</button>' : ""}</div>
+      <div class="affiche-prev" id="${px}affPrev">${c && c.affiche_v ? `<img src="${afficheUrl(c)}" alt="Affiche">` : '<span class="muted small">Pas encore d\'affiche</span>'}</div>
+      <div><label>Affiche (image)<input type="file" id="${px}affFile" accept="image/*"></label>
+        <p class="muted small">PNG, JPEG, WebP ou GIF (photo de téléphone acceptée). L'image est réduite automatiquement (1600 px maximum) et visible par tous.</p>
+        ${c && c.affiche_v ? `<button type="button" class="btn small ghost" id="${px}affDel">Retirer l'affiche</button>` : ""}</div>
     </div>
     <label>Lien vers le programme<input name="lien" type="url" placeholder="https://…" value="${esc(c && c.lien)}"></label>
     <label>Autre lien (facultatif)<input name="affiche" type="url" placeholder="https://…" value="${esc(c && c.affiche)}"></label>
-    <div class="wide actions"><button class="btn">${c ? "Mettre à jour" : "Déposer ma candidature"}</button>${c ? '<button type="button" class="btn ghost danger" id="candWithdraw">Retirer</button>' : ""}</div></form>`;
+    <div class="wide actions"><button class="btn">${c ? "Mettre à jour" : other ? "Déposer sa candidature" : "Déposer ma candidature"}</button>${c ? `<button type="button" class="btn ghost danger" id="${px}candWithdraw">Retirer</button>` : ""}</div></form>`;
+}
+function bindCandForm(px, c, playerId) {
+  const cf = $(px + "candForm");
+  if (!cf) return;
+  const file = $(px + "affFile");
+  file.onchange = () => { const f = file.files[0]; if (f) $(px + "affPrev").innerHTML = `<img src="${URL.createObjectURL(f)}" alt="Aperçu de l'affiche">`; };
+  cf.onsubmit = (e) => { e.preventDefault(); act(async () => {
+    const f = file.files[0], image = f ? await shrinkImage(f) : null;  // réduite avant d'enregistrer : une erreur d'image n'enregistre rien
+    const fields = { resume: cf.resume.value, lien: cf.lien.value, affiche: cf.affiche.value };
+    const id = c ? (await call("PUT", `/api/candidats/${c.id}`, fields), c.id) : (await call("POST", "/api/candidats", playerId ? { ...fields, player_id: playerId } : fields)).id;
+    if (image) await call("PUT", `/api/candidats/${id}/affiche`, { image });
+  }, "Candidature enregistrée"); };
+  const del = $(px + "affDel");
+  if (del) del.onclick = () => confirm("Retirer l'affiche ?") && act(() => call("DELETE", `/api/candidats/${c.id}/affiche`), "Affiche retirée");
+  const cw = $(px + "candWithdraw");
+  if (cw) cw.onclick = () => confirm(playerId ? "Retirer cette candidature ?" : "Retirer ta candidature ?") && act(() => call("DELETE", `/api/candidats/${c.id}`), "Candidature retirée");
 }
 const afficheUrl = (c) => `/api/candidats/${c.id}/affiche?v=${c.affiche_v}`;
 // Réduit l'image dans le navigateur (1600 px max, WebP ou JPEG) pour rester sous ~900 ko
 async function shrinkImage(file) {
-  if (!/^image\/(png|jpeg|webp)$/.test(file.type)) throw new Error("Choisis une image PNG, JPEG ou WebP.");
-  const img = await new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ko(new Error("Image illisible."));
+  if (file.type && !file.type.startsWith("image/")) throw new Error("Ce fichier n'est pas une image.");
+  if (file.size > 40e6) throw new Error("Image trop lourde (40 Mo maximum avant réduction).");
+  const img = await new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i);
+    i.onerror = () => ko(new Error(/heic|heif/i.test(file.type + file.name) ? "Format HEIC (photo d'iPhone) non lu par ce navigateur : enregistre l'image en JPEG ou PNG, ou fais une capture d'écran." : "Image illisible : essaie en PNG ou JPEG."));
     i.src = URL.createObjectURL(file); });
   let side = 1600, q = 0.85;
   for (let tries = 0; tries < 8; tries++) {
@@ -758,7 +835,8 @@ const copyBtn = (cmd) => `<code>${esc(cmd)}</code> <button class="x copy" data-c
 
 function staff() {
   const s = D.settings;
-  const tailles = D.players.filter((p) => p.taille_cm).map((p) => ({ p, sc: scaleOf(p.taille_cm) }));
+  const tailles = D.players.filter((p) => p.taille_cm && !p.taille_fixe).map((p) => ({ p, sc: scaleOf(p.taille_cm) }));
+  const fixes = D.players.filter((p) => p.taille_fixe);
   const todo = tailles.filter(({ p, sc }) => p.taille_appliquee == null || Math.abs(p.taille_appliquee - sc) >= 0.0005);
   const aWl = D.wlSynced ? D.players.filter((p) => !p.whitelisted).sort((a, b) => ficheOk(b) - ficheOk(a) || a.mc_name.localeCompare(b.mc_name)) : [];
   const nav = [["st-wl", `À whitelister (${aWl.filter(ficheOk).length})`], ["st-taille", `Tailles RP (${todo.length})`], ["st-bordure", "Bordure"], ["st-hist", "Historique d'un joueur"], ["st-reglages", "Réglages"], ["st-import", "Import"], ["st-histo", "Historique"]];
@@ -783,7 +861,9 @@ function staff() {
         return `<tr><td>${esc(p.mc_name)}</td><td>${p.taille_cm} cm</td><td>${fmt(sc)}${p.taille_appliquee != null && !ok ? ` <span class="chip warn">en jeu ${fmt(p.taille_appliquee)}</span>` : ""}</td>
           <td>${copyBtn(`/attribute ${p.mc_name} minecraft:scale base set ${sc}`)}</td>
           <td><input type="checkbox" data-applied="${p.id}" data-sc="${sc}"${ok ? " checked" : ""} aria-label="Taille appliquée pour ${esc(p.mc_name)}"></td></tr>`;
-      }).join("") || '<tr><td colspan="5" class="empty">Aucune taille renseignée.</td></tr>'}</tbody></table></div></section>
+      }).join("") || '<tr><td colspan="5" class="empty">Aucune taille renseignée.</td></tr>'}</tbody></table></div>
+      ${fixes.length ? `<p class="small">Gardent la taille normale (rien à appliquer${fixes.some((p) => p.taille_appliquee != null && p.taille_appliquee !== 1) ? ", sauf remettre <code>1</code> si une taille avait déjà été appliquée" : ""}) : ${fixes.map((p) => `${esc(p.mc_name)}${p.taille_appliquee != null && p.taille_appliquee !== 1 ? ` (${copyBtn(`/attribute ${p.mc_name} minecraft:scale base set 1`)})` : ""}`).join(", ")}</p>` : ""}
+      <p class="muted small">Pour cocher « ne veut pas changer de taille » à la place d'un joueur : Communauté › Joueurs › Modifier (staff).</p></section>
     <section class="card" id="st-bordure"><h3>Bordure après un changement de multiplicateur</h3><div id="borderTool"><p class="empty">Chargement…</p></div></section>
     <section class="card" id="st-hist"><h3>Historique économique d'un joueur</h3>
       <p class="muted small">Achats, ventes, rachats du FISC, frais… d'après le journal du mod. Utile pour vérifier un abus (prix mal réglé, par exemple).</p>

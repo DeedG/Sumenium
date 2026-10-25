@@ -149,7 +149,7 @@ async function proxy(req, env, url) {
 }
 
 const CSP = ["default-src 'self'", "script-src 'self' 'unsafe-inline'", "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src https://fonts.gstatic.com", "img-src 'self' data: https://mc-heads.net https://textures.minecraft.net https://cdn.discordapp.com", "connect-src 'self'",
+  "font-src https://fonts.gstatic.com", "img-src 'self' data: blob: https://mc-heads.net https://textures.minecraft.net https://cdn.discordapp.com", "connect-src 'self'",
   "frame-src https://carte.sumenium.com", "frame-ancestors 'self'", "base-uri 'self'", "form-action 'self'", "object-src 'none'"].join("; ");
 function securityHeaders(h) {
   h.set("strict-transport-security", "max-age=31536000");
@@ -228,7 +228,7 @@ async function audit(env, s, entity, id, action, before, after) {
 }
 
 const TABLES = {
-  players: ["mc_name", "discord_id", "faction_id", "metier", "metier_desc", "perso_desc", "activite", "mort", "taille_cm", "taille_appliquee", "deleted"],
+  players: ["mc_name", "discord_id", "faction_id", "metier", "metier_desc", "perso_desc", "activite", "mort", "taille_cm", "taille_appliquee", "taille_fixe", "deleted"],
   factions: ["name", "theme", "hub", "projet_commu", "autres_projets", "recrutement", "tirage", "deleted"],
   bases: ["faction_id", "type", "nom", "x", "y", "z", "deleted"],
   candidats: ["player_id", "resume", "lien", "affiche", "tour2", "deleted"],
@@ -389,6 +389,39 @@ async function api(req, env, url, ctx) {
     return json(await toggleUsine(env, s, fid, int(body.usine_id), !!body.on));
   }
 
+  if ((mm = p.match(/^\/api\/factions\/(\d+)\/usines\/fini$/)) && m === "POST") {
+    const s = await need(req, env, "sumenien");
+    const fid = Number(mm[1]);
+    await canEditFaction(env, s, fid);
+    const tour = int(body.tour) || Number(await setting(env, "usine_tour")) || 1;
+    if (s.level !== "staff" && tour !== (Number(await setting(env, "usine_tour")) || 1)) fail(400, "Ce n'est pas le tour en cours.");
+    return json(await usineFini(env, s, fid, tour, body.on !== false));
+  }
+  // Suivi en direct du tirage (relu toutes les quelques secondes par la page Usines)
+  if (p === "/api/usines/live" && m === "GET") {
+    const [st, ch, fi, fs] = await env.DB.batch([
+      env.DB.prepare("SELECT key, value FROM settings WHERE key IN ('usine_tour','usines_ouvertes')"),
+      env.DB.prepare("SELECT * FROM usine_choix"),
+      env.DB.prepare("SELECT faction_id, tour FROM usine_fini"),
+      env.DB.prepare("SELECT id, tirage FROM factions WHERE deleted = 0")]);
+    const set = Object.fromEntries(st.results.map((r) => [r.key, r.value]));
+    return json({ usine_tour: set.usine_tour, usines_ouvertes: set.usines_ouvertes, choix: ch.results, usineFini: fi.results, tirage: fs.results },
+      200, { "cache-control": "no-store" });
+  }
+  // Tirage au sort de l'ordre des factions (une fois en début de saison ; refait seulement si force)
+  if (p === "/api/admin/tirage" && m === "POST") {
+    const s = await need(req, env, "staff");
+    const fs = (await env.DB.prepare("SELECT id, tirage FROM factions WHERE deleted = 0").all()).results;
+    if (fs.some((f) => f.tirage) && !body.force) fail(400, "Un ordre existe déjà : coche « refaire le tirage » pour le remplacer.");
+    const order = fs.map((f) => f.id);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    for (const [i, id] of order.entries()) await update(env, s, "factions", id, { tirage: i + 1 });
+    return json({ ok: true, order });
+  }
+
   /* ---- bases ---- */
   if (p === "/api/bases" && m === "POST") {
     const s = await need(req, env, "sumenien");
@@ -427,10 +460,13 @@ async function api(req, env, url, ctx) {
     const s = await need(req, env, "sumenien");
     const st = await setting(env, "election");
     if (st !== "candidatures" && s.level !== "staff") fail(400, "Les candidatures ne sont pas ouvertes.");
-    const me = await env.DB.prepare("SELECT id FROM players WHERE discord_id = ? AND deleted = 0").bind(s.id).first();
-    if (!me) fail(400, "Relie d'abord ton pseudo Minecraft.");
+    // Le staff peut déposer la candidature d'un autre joueur (player_id)
+    const me = s.level === "staff" && body.player_id
+      ? await env.DB.prepare("SELECT id FROM players WHERE id = ? AND deleted = 0").bind(int(body.player_id)).first()
+      : await env.DB.prepare("SELECT id FROM players WHERE discord_id = ? AND deleted = 0").bind(s.id).first();
+    if (!me) fail(400, s.level === "staff" && body.player_id ? "Fiche joueur introuvable." : "Relie d'abord ton pseudo Minecraft.");
     const dup = await env.DB.prepare("SELECT id FROM candidats WHERE player_id = ? AND deleted = 0").bind(me.id).first();
-    if (dup) fail(400, "Tu es déjà candidat : modifie ta candidature.");
+    if (dup) fail(400, body.player_id ? "Ce joueur est déjà candidat : modifie sa candidature." : "Tu es déjà candidat : modifie ta candidature.");
     return json({ id: await insert(env, s, "candidats", { player_id: me.id, ...candidatFields(body) }) });
   }
   if ((mm = p.match(/^\/api\/candidats\/(\d+)$/)) && (m === "PUT" || m === "DELETE")) {
@@ -586,6 +622,7 @@ function playerFields(b) {
     if (!MORT.includes(b.mort)) fail(400, "Choix invalide pour « Mourir ou survivre ».");
     f.mort = b.mort;
   }
+  if ("taille_fixe" in b) f.taille_fixe = b.taille_fixe && b.taille_fixe !== "0" ? 1 : 0;
   if ("taille_cm" in b) {
     const t = int(b.taille_cm);
     if (t !== null && (t < 50 || t > 250)) fail(400, "Taille IRL entre 50 et 250 cm.");
@@ -764,6 +801,11 @@ async function toggleUsine(env, s, fid, uid, on) {
   if (!u) fail(404, "Usine introuvable.");
   const has = await env.DB.prepare("SELECT projet_faction_id, tour FROM usine_choix WHERE faction_id = ? AND usine_id = ?").bind(fid, uid).first();
   if (has && has.projet_faction_id && !on) fail(400, "Cette usine a été débloquée par un projet communautaire : retire le projet dans l'onglet Projets.");
+  if (!staff && !(has && has.projet_faction_id)) {
+    const t = await usineTurn(env, tour);
+    if (t.done.has(fid)) fail(400, "Ta faction a déjà validé ses choix pour ce tour : demande au staff pour changer.");
+    if (t.current !== fid) fail(400, t.current ? `Ce n'est pas encore ton tour : on attend ${t.currentName}.` : "Le tour est terminé.");
+  }
   if (on && !has) {
     if (!staff) {
       if (!rules) fail(400, "Aucun tour de choix n'est défini pour le moment.");
@@ -785,6 +827,29 @@ async function toggleUsine(env, s, fid, uid, on) {
   return { ok: true };
 }
 
+// Ordre de passage du tour : factions triées par tirage (celles sans rang à la fin) ; la première qui n'a pas validé a la main
+async function usineTurn(env, tour) {
+  const [fs, fini] = await env.DB.batch([
+    env.DB.prepare("SELECT id, name, tirage FROM factions WHERE deleted = 0 ORDER BY tirage IS NULL, tirage, name COLLATE NOCASE"),
+    env.DB.prepare("SELECT faction_id FROM usine_fini WHERE tour = ?").bind(tour)]);
+  const done = new Set(fini.results.map((r) => r.faction_id));
+  const cur = fs.results.find((f) => !done.has(f.id));
+  return { done, current: cur ? cur.id : null, currentName: cur ? cur.name : null };
+}
+async function usineFini(env, s, fid, tour, on) {
+  const staff = s.level === "staff";
+  if (!staff) {
+    if ((await setting(env, "usines_ouvertes")) !== "1") fail(400, "Les choix d'usines sont fermés pour le moment.");
+    if (!on) fail(403, "Seul le staff peut rendre la main à une faction.");
+    const t = await usineTurn(env, tour);
+    if (t.current !== fid) fail(400, t.current ? `Ce n'est pas ton tour : on attend ${t.currentName}.` : "Le tour est terminé.");
+  }
+  if (on) await env.DB.prepare("INSERT OR IGNORE INTO usine_fini (faction_id, tour, ts) VALUES (?, ?, ?)").bind(fid, tour, now()).run();
+  else await env.DB.prepare("DELETE FROM usine_fini WHERE faction_id = ? AND tour = ?").bind(fid, tour).run();
+  await audit(env, s, "usine_fini", `${fid}:${tour}`, "update", { fini: !on }, { fini: on });
+  return { ok: true };
+}
+
 async function revert(env, s, auditId) {
   const a = await env.DB.prepare("SELECT * FROM audit WHERE id = ?").bind(auditId).first();
   if (!a) fail(404, "Entrée d'historique introuvable.");
@@ -795,6 +860,11 @@ async function revert(env, s, auditId) {
     if (before && before.on) await env.DB.prepare("INSERT OR IGNORE INTO usine_choix (faction_id, usine_id, tour) VALUES (?, ?, ?)").bind(fid, uid, before.tour || 1).run();
     else await env.DB.prepare("DELETE FROM usine_choix WHERE faction_id = ? AND usine_id = ?").bind(fid, uid).run();
     await audit(env, s, "usine_choix", a.entity_id, "revert", JSON.parse(a.after || "null"), before);
+  } else if (a.entity === "usine_fini") {
+    const [fid, tour] = a.entity_id.split(":").map(Number);
+    if (before && before.fini) await env.DB.prepare("INSERT OR IGNORE INTO usine_fini (faction_id, tour, ts) VALUES (?, ?, ?)").bind(fid, tour, now()).run();
+    else await env.DB.prepare("DELETE FROM usine_fini WHERE faction_id = ? AND tour = ?").bind(fid, tour).run();
+    await audit(env, s, "usine_fini", a.entity_id, "revert", JSON.parse(a.after || "null"), before);
   } else if (a.entity === "settings") {
     await env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").bind(a.entity_id, before.value).run();
     await audit(env, s, "settings", a.entity_id, "revert", JSON.parse(a.after || "null"), before);
@@ -872,7 +942,7 @@ async function allData(env, s) {
   const staff = s.level === "staff";
   const Q = (sql, ...a) => env.DB.prepare(sql).bind(...a);
   const myFaction = "(SELECT faction_id FROM players WHERE discord_id = ? AND deleted = 0)";
-  const [meR, playersR, factionsR, usinesR, choixR, projetsR, realisesR, prixR, settingsR, basesR, candidatsR, votesR, resultsR, wlCountR, wlFreeR] = await env.DB.batch([
+  const [meR, playersR, factionsR, usinesR, choixR, projetsR, realisesR, prixR, settingsR, basesR, candidatsR, votesR, resultsR, wlCountR, wlFreeR, finiR] = await env.DB.batch([
     Q("SELECT * FROM players WHERE discord_id = ? AND deleted = 0", s.id),
     Q("SELECT p.*, u.discord_name, (w.mc_name IS NOT NULL) AS wl FROM players p LEFT JOIN users u ON u.discord_id = p.discord_id LEFT JOIN whitelist w ON w.mc_name = p.mc_name WHERE p.deleted = 0 ORDER BY p.mc_name"),
     Q("SELECT * FROM factions WHERE deleted = 0 ORDER BY name"),
@@ -891,6 +961,7 @@ async function allData(env, s) {
     Q("SELECT COUNT(*) AS n FROM whitelist"),
     // Pseudos whitelistés sans fiche : aide le staff à corriger les fiches importées sous un autre nom
     Q("SELECT w.mc_name FROM whitelist w WHERE NOT EXISTS (SELECT 1 FROM players p WHERE p.mc_name = w.mc_name AND p.deleted = 0) ORDER BY w.mc_name"),
+    Q("SELECT faction_id, tour FROM usine_fini"),
   ]);
   const me = meR.results[0] || null;
   const players = playersR.results.map((p) => {
@@ -898,7 +969,7 @@ async function allData(env, s) {
     const out = { id: p.id, mc_name: p.mc_name, faction_id: p.faction_id, metier: p.metier, metier_desc: p.metier_desc,
       perso_desc: p.perso_desc, activite: p.activite, mort: p.mort };
     if (!pub) Object.assign(out, { linked: !!p.discord_id, whitelisted: !!p.wl, taille_appliquee: p.taille_appliquee });
-    if (staff || own) Object.assign(out, { taille_cm: p.taille_cm, discord_name: p.discord_name || null });
+    if (staff || own) Object.assign(out, { taille_cm: p.taille_cm, taille_fixe: !!p.taille_fixe, discord_name: p.discord_name || null });
     return out;
   });
   let settings = Object.fromEntries(settingsR.results.map((r) => [r.key, r.value]));
@@ -906,7 +977,7 @@ async function allData(env, s) {
   return {
     user: pub ? null : { id: s.id, name: s.name, avatar: s.avatar, level: s.level },
     players, factions: factionsR.results, usines: usinesR.results, choix: choixR.results, projets: projetsR.results,
-    usineTours: USINE_TOURS, usineMax: USINE_MAX,
+    usineTours: USINE_TOURS, usineMax: USINE_MAX, usineFini: finiR.results,
     realises: staff ? realisesR.results : realisesR.results.map(({ note, ...r }) => r), settings, bases: basesR.results, candidats: candidatsR.results,
     myVotes: Object.fromEntries(votesR.results.map((v) => [v.tour, v.candidat_id])),
     results: staff || settings.election === "resultats" ? resultsR.results : null,

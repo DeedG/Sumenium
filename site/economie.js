@@ -65,6 +65,9 @@ const facColor = (c) => (typeof col === "function" ? col(c) : null) || (/^#[0-9a
 const facTag = (id) => { const x = facById(id); if (!x) return id ? `<span class="chip">${E_(id)}</span>` : "";
   const tag = `<span class="ftag" style="--fc:${E_(facColor(x.couleur))}">${E_(x.tag)}</span>`, h = facHref(x.id);
   return h ? `<a class="faclink" href="${h}" title="Fiche de la faction">${tag}</a>` : tag; };
+// Petite icône devant le propriétaire : tête du skin pour un joueur, bannière aux couleurs pour une faction
+const headE = (n) => /^[A-Za-z0-9_]{2,16}$/.test(n || "") ? `<img class="own-ico" src="https://mc-heads.net/avatar/${encodeURIComponent(n)}/20" alt="" width="20" height="20" loading="lazy">` : "";
+const facIco = (id) => { const x = facById(id); return `<span class="own-ico fac-ico" style="--fc:${E_(facColor(x && x.couleur))}" aria-hidden="true"></span>`; };
 const unavailable = (what) => `<div class="card center muted">Données indisponibles${what ? ` (${E_(what)})` : ""}. Elles reviendront à la prochaine synchronisation du serveur.</div>`;
 const mapLink = (o) => (o && o.x !== undefined && o.x !== null && (!o.monde || o.monde === "minecraft:overworld"))
   ? `<button class="linkbtn" data-map="${o.x},${o.y},${o.z}" title="Voir sur la carte">📍 ${o.x} / ${o.y} / ${o.z}</button>`
@@ -337,7 +340,9 @@ function shopCard(s) {
     ${lot ? lotHtml(s) : svc ? "" : det(s.details)}
     <p class="price">${label ? `<span class="muted small">${label} </span>` : ""}${su(s.prix)}${lot ? '<span class="muted small"> le lot</span>' : s.quantite > 1 ? `<span class="muted small"> · ${su(unit(s))} l'unité</span>` : ""}</p>
     <div class="tags">${stock}${s.ventes ? `<span class="chip muted">${n0(s.ventes)} vente${s.ventes > 1 ? "s" : ""}</span>` : ""}</div>
-    <p class="owner">${fiscS ? "<b>FISC</b>" : `<b>${s.proprietaireType === "joueur" ? plinkE(s.proprietaire) : facHref(s.faction) ? `<a class="plink" href="${facHref(s.faction)}">${E_(s.proprietaire)}</a>` : E_(s.proprietaire)}</b>`} ${s.proprietaireType === "faction" ? '<span class="muted small">boutique de faction</span>' : ""} ${facTag(s.faction)}</p>
+    <p class="owner">${fiscS ? "<b>FISC</b>" : s.proprietaireType === "faction"
+      ? `${facIco(s.faction)}${facTag(s.faction) || `<b>${E_(s.proprietaire)}</b>`} <span class="muted small">boutique de faction</span>`
+      : `${headE(s.proprietaire)}<b>${plinkE(s.proprietaire)}</b> ${facTag(s.faction)}`}</p>
     <p class="pos">${mapLink(s)}</p>
   </article>`;
 }
@@ -347,7 +352,7 @@ function hdv(view) {
   const list = E.hdv;
   if (!list) { view.innerHTML = unavailable("hôtel des ventes"); return; }
   const open = list.filter((a) => (!a.fin || a.fin > Date.now()) && matches(hq, itemKeys(a.item, a.nom), a.vendeur, detText(a.details)));
-  view.innerHTML = `<div class="card"><p class="small">Enchères de 7 jours au PNJ du spawn. Une offre dans les 5 dernières minutes prolonge l'enchère de 5 minutes. Taxe de 15 % sur le prix final. <a href="#aide/commandes">Commandes de l'hôtel des ventes</a></p></div>
+  view.innerHTML = `<div class="card"><p class="small">Enchères de 7 jours au PNJ du spawn. Une offre dans les 5 dernières minutes prolonge l'enchère de 5 minutes. Taxe de 15 % sur le prix final. <a href="#aide/commandes/hdv">Commandes de l'hôtel des ventes</a></p></div>
     <div class="bar"><input type="search" id="hq" placeholder="Chercher un objet (français ou anglais), un vendeur…" value="${E_(hq)}" aria-label="Chercher une annonce"></div>
     <p class="count">${n0(open.length)} annonce${open.length > 1 ? "s" : ""} en cours</p>
     <div class="shop-grid">${open.map((a) => `<article class="shop hdv">
@@ -472,7 +477,7 @@ const match = (...t) => !cq || t.join(" ").toLowerCase().includes(cq);
 function cmdTable(sec, withWho) {
   const rows = sec.lignes.filter((l) => match(sec.titre, ...l));
   if (!rows.length) return "";
-  return `<section class="board cmd-sec"><h3>${E_(sec.titre)}</h3>${sec.intro ? `<p class="small muted">${E_(sec.intro)}</p>` : ""}
+  return `<section class="board cmd-sec" id="cmd-${E_(fold(sec.titre).replace(/[^a-z0-9]+/g, "-"))}"><h3>${E_(sec.titre)}</h3>${sec.intro ? `<p class="small muted">${E_(sec.intro)}</p>` : ""}
     <div class="tbl-wrap"><table class="tbl left cmds"><thead><tr><th>Commande</th><th>Usage</th>${withWho ? "<th>Qui</th>" : ""}</tr></thead><tbody>
     ${rows.map((l) => `<tr><td>${cmdHtml(l[0])}</td><td>${E_(l[1])}</td>${withWho ? `<td class="muted small">${E_(l[2])}</td>` : ""}</tr>`).join("")}</tbody></table></div>
     ${sec.note ? `<p class="small muted">${E_(sec.note)}</p>` : ""}</section>`;
@@ -496,12 +501,20 @@ function commandes(view) {
   if (!view.querySelector(".cmd-sec")) $("cmdNone").hidden = false;
   $("cq").oninput = (e) => { cq = e.target.value.toLowerCase(); const pos = e.target.selectionStart; render(); const el = $("cq"); el.focus(); el.setSelectionRange(pos, pos); };
   view.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = () => navigator.clipboard.writeText(b.dataset.copy).then(() => { b.textContent = "✓"; setTimeout(() => (b.textContent = "⧉"), 1200); })));
+  // Lien direct vers une section : #aide/commandes/hdv, /boutiques, /factions…
+  // (la page peut se redessiner juste après, quand la liste staff arrive : on garde l'ancre 2 s)
+  if (cmdAnchor && Date.now() < cmdAnchor.until) {
+    const id = "cmd-" + ({ hdv: "hotel-des-ventes", boutique: "boutiques", faction: "factions", bons: "bons-de-service" }[cmdAnchor.k] || cmdAnchor.k);
+    setTimeout(() => { const el = $(id); if (el) el.scrollIntoView({ block: "start" }); }, 60);
+  }
 }
+let cmdAnchor = null;
 
 /* ---------------- entrée ---------------- */
 const visible = () => (mode === "marche" && !$("p-marche").hidden) || (mode === "richesse" && !$("p-classements").hidden);
 function show(m, s) {
   mode = ROOTS[m] ? m : "marche";
+  if (mode === "commandes" && s) cmdAnchor = { k: s, until: Date.now() + 2000 };
   if (mode === "marche") sub = SUBS.some(([k]) => k === s) ? s : "boutiques";
   if (!loaded) load(); else render();
   if (!timer) timer = setInterval(() => { if (visible()) load(); }, 120000);
