@@ -55,9 +55,16 @@ const nomPerso = (o) => { const d = o.details; const n = d ? d.nomPerso : o.nom;
 const facById = (id) => (E && E.factions || []).find((x) => x.id === id);
 const head = (t, s2) => `<div class="sec-head"><h3>${t}</h3>${s2 ? `<p class="sub2">${s2}</p>` : ""}</div>`;
 const plinkE = (n) => (typeof plink === "function" && /^[A-Za-z0-9_]{2,16}$/.test(n || "") ? plink(n) : E_(n));
+// Recherche : sans accents ni majuscules, en français (noms du jeu) comme en anglais (nom du mod, identifiant)
+const fold = (t) => String(t ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[_:]/g, " ");
+const itemKeys = (item, nom) => [itemName(item), nom, idOf(item).replace(/_/g, " ")].join(" ");
+const matches = (q, ...txt) => { const words = fold(q).split(/\s+/).filter(Boolean); if (!words.length) return true; const hay = fold(txt.join(" ")); return words.every((w) => hay.includes(w)); };
+// Lien vers la fiche de la faction (Communauté), retrouvée par l'Espace à partir de l'id du mod
+const facHref = (ecoId) => { const f = window.Espace && window.Espace.facOfEco && window.Espace.facOfEco(ecoId); return f ? `#communaute/faction/${f.id}` : null; };
 const facColor = (c) => (typeof col === "function" ? col(c) : null) || (/^#[0-9a-f]{3,8}$/i.test(c || "") ? c : null) || "var(--muted)";
 const facTag = (id) => { const x = facById(id); if (!x) return id ? `<span class="chip">${E_(id)}</span>` : "";
-  return `<span class="ftag" style="--fc:${E_(facColor(x.couleur))}">${E_(x.tag)}</span>`; };
+  const tag = `<span class="ftag" style="--fc:${E_(facColor(x.couleur))}">${E_(x.tag)}</span>`, h = facHref(x.id);
+  return h ? `<a class="faclink" href="${h}" title="Fiche de la faction">${tag}</a>` : tag; };
 const unavailable = (what) => `<div class="card center muted">Données indisponibles${what ? ` (${E_(what)})` : ""}. Elles reviendront à la prochaine synchronisation du serveur.</div>`;
 const mapLink = (o) => (o && o.x !== undefined && o.x !== null && (!o.monde || o.monde === "minecraft:overworld"))
   ? `<button class="linkbtn" data-map="${o.x},${o.y},${o.z}" title="Voir sur la carte">📍 ${o.x} / ${o.y} / ${o.z}</button>`
@@ -289,9 +296,9 @@ function boutiques(view) {
   const owners = [...new Set(all.map((s) => s.proprietaire).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const facs = [...new Set(all.map((s) => s.faction).filter(Boolean))];
   const q = f.q.toLowerCase();
-  const match = (s) => !q || [itemName(s.item, s.nom), s.nom, s.service, s.item, s.proprietaire, detText(s.details),
-    ...(s.lot || []).flatMap((x) => [itemName(x.item, x.nom), x.item, detText(x.details)])].join(" ").toLowerCase().includes(q);
-  const fq = q && E.fisc ? [...(E.fisc.rachat || []), ...(E.fisc.vente || [])].filter((r) => [itemName(r.item, r.nom), r.nom, r.item].join(" ").toLowerCase().includes(q)).length : 0;
+  const match = (s) => matches(f.q, itemKeys(s.item, s.nom), s.service, s.proprietaire, detText(s.details), ...((s.details && s.details.enchantements) || []).map((e) => e.nom || ""),
+    ...(s.lot || []).flatMap((x) => [itemKeys(x.item, x.nom), detText(x.details)]));
+  const fq = q && E.fisc ? [...(E.fisc.rachat || []), ...(E.fisc.vente || [])].filter((r) => matches(f.q, itemKeys(r.item, r.nom))).length : 0;
   let list = all.filter((s) => match(s)
     && (!f.owner || s.proprietaire === f.owner) && (!f.fac || s.faction === f.fac)
     && (!f.type || (f.type === "service" ? s.type === "service" : s.type !== "service"))
@@ -301,7 +308,7 @@ function boutiques(view) {
   list = list.sort(by);
   const rupt = all.filter((s) => s.rupture).length;
   view.innerHTML = `<div class="bar">
-      <input type="search" id="bq" placeholder="Chercher un objet, un service, un vendeur…" value="${E_(f.q)}" aria-label="Chercher une boutique">
+      <input type="search" id="bq" placeholder="Chercher un objet (français ou anglais), un enchantement, un vendeur…" value="${E_(f.q)}" aria-label="Chercher une boutique">
       <select id="bo" aria-label="Propriétaire"><option value="">Tous les vendeurs</option>${owners.map((o) => `<option${o === f.owner ? " selected" : ""}>${E_(o)}</option>`).join("")}</select>
       <select id="bf" aria-label="Faction"><option value="">Toutes les factions</option>${facs.map((x) => `<option value="${E_(x)}"${x === f.fac ? " selected" : ""}>${E_((facById(x) || {}).tag || x)}</option>`).join("")}</select>
       <select id="bt" aria-label="Type"><option value="">Objets et services</option><option value="item"${f.type === "item" ? " selected" : ""}>Objets</option><option value="service"${f.type === "service" ? " selected" : ""}>Services</option></select>
@@ -330,7 +337,7 @@ function shopCard(s) {
     ${lot ? lotHtml(s) : svc ? "" : det(s.details)}
     <p class="price">${label ? `<span class="muted small">${label} </span>` : ""}${su(s.prix)}${lot ? '<span class="muted small"> le lot</span>' : s.quantite > 1 ? `<span class="muted small"> · ${su(unit(s))} l'unité</span>` : ""}</p>
     <div class="tags">${stock}${s.ventes ? `<span class="chip muted">${n0(s.ventes)} vente${s.ventes > 1 ? "s" : ""}</span>` : ""}</div>
-    <p class="owner">${fiscS ? "<b>FISC</b>" : `<b>${s.proprietaireType === "joueur" ? plinkE(s.proprietaire) : E_(s.proprietaire)}</b>`} ${s.proprietaireType === "faction" ? '<span class="muted small">boutique de faction</span>' : ""} ${facTag(s.faction)}</p>
+    <p class="owner">${fiscS ? "<b>FISC</b>" : `<b>${s.proprietaireType === "joueur" ? plinkE(s.proprietaire) : facHref(s.faction) ? `<a class="plink" href="${facHref(s.faction)}">${E_(s.proprietaire)}</a>` : E_(s.proprietaire)}</b>`} ${s.proprietaireType === "faction" ? '<span class="muted small">boutique de faction</span>' : ""} ${facTag(s.faction)}</p>
     <p class="pos">${mapLink(s)}</p>
   </article>`;
 }
@@ -339,18 +346,23 @@ function shopCard(s) {
 function hdv(view) {
   const list = E.hdv;
   if (!list) { view.innerHTML = unavailable("hôtel des ventes"); return; }
-  const open = list.filter((a) => !a.fin || a.fin > Date.now());
-  view.innerHTML = `<div class="card"><p class="small">Enchères de 7 jours au PNJ du spawn. Une offre dans les 5 dernières minutes prolonge l'enchère de 5 minutes. Taxe de 15 % sur le prix final.</p></div>
+  const open = list.filter((a) => (!a.fin || a.fin > Date.now()) && matches(hq, itemKeys(a.item, a.nom), a.vendeur, detText(a.details)));
+  view.innerHTML = `<div class="card"><p class="small">Enchères de 7 jours au PNJ du spawn. Une offre dans les 5 dernières minutes prolonge l'enchère de 5 minutes. Taxe de 15 % sur le prix final. <a href="#aide/commandes">Commandes de l'hôtel des ventes</a></p></div>
+    <div class="bar"><input type="search" id="hq" placeholder="Chercher un objet (français ou anglais), un vendeur…" value="${E_(hq)}" aria-label="Chercher une annonce"></div>
     <p class="count">${n0(open.length)} annonce${open.length > 1 ? "s" : ""} en cours</p>
     <div class="shop-grid">${open.map((a) => `<article class="shop hdv">
       <header>${ico(a.item)}<div><b>${E_(itemName(a.item, a.nom))}</b>${a.quantite > 1 ? `<span class="muted small"> × ${n0(a.quantite)}</span>` : ""}
         ${nomPerso(a)}</div></header>
       ${det(a.details)}
-      <p class="price">${a.offreActuelle ? su(a.offreActuelle) : su(a.prixDepart)}<span class="muted small"> ${a.offreActuelle ? `offre de ${E_(a.meilleurEncherisseur || "?")} · ${n0(a.nbOffres)} offre${a.nbOffres > 1 ? "s" : ""}` : "prix de départ, aucune offre"}</span></p>
+      <p class="price">${a.offreActuelle ? su(a.offreActuelle) : su(a.prixDepart)}<span class="muted small"> ${a.offreActuelle ? `offre de ${plinkE(a.meilleurEncherisseur || "?")} · ${n0(a.nbOffres)} offre${a.nbOffres > 1 ? "s" : ""}` : "prix de départ, aucune offre"}</span></p>
       <div class="tags">${a.achatImmediat ? `<span class="chip ok">Achat immédiat ${su(a.achatImmediat)}</span>` : '<span class="chip muted">Pas d\'achat immédiat</span>'}</div>
       <p class="owner">Vendu par <b>${plinkE(a.vendeur)}</b></p>
       <p class="countdown" data-fin="${a.fin || ""}">${remain(a.fin)}</p></article>`).join("") || '<p class="empty">Aucune annonce en cours.</p>'}</div>`;
+  keepSearch("hq", (v) => (hq = v));
 }
+let hq = "", fqS = "";
+// Garde le curseur dans le champ de recherche pendant que la liste se redessine
+function keepSearch(id, set) { const el = $(id); if (!el) return; el.oninput = (e) => { set(e.target.value); const pos = e.target.selectionStart; render(); const n = $(id); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }; }
 function remain(fin) {
   if (!fin) return "";
   const s = Math.floor((fin - Date.now()) / 1000);
@@ -364,12 +376,15 @@ function remain(fin) {
 function fisc(view) {
   const F = E.fisc;
   if (!F) { view.innerHTML = unavailable("prix du FISC"); return; }
-  const table = (rows, sell) => rows.length ? `<div class="tbl-wrap"><table class="tbl left"><thead><tr><th>Objet</th><th>${sell ? "Prix" : "Le FISC paie"}</th>${sell ? "<th>Lot</th>" : ""}<th>Où</th></tr></thead><tbody>
+  const keep = (rows) => rows.filter((r) => matches(fqS, itemKeys(r.item, r.nom)));
+  const table = (rows, sell) => (rows = keep(rows)).length ? `<div class="tbl-wrap"><table class="tbl left"><thead><tr><th>Objet</th><th>${sell ? "Prix" : "Le FISC paie"}</th>${sell ? "<th>Lot</th>" : ""}<th>Où</th></tr></thead><tbody>
     ${rows.slice().sort((a, b) => itemName(a.item, a.nom).localeCompare(itemName(b.item, b.nom))).map((r) => `<tr><td>${ico(r.item)} ${E_(itemName(r.item, r.nom))}</td><td><b>${su(r.prix)}</b>${sell ? "" : '<span class="muted small"> / unité</span>'}</td>${sell ? `<td>× ${n0(r.quantite || 1)}</td>` : ""}<td>${mapLink(r)}</td></tr>`).join("")}
     </tbody></table></div>` : '<p class="empty">Aucun.</p>';
-  view.innerHTML = `${F.prixDynamiques && F.prixDynamiques !== "off" ? `<div class="banner info">Prix dynamiques activés (${E_(F.prixDynamiques)}) : les prix évoluent selon les quantités échangées.</div>` : ""}
+  view.innerHTML = `<div class="bar"><input type="search" id="fqS" placeholder="Chercher un objet (français ou anglais)…" value="${E_(fqS)}" aria-label="Chercher un objet du FISC"></div>
+    ${F.prixDynamiques && F.prixDynamiques !== "off" ? `<div class="banner info">Prix dynamiques activés (${E_(F.prixDynamiques)}) : les prix évoluent selon les quantités échangées.</div>` : ""}
     <div class="board"><h3>Ce que le FISC rachète<small>${n0(F.rachat.length)} objets</small></h3>${table(F.rachat, false)}</div>
     <div class="board" style="margin-top:14px"><h3>Ce que le FISC vend<small>stock illimité</small></h3>${table(F.vente, true)}</div>`;
+  keepSearch("fqS", (v) => (fqS = v));
 }
 
 /* ---------------- Baltop ---------------- */
@@ -381,7 +396,7 @@ function baltop(view) {
     <div class="board"><h3>Joueurs les plus riches<small>${J ? n0(J.length) + " joueurs" : ""}</small></h3>
       ${J ? (typeof rankList === "function" ? rankList(J.filter((p) => p.solde > 0).map((p) => [p.nom, p.solde]), (v) => su(v, 0)) : "") : '<p class="empty">Données indisponibles.</p>'}</div>
     <div class="board"><h3>Banques de faction<small>${facRows ? n0(facRows.length) + " factions" : ""}</small></h3>
-      ${facRows ? `<div class="rank-scroll"><ol class="rank">${facRows.map((x, i) => `<li><span class="pos">${i + 1}</span><span class="who"><span class="ftag" style="--fc:${E_(facColor(x.couleur))}">${E_(x.tag)}</span></span>
+      ${facRows ? `<div class="rank-scroll"><ol class="rank">${facRows.map((x, i) => `<li><span class="pos">${i + 1}</span><span class="who">${facTag(x.id)}</span>
         <span class="val">${su(x.banque, 0)}</span><span class="bar2"><s style="width:${Math.max(2, Math.round(x.banque / max * 100))}%"></s></span></li>`).join("")}</ol></div>` : '<p class="empty">Données indisponibles.</p>'}</div>
   </div>`;
 }

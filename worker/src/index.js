@@ -544,7 +544,7 @@ async function api(req, env, url, ctx) {
   }
   if (p === "/api/admin/settings" && m === "PUT") {
     const s = await need(req, env, "staff");
-    const allowed = { election: ["fermee", "candidatures", "tour1", "tour2", "resultats"], usines_ouvertes: ["0", "1"], usines_max: null };
+    const allowed = { election: ["fermee", "candidatures", "tour1", "tour2", "resultats"], usines_ouvertes: ["0", "1"], usine_tour: Object.keys(USINE_TOURS), usines_max: null };
     for (const [k, v] of Object.entries(body)) {
       if (!(k in allowed)) continue;
       const val = str(v, 20);
@@ -744,31 +744,43 @@ async function claim(env, s, name) {
   return { player: await row(env, "players", id) };
 }
 
+// Règles des tours de choix d'usines. Chaque faction choisit, dans l'ordre du tirage, une des combinaisons du tour en cours
+// (les usines débloquées par un projet communautaire ne comptent pas). Chaque usine est limitée sur le serveur.
+const USINE_MAX = { grosse: 3, moyenne: 4, petite: 5 };
+const USINE_TOURS = {
+  1: { nom: "1er tour", quand: "avant le lancement de la saison",
+       combos: [["grosse", "moyenne", "petite"], ["moyenne", "moyenne", "petite"], ["petite", "petite", "petite"]] },
+  2: { nom: "2e tour", quand: "trois semaines après le début de la saison",
+       combos: [["grosse"], ["moyenne", "petite"], ["petite", "petite"]] },
+};
+// Les usines déjà prises dans ce tour (plus la nouvelle) tiennent-elles dans au moins une combinaison ?
+const fitsCombo = (sizes, combos) => combos.some((c) => { const left = [...c]; return sizes.every((t) => { const i = left.indexOf(t); if (i < 0) return false; left.splice(i, 1); return true; }); });
 async function toggleUsine(env, s, fid, uid, on) {
-  if (s.level !== "staff" && (await setting(env, "usines_ouvertes")) !== "1") fail(400, "Les choix d'usines sont fermés pour le moment.");
+  const staff = s.level === "staff";
+  if (!staff && (await setting(env, "usines_ouvertes")) !== "1") fail(400, "Les choix d'usines sont fermés pour le moment.");
+  const tour = Number(await setting(env, "usine_tour")) || 1;
+  const rules = USINE_TOURS[tour];
   const u = uid ? await env.DB.prepare("SELECT * FROM usines WHERE id = ?").bind(uid).first() : null;
   if (!u) fail(404, "Usine introuvable.");
-  const has = await env.DB.prepare("SELECT projet_faction_id FROM usine_choix WHERE faction_id = ? AND usine_id = ?").bind(fid, uid).first();
+  const has = await env.DB.prepare("SELECT projet_faction_id, tour FROM usine_choix WHERE faction_id = ? AND usine_id = ?").bind(fid, uid).first();
   if (has && has.projet_faction_id && !on) fail(400, "Cette usine a été débloquée par un projet communautaire : retire le projet dans l'onglet Projets.");
   if (on && !has) {
-    if (s.level !== "staff") {
-      const max = { grosse: 3, moyenne: 4, petite: 5 }[u.taille];
+    if (!staff) {
+      if (!rules) fail(400, "Aucun tour de choix n'est défini pour le moment.");
+      const max = USINE_MAX[u.taille];
       const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM usine_choix WHERE usine_id = ?").bind(uid).first();
       if (n.n >= max) fail(400, `Plus de place pour « ${u.nom} » (${max} maximum sur le serveur).`);
-      const mine = (await env.DB.prepare("SELECT u.taille FROM usine_choix c JOIN usines u ON u.id = c.usine_id WHERE c.faction_id = ? AND c.projet_faction_id IS NULL").bind(fid).all()).results;
-      const count = (t) => mine.filter((x) => x.taille === t).length + (u.taille === t ? 1 : 0);
-      const total = mine.length + 1;
-      const maxTotal = Number(await setting(env, "usines_max")) || 3;
-      if (total > maxTotal) fail(400, `Ta faction a déjà ${maxTotal} usines.`);
-      if (count("grosse") > 1 || count("grosse") + count("moyenne") > 2) {
-        fail(400, "Combinaisons possibles : 1 grosse + 1 moyenne + 1 petite, 2 moyennes + 1 petite, ou 3 petites.");
+      const mine = (await env.DB.prepare("SELECT u.taille FROM usine_choix c JOIN usines u ON u.id = c.usine_id WHERE c.faction_id = ? AND c.projet_faction_id IS NULL AND c.tour = ?").bind(fid, tour).all()).results;
+      if (!fitsCombo([...mine.map((x) => x.taille), u.taille], rules.combos)) {
+        fail(400, `${rules.nom} : combinaisons possibles ${rules.combos.map((c) => c.join(" + ")).join(", ou ")}.`);
       }
     }
-    await env.DB.prepare("INSERT INTO usine_choix (faction_id, usine_id) VALUES (?, ?)").bind(fid, uid).run();
-    await audit(env, s, "usine_choix", `${fid}:${uid}`, "update", { on: false }, { on: true });
+    await env.DB.prepare("INSERT INTO usine_choix (faction_id, usine_id, tour) VALUES (?, ?, ?)").bind(fid, uid, tour).run();
+    await audit(env, s, "usine_choix", `${fid}:${uid}`, "update", { on: false }, { on: true, tour });
   } else if (!on && has) {
+    if (!staff && has.tour !== tour) fail(400, "Cette usine a été choisie à un tour précédent : seul le staff peut la retirer.");
     await env.DB.prepare("DELETE FROM usine_choix WHERE faction_id = ? AND usine_id = ?").bind(fid, uid).run();
-    await audit(env, s, "usine_choix", `${fid}:${uid}`, "update", { on: true }, { on: false });
+    await audit(env, s, "usine_choix", `${fid}:${uid}`, "update", { on: true, tour: has.tour }, { on: false });
   }
   return { ok: true };
 }
@@ -780,7 +792,7 @@ async function revert(env, s, auditId) {
   const before = a.before ? JSON.parse(a.before) : null;
   if (a.entity === "usine_choix") {
     const [fid, uid] = a.entity_id.split(":").map(Number);
-    if (before && before.on) await env.DB.prepare("INSERT OR IGNORE INTO usine_choix (faction_id, usine_id) VALUES (?, ?)").bind(fid, uid).run();
+    if (before && before.on) await env.DB.prepare("INSERT OR IGNORE INTO usine_choix (faction_id, usine_id, tour) VALUES (?, ?, ?)").bind(fid, uid, before.tour || 1).run();
     else await env.DB.prepare("DELETE FROM usine_choix WHERE faction_id = ? AND usine_id = ?").bind(fid, uid).run();
     await audit(env, s, "usine_choix", a.entity_id, "revert", JSON.parse(a.after || "null"), before);
   } else if (a.entity === "settings") {
@@ -890,10 +902,11 @@ async function allData(env, s) {
     return out;
   });
   let settings = Object.fromEntries(settingsR.results.map((r) => [r.key, r.value]));
-  if (!staff) settings = { election: settings.election, usines_ouvertes: settings.usines_ouvertes, usines_max: settings.usines_max };
+  if (!staff) settings = { election: settings.election, usines_ouvertes: settings.usines_ouvertes, usine_tour: settings.usine_tour };
   return {
     user: pub ? null : { id: s.id, name: s.name, avatar: s.avatar, level: s.level },
     players, factions: factionsR.results, usines: usinesR.results, choix: choixR.results, projets: projetsR.results,
+    usineTours: USINE_TOURS, usineMax: USINE_MAX,
     realises: staff ? realisesR.results : realisesR.results.map(({ note, ...r }) => r), settings, bases: basesR.results, candidats: candidatsR.results,
     myVotes: Object.fromEntries(votesR.results.map((v) => [v.tour, v.candidat_id])),
     results: staff || settings.election === "resultats" ? resultsR.results : null,

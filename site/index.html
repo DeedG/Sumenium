@@ -390,7 +390,8 @@ h3.sec small{font:600 .8rem var(--body);color:var(--muted);margin-left:8px}
 .usine>div:first-child{display:flex;justify-content:space-between;gap:8px}
 .usine.has{border-color:var(--grass);box-shadow:0 0 0 2px var(--leaf-soft)}
 .usine.full:not(.has){opacity:.6}
-.takers{display:flex;flex-wrap:wrap;gap:4px;min-height:1px}
+.takers{display:flex;flex-wrap:wrap;align-items:flex-start;gap:4px;min-height:1px}
+.usine{align-content:start}
 .usine .btn{justify-self:start}
 .tbl code{font-size:.82rem;background:var(--bg);padding:2px 6px;border-radius:6px}
 .tbl.edit td{padding:6px 8px}
@@ -441,6 +442,12 @@ body.busy{cursor:progress}
 .eco-when{margin:-6px 0 12px}
 .eco-ico{width:28px;height:28px;image-rendering:pixelated;vertical-align:middle;flex:none}
 .rank .eco-ico{width:20px;height:20px;margin-right:4px}
+.shops-mini .shop-name{display:flex;align-items:center;gap:8px}
+.shops-mini .eco-ico{width:24px;height:24px}
+.rules-list{margin:8px 0 0;padding-left:20px}
+.rules-list li{margin:4px 0;color:var(--muted)}
+.rules-list li.cur{color:var(--fg)}
+.ip-players a:hover{text-decoration:underline}
 .ph{display:inline-grid;place-items:center;min-width:28px;height:28px;padding:0 3px;border-radius:4px;background:var(--bg);font:600 .55rem/1 var(--body);color:var(--muted);vertical-align:middle;overflow:hidden}
 .ftag{display:inline-block;font:700 .78rem var(--display);padding:2px 8px;border-radius:6px;color:#fff;background:var(--fc,var(--muted));text-shadow:0 1px 1px rgba(0,0,0,.35);vertical-align:1px}
 .ftag.big{font-size:1.05rem;padding:3px 10px}
@@ -755,6 +762,8 @@ const $=id=>document.getElementById(id);
 const fmt=n=>Number(n||0).toLocaleString("fr-FR",{maximumFractionDigits:2});
 const fmtB=n=>n>=10000?Number(n).toLocaleString("fr-FR",{notation:"compact",maximumFractionDigits:1}):fmt(n);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+// Recherche sans accents ni majuscules ; « iron_ingot » et « iron ingot » se valent
+const fold=t=>String(t??"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[_:]/g," ");
 const crit=c=>c.replace(/^[a-z_]+:/,"").replace(/[_/]/g," ");
 let PROG=null,TECH=null,techLoading=null;
 let CAT=[],DATA={adv:{}},NAMES={},st={q:"",tab:"",tier:"",min:0,sort:"blocks",f:"rem",secret:false,loot:"",trophies:true,limit:150};
@@ -821,11 +830,11 @@ function item(e){
     else if(n>1)extra=`<div class="prog"><i><s style="width:${Math.round(k/n*100)}%"></s></i><span><b>${k}/${n}</b> pour ${esc(PROG.name)}</span></div>`;
     else extra=`<div class="prog">Pas encore obtenu par ${esc(PROG.name)}</div>`;
     extra+=r.done?`<div class="prog small">Bordure déjà agrandie${r.by?` par <b>${esc(r.by)}</b>`:""} : plus de blocs à gagner avec celui-ci.</div>`
-      :(r.p&&r.pw!==PROG.name?`<div class="prog small">Le plus avancé : ${esc(r.pw)} (${r.p}/${n})</div>`:"");
+      :(r.p&&r.pw!==PROG.name?`<div class="prog small">Le plus avancé : ${plink(r.pw)} (${r.p}/${n})</div>`:"");
   }else if(r.done){
-    extra=`<div class="prog">Obtenu${r.by?` par <b>${plink(r.by)}</b>${r.team?` (${esc(r.team)})`:""}`:""}${r.at?` · ${fdate(r.at)}`:""}</div>`;
+    extra=`<div class="prog">Obtenu${r.by?` par <b>${plink(r.by)}</b>${r.team?` (${tlink(r.team)})`:""}`:""}${r.at?` · ${fdate(r.at)}`:""}</div>`;
   }else if(r.p){
-    extra=`<div class="prog"><i><s style="width:${Math.round(r.p/n*100)}%"></s></i><span><b>${r.p}/${n}</b> · ${esc(r.pw)}${r.team?` (${esc(r.team)})`:""}</span></div>`;
+    extra=`<div class="prog"><i><s style="width:${Math.round(r.p/n*100)}%"></s></i><span><b>${r.p}/${n}</b> · ${plink(r.pw)}${r.team?` (${tlink(r.team)})`:""}</span></div>`;
   }
   const parts=[];
   if(e.parent)parts.push(`<div>Se débloque après : <b>${esc(e.parent)}</b></div>`);
@@ -842,7 +851,7 @@ function item(e){
 
 function render(){
   header();
-  const q=st.q.toLowerCase();
+  const q=fold(st.q).trim();
   let rows=CAT.filter(e=>{
     const r=rec(e);
     const d=isDone(e);
@@ -859,7 +868,7 @@ function render(){
       if(st.loot==="xp"&&!(bacOn("exp")&&e.xp))return false;
       if(st.loot.startsWith("i:")&&!g.some(it=>it.id===st.loot.slice(2)))return false;
     }
-    if(q&&!(e.title+" "+e.desc+" "+e.req.flat().join(" ")+" "+gives(e).map(it=>iname(it.id)+" "+it.id+" "+((it.name&&it.name.t)||"")).join(" ")).toLowerCase().includes(q))return false;
+    if(q&&!q.split(/\s+/).every(w=>fold(e.title+" "+e.desc+" "+e.req.flat().join(" ")+" "+gives(e).map(it=>iname(it.id)+" "+it.id+" "+((it.name&&it.name.t)||"")).join(" ")).includes(w)))return false;
     return true;
   });
   const by={
@@ -999,7 +1008,7 @@ function statusTip(){
   const p=s.players||{},list=p.sample||[];
   return `<div class="motd">${motdHtml(s.motd)||"Suménium"}</div>
     <p class="ip-line"><b>${fmt(p.online)}</b> / ${fmt(p.max)} joueurs en ligne${s.version?` · ${esc(s.version)}`:""}</p>
-    ${list.length?`<ul class="ip-players">${list.map(n=>`<li>${headImg(n,20)}${esc(n)}</li>`).join("")}</ul>${p.online>list.length?`<p class="muted small">et ${fmt(p.online-list.length)} autre${p.online-list.length>1?"s":""}</p>`:""}`
+    ${list.length?`<ul class="ip-players">${list.map(n=>`<li><a href="#communaute/joueur/${encodeURIComponent(n)}">${headImg(n,20)}${esc(n)}</a></li>`).join("")}</ul>${p.online>list.length?`<p class="muted small">et ${fmt(p.online-list.length)} autre${p.online-list.length>1?"s":""}</p>`:""}`
       :(p.online?'<p class="muted small">Le serveur ne publie pas la liste des joueurs.</p>':'<p class="muted small">Personne en ligne pour le moment.</p>')}
     <p class="muted small">Clique pour copier l'adresse</p>`;
 }
@@ -1027,7 +1036,7 @@ function renderHome(){
   const now=[];
   const el=D&&D.settings&&D.settings.election;
   if(el&&el!=="fermee"){const lab={candidatures:"Candidatures ouvertes pour la mairie",tour1:"Vote du 1er tour en cours",tour2:"Vote du 2nd tour en cours",resultats:"Résultats de l'élection publiés"}[el];
-    if(lab)now.push(`<li><span class="chip warn">Élection</span> <a href="#communaute/elections">${lab}</a>${D.candidats&&D.candidats.length?` · ${fmt(D.candidats.length)} candidat${D.candidats.length>1?"s":""}`:""}</li>`)}
+    if(lab)now.push(`<li><span class="chip warn">Élection</span> <a href="#communaute/elections">${lab}</a>${D.candidats&&D.candidats.length?` · ${D.candidats.map(c=>plink(c.mc_name)).join(", ")}`:""}</li>`)}
   if(E&&E.hdv){E.hdv.filter(a=>a.fin&&a.fin>Date.now()).sort((a,b)=>a.fin-b.fin).slice(0,3).forEach(a=>{
     const h=Math.round((a.fin-Date.now())/3600000);
     now.push(`<li><span class="chip">Enchère</span> <a href="#marche/hdv">${esc(NAMES[String(a.item).replace("minecraft:","")]||a.nom||a.item)}${a.quantite>1?` × ${fmt(a.quantite)}`:""}</a> · finit ${h<1?"dans moins d'une heure":h<48?`dans ${h} h`:`dans ${Math.round(h/24)} jours`}</li>`)})}
@@ -1043,7 +1052,7 @@ function renderHome(){
       </div>
       ${s&&s.online&&s.motd?`<div class="motd big">${motdHtml(s.motd)}</div>`:""}
       ${p&&p.sample&&p.sample.length?`<ul class="ip-players inline">${p.sample.map(n=>`<li><a href="#communaute/joueur/${encodeURIComponent(n)}">${headImg(n,20)}${esc(n)}</a></li>`).join("")}</ul>`:""}
-      <div class="home-actions"><button type="button" class="btn" id="homeCopy">Copier l'adresse play.sumenium.com</button><a class="btn ghost" href="#aide/rejoindre">Comment rejoindre</a></div>
+      <div class="home-actions"><a class="btn" href="#aide/rejoindre">Comment rejoindre</a><a class="btn ghost" href="#monde/carte">Voir la carte</a></div>
     </section>
     <div class="stats home-stats">
       <a class="stat" href="#monde/succes"><b>${hasData()?fmt(DATA.worldSize*2):"–"}</b><span>Largeur du monde (blocs)</span></a>
@@ -1062,7 +1071,6 @@ function renderHome(){
       ${card("#espace/fiche","🪪","Ma fiche","Mon personnage, mon historique")}
       ${card("#aide/commandes","📖","Les commandes","Boutiques, factions, hôtel des ventes")}
     </div>`;
-  $("homeCopy").onclick=()=>$("ipCopy").click();
 }
 
 // Carte hébergée sur le homelab (via le tunnel Cloudflare)
@@ -1157,13 +1165,15 @@ let STATS=null, mapReady=false, statSel=null;
 const okName=n=>/^[A-Za-z0-9_]{2,16}$/.test(n);
 // Lien vers la fiche d'un joueur (Communauté › Joueurs)
 const plink=n=>`<a class="plink" href="#communaute/joueur/${encodeURIComponent(n)}">${esc(n)}</a>`;
+// Lien vers la fiche d'une faction à partir d'un nom d'équipe en jeu (si l'Espace la connaît)
+const tlink=t=>{const f=window.Espace&&window.Espace.facByName&&window.Espace.facByName(t);return f?`<a class="plink" href="#communaute/faction/${f.id}">${esc(t)}</a>`:esc(t)};
 const teamOf=n=>(STATS&&STATS.playerTeams&&STATS.playerTeams[n])||"";
 function rankList(rows,fmtv,limit){
   rows=(rows||[]).filter(r=>okName(r[0])).slice(0,limit||1000);
   if(!rows.length)return '<p class="empty">Pas encore de données.</p>';
   const max=Math.max(...rows.map(r=>Math.abs(r[1])),1);
   return '<div class="rank-scroll"><ol class="rank">'+rows.map((r,i)=>{const t=teamOf(r[0]);
-    return `<li><span class="pos">${i+1}</span><span class="who">${plink(r[0])}${t?`<small>${esc(t)}</small>`:""}</span><span class="val">${fmtv(r[1])}</span><span class="bar2"><s style="width:${Math.max(2,Math.round(Math.abs(r[1])/max*100))}%"></s></span></li>`}).join("")+'</ol></div>';
+    return `<li><span class="pos">${i+1}</span><span class="who">${plink(r[0])}${t?`<small>${tlink(t)}</small>`:""}</span><span class="val">${fmtv(r[1])}</span><span class="bar2"><s style="width:${Math.max(2,Math.round(Math.abs(r[1])/max*100))}%"></s></span></li>`}).join("")+'</ol></div>';
 }
 // Blocs de bordure gagnés : chaque succès compte pour le premier joueur qui l'a obtenu (et sa faction)
 function borderBlocks(){
@@ -1178,7 +1188,7 @@ function renderClassement(){
   const bb=borderBlocks();
   $("tabBoards").innerHTML=STATS.tab.map(t=>`<div class="board"><h3>${esc(t.label)}<small>${fmt(t.rows.filter(r=>okName(r[0])).length)} joueurs</small></h3>${rankList(t.rows,fmt)}</div>`).join("")+
     `<div class="board"><h3>Blocs ajoutés à la bordure<small>${fmt(bb.players.length)} joueurs</small></h3>${rankList(bb.players,v=>"+"+fmt(Math.round(v)))}<p class="empty small">Somme des gains des succès dont le joueur a été le premier, au multiplicateur actuel (×${fmt(DATA.multiplier??1)}).</p></div>`;
-  const rows=(STATS.teams||[]).map((t,i)=>`<tr><td>${i+1}</td><td><b>${esc(t.team)}</b></td><td>${fmt(t.members)}</td><td>${fmt(t.bac_advancements)}</td><td>${fmt(t.bac_advfirst)}</td><td>${fmt(t.Morts)}</td><td>+${fmt(Math.round(bb.teams[t.team]||0))}</td></tr>`).join("");
+  const rows=(STATS.teams||[]).map((t,i)=>`<tr><td>${i+1}</td><td><b>${tlink(t.team)}</b></td><td>${fmt(t.members)}</td><td>${fmt(t.bac_advancements)}</td><td>${fmt(t.bac_advfirst)}</td><td>${fmt(t.Morts)}</td><td>+${fmt(Math.round(bb.teams[t.team]||0))}</td></tr>`).join("");
   document.querySelector("#teamTable tbody").innerHTML=rows||'<tr><td colspan="7" class="empty">Aucune faction trouvée.</td></tr>';
 }
 function fmtUnit(u){

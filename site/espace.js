@@ -82,6 +82,8 @@ function ecoFac(f) {
   _ecoFac.set(f.id, [ECO, hit || null]);
   return hit || null;
 }
+// Faction de l'Espace correspondant à une faction du mod (id du mod)
+const ecoToFac = (ecoId) => (D && ecoId ? D.factions.find((f) => { const e = ecoFac(f); return e && e.id === ecoId; }) || null : null);
 const ecoPlayer = (name) => ECO && ECO.joueurs ? ECO.joueurs.find((j) => norm(j.nom) === norm(name)) || null : null;
 const suE = (v) => Number(v || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + "\u00a0" + ((ECO && ECO.monnaie) || "Su");
 const facStyle = (f) => { const e = ecoFac(f); const c = e && typeof col === "function" ? col(e.couleur) : null; return c ? ` style="--fc:${esc(c)}"` : ""; };
@@ -379,7 +381,7 @@ function bindFac() {
 }
 function usineChip(c) {
   const u = usine(c.usine_id);
-  return u ? `<span class="chip u-${u.taille}"${c.projet_faction_id ? ' title="Débloquée par un projet communautaire"' : ""}>${c.projet_faction_id ? "★ " : ""}${esc(u.nom)}</span>` : "";
+  return u ? `<span class="chip u-${u.taille}"${c.projet_faction_id ? ' title="Débloquée par un projet communautaire"' : (c.tour || 1) > 1 ? ` title="Choisie au ${c.tour}e tour"` : ""}>${c.projet_faction_id ? "★ " : ""}${esc(u.nom)}${!c.projet_faction_id && (c.tour || 1) > 1 ? ` <small>T${c.tour}</small>` : ""}</span>` : "";
 }
 function facCard(f) {
   const ms = members(f.id);
@@ -445,7 +447,7 @@ function projets() {
     ${P.map((pr) => {
       const done = byP(pr.id), c = can(pr);
       return `<tr><td>${projetNom(pr)}</td><td>${esc(taillesTxt(pr.tailles))}</td><td>${reglesProjet(pr)}</td>
-        <td>${done.map((r) => `<span class="chip${r.faction_id === myF ? " ok" : ""}" title="${esc(r.note || "")}">${esc(facName(r.faction_id))}${r.usine_id ? ` → ${esc((usine(r.usine_id) || {}).nom || "")}` : ""}</span>`).join(" ") || '<span class="muted">—</span>'}
+        <td>${done.map((r) => `<a href="#communaute/faction/${r.faction_id}" class="chip${r.faction_id === myF ? " ok" : ""}" title="${esc(r.note || "")}">${esc(facName(r.faction_id))}${r.usine_id ? ` → ${esc((usine(r.usine_id) || {}).nom || "")}` : ""}</a>`).join(" ") || '<span class="muted">—</span>'}
           ${isStaff() ? done.map((r) => `<button class="x" data-pf-del="${r.id}" title="Retirer ce projet de ${esc(facName(r.faction_id))}" aria-label="Retirer">✕</button>`).join("") : ""}</td>
         ${myF ? `<td>${c === true ? '<span class="chip ok">Disponible</span>' : pr.unique_srv ? '<span class="chip muted">Déjà pris</span>' : '<span class="chip muted">Déjà fait</span>'}</td>` : ""}</tr>`;
     }).join("") || '<tr><td colspan="5" class="empty">Aucun projet.</td></tr>'}</tbody></table></div>
@@ -510,12 +512,18 @@ const tile = (label, v, rk, cls = "") => `<div class="stat ${cls}"><b>${v}</b><s
 const itemFr = (id, nom) => { const k = String(id || "").replace(/^minecraft:/, ""); return (typeof NAMES !== "undefined" && NAMES[k]) || nom || k.replace(/_/g, " "); };
 const mapBtn = (o) => o && o.x !== undefined && o.x !== null && (!o.monde || o.monde === "minecraft:overworld")
   ? `<button class="linkbtn" data-map="${o.x},${o.y},${o.z}" title="Voir sur la carte">📍 ${o.x} / ${o.y} / ${o.z}</button>` : "";
-function shopRows(list) {
+const icoE = (item) => { const id = String(item || "").replace(/^minecraft:/, ""); if (!/^[a-z0-9_]+$/.test(id)) return '<span class="eco-ico ph"></span>';
+  return `<img class="eco-ico" src="icons/${id}.png" alt="" loading="lazy" data-ph="${esc(itemFr(id).slice(0, 10))}" onerror="iconFail(this)">`; };
+// Boutiques (Marché) en tableau compact : icône, objet, prix, stock, propriétaire, position sur la carte
+function shopRows(list, withOwner) {
   if (!list.length) return '<p class="empty">Aucune.</p>';
-  return `<div class="tbl-wrap"><table class="tbl left"><thead><tr><th>Vend</th><th>Prix</th><th>Stock</th><th>Où</th></tr></thead><tbody>${list.map((b) => {
-    const name = b.type === "service" ? (b.service || "Service") : b.type === "lot" ? `Lot (${(b.lot || []).length} objets)` : itemFr(b.item, b.nom);
-    return `<tr><td><b>${esc(name)}</b>${b.quantite > 1 ? ` <span class="muted small">× ${fmt(b.quantite)}</span>` : ""}</td><td>${suE(b.prix)}</td>
-      <td>${b.type === "service" ? '<span class="chip ok">illimité</span>' : b.rupture ? '<span class="chip warn">Rupture</span>' : b.stock != null ? fmt(b.stock) : ""}</td><td>${mapBtn(b)}</td></tr>`;
+  return `<div class="tbl-wrap"><table class="tbl left shops-mini"><thead><tr><th>Vend</th><th>Prix</th><th>Stock</th>${withOwner ? "<th>Boutique de</th>" : ""}<th>Où</th></tr></thead><tbody>${list.map((b) => {
+    const lot = b.type === "lot", first = lot ? ((b.lot || [])[0] || {}).item : b.item;
+    const name = b.type === "service" ? (b.service || "Service") : lot ? `Lot : ${(b.lot || []).map((x) => `${fmt(x.quantite)} ${itemFr(x.item, x.nom)}`).join(", ")}` : itemFr(b.item, b.nom);
+    const ench = b.details && b.details.enchantements ? b.details.enchantements.map((e) => esc((e.nom || String(e.id).replace(/^minecraft:/, "")) + (e.niveau > 1 ? " " + e.niveau : ""))).join(", ") : "";
+    const owner = b.proprietaireType === "faction" ? (ecoToFac(b.faction) ? flink(ecoToFac(b.faction)) : esc(b.proprietaire)) : plink(b.proprietaire);
+    return `<tr><td><span class="shop-name">${b.type === "service" ? "🎫" : icoE(first)}<span><b>${esc(name)}</b>${!lot && b.quantite > 1 ? ` <span class="muted small">× ${fmt(b.quantite)}</span>` : ""}${ench ? `<small class="muted"> · ${ench}</small>` : ""}</span></span></td><td>${suE(b.prix)}</td>
+      <td>${b.type === "service" ? '<span class="chip ok">illimité</span>' : b.rupture ? '<span class="chip warn">Rupture</span>' : b.stock != null ? fmt(b.stock) : ""}</td>${withOwner ? `<td>${owner}</td>` : ""}<td>${mapBtn(b)}</td></tr>`;
   }).join("")}</tbody></table></div>`;
 }
 function bindMap() {
@@ -533,7 +541,9 @@ function joueurPage() {
   const border = rankOf(bb.players, name);
   if (!p && !eco && !tabs.some(([, x]) => x) && !border) return notFound("Joueur");
   const f = p && p.faction_id ? fac(p.faction_id) : null;
-  const shops = ((ECO && ECO.boutiques) || []).filter((b) => b.proprietaireType !== "fisc" && norm(b.proprietaire) === norm(name));
+  const shops = ((ECO && ECO.boutiques) || []).filter((b) => b.proprietaireType === "joueur" && norm(b.proprietaire) === norm(name));
+  const efP = f ? ecoFac(f) : null, facId = efP ? efP.id : eco && eco.faction;
+  const facShops = facId ? ((ECO && ECO.boutiques) || []).filter((b) => b.proprietaireType === "faction" && b.faction === facId) : null;
   const hdv = ((ECO && ECO.hdv) || []).filter((a) => norm(a.vendeur) === norm(name) && (!a.fin || a.fin > Date.now()));
   const cand = D.candidats.find((c) => norm(c.mc_name) === norm(name));
   const team = S && S.playerTeams && S.playerTeams[name];
@@ -556,7 +566,8 @@ function joueurPage() {
     </div>
     ${p && (p.metier_desc || p.perso_desc) ? `<div class="boards boards-2">${p.metier_desc ? `<div class="board"><h3>Métier</h3>${para(p.metier_desc)}</div>` : ""}${p.perso_desc ? `<div class="board"><h3>Personnage</h3>${para(p.perso_desc)}</div>` : ""}</div>` : ""}
     <div class="profile-links"><a class="btn small ghost" href="#monde/succes" data-who="${esc(name)}">Voir ses succès</a><a class="btn small ghost" href="#classements/stats">Statistiques</a></div>
-    <h3 class="sec">Boutiques <small>${fmt(shops.length)}</small></h3>${shopRows(shops)}
+    <h3 class="sec">Ses boutiques <small>${fmt(shops.length)}</small></h3>${shopRows(shops)}
+    ${facShops ? `<h3 class="sec">Boutiques de sa faction <small>${fmt(facShops.length)}</small></h3>${shopRows(facShops, true)}` : ""}
     ${hdv.length ? `<h3 class="sec">À l'hôtel des ventes <small>${fmt(hdv.length)}</small></h3><ul class="now">${hdv.map((a) => `<li><a href="#marche/hdv">${esc(itemFr(a.item, a.nom))}${a.quantite > 1 ? ` × ${fmt(a.quantite)}` : ""}</a> · ${suE(a.offreActuelle || a.prixDepart)}</li>`).join("")}</ul>` : ""}`);
   document.querySelectorAll("[data-who]").forEach((b) => (b.onclick = () => { try { localStorage.setItem("sumenium-who", b.dataset.who); } catch (e) {} if (window.setWho) window.setWho(b.dataset.who); }));
   bindMap();
@@ -583,36 +594,50 @@ function factionPage() {
         <span class="muted small">${ROLE_MOD[role] ? ROLE_MOD[role] + " · " : ""}${esc(p.metier || "Métier non renseigné")}</span></div></a>`; }).join("") || '<p class="empty">Aucun membre.</p>'}</div>
     ${loginHint("Pour modifier ta faction,")}
     <div class="fac-grid one">${facCard(f)}</div>
-    <h3 class="sec">Boutiques de la faction et de ses membres <small>${fmt(shops.length)}</small></h3>${shopRows(shops)}`);
+    <h3 class="sec">Boutiques de la faction <small>${fmt(shops.filter((b) => b.proprietaireType === "faction").length)}</small></h3>${shopRows(shops.filter((b) => b.proprietaireType === "faction"))}
+    <h3 class="sec">Boutiques de ses membres <small>${fmt(shops.filter((b) => b.proprietaireType === "joueur").length)}</small></h3>${shopRows(shops.filter((b) => b.proprietaireType === "joueur"), true)}`);
   bindFac();
   bindMap();
 }
 
 /* ---------- Usines ---------- */
+// Règles des tours (envoyées par le Worker, qui les vérifie aussi)
+const TAILLE_TXT = { grosse: "grosse", moyenne: "moyenne", petite: "petite" };
+const comboTxt = (c) => { const n = {}; c.forEach((t) => (n[t] = (n[t] || 0) + 1));
+  return Object.entries(n).map(([t, k]) => `${k} ${TAILLE_TXT[t]}${k > 1 ? "s" : ""}`).join(" + "); };
+const fitsCombo = (sizes, combos) => combos.some((c) => { const left = [...c]; return sizes.every((t) => { const i = left.indexOf(t); if (i < 0) return false; left.splice(i, 1); return true; }); });
 function usines() {
   const myFid = isStaff() ? staffFaction : me() && me().faction_id;
   const open = D.settings.usines_ouvertes === "1";
-  const mine = myFid ? D.choix.filter((c) => c.faction_id === myFid && !c.projet_faction_id).length : 0;
-  view(head("Usines", "Résultats du tirage et places restantes. ★ = usine débloquée par un projet communautaire.") + (open ? loginHint("Pour choisir les usines de ta faction,") : "") + `<div class="card">
-      <p><b>Règles :</b> chaque faction choisit 1 grosse + 1 moyenne + 1 petite, ou 2 moyennes + 1 petite, ou 3 petites
-      (${esc(D.settings.usines_max || 3)} usines au total pour ce tour), dans l'ordre du tirage. Chaque usine est limitée sur le serveur : 3 grosses, 4 moyennes, 5 petites du même type.</p>
-      <p>${open ? '<span class="chip ok">Choix ouverts</span>' : '<span class="chip warn">Choix fermés</span>'}
+  const tour = +D.settings.usine_tour || 1, TOURS = D.usineTours || {}, rules = TOURS[tour];
+  const MAX = D.usineMax || { grosse: 3, moyenne: 4, petite: 5 };
+  const mineNow = myFid ? D.choix.filter((c) => c.faction_id === myFid && !c.projet_faction_id && (c.tour || 1) === tour) : [];
+  const sizesNow = mineNow.map((c) => (usine(c.usine_id) || {}).taille);
+  const canAdd = (t) => !!rules && fitsCombo([...sizesNow, t], rules.combos);
+  view(head("Usines", "Résultats du tirage, règles du tour en cours et places restantes. ★ = usine débloquée par un projet communautaire.") + (open ? loginHint("Pour choisir les usines de ta faction,") : "") + `<div class="card rules">
+      <h3>Règles</h3>
+      <ul class="rules-list">${Object.entries(TOURS).map(([k, r]) => `<li class="${+k === tour ? "cur" : ""}"><b>${esc(r.nom)}</b> (${esc(r.quand)})${+k === tour ? ' <span class="chip ok">tour en cours</span>' : ""} :
+        ${r.combos.map(comboTxt).join(", ou ")}${+k === 1 ? ", dans l'ordre du tirage" : ""}.</li>`).join("")}</ul>
+      <p>Chaque usine du même type est limitée sur le serveur : grosses ${MAX.grosse}, moyennes ${MAX.moyenne}, petites ${MAX.petite}.
+        Des usines supplémentaires sont disponibles en accomplissant des <a href="#monde/projets">projets communautaires</a>.</p>
+      <p>${open ? `<span class="chip ok">Choix ouverts · ${esc(rules ? rules.nom : "")}</span>` : '<span class="chip warn">Choix fermés</span>'}
       ${isStaff() ? `<label class="chk">Agir pour la faction <select id="usFac">${facOpts(staffFaction, "— choisir —")}</select></label>` : ""}
-      ${myFid ? `<span class="muted">${esc(facName(myFid))} : ${plural(mine, "usine choisie", "usines choisies")} au tirage</span>` : ""}</p>
+      ${myFid && rules ? `<span class="muted">${esc(facName(myFid))} · ${esc(rules.nom)} : ${sizesNow.length ? sizesNow.map((t) => TAILLE_TXT[t]).join(" + ") : "rien choisi"}${["grosse", "moyenne", "petite"].some(canAdd) ? ` · encore possible : ${["grosse", "moyenne", "petite"].filter(canAdd).map((t) => TAILLE_TXT[t]).join(", ")}` : " · choix complet"}</span>` : ""}</p>
     </div>
     ${tirageTable(myFid)}
     <details class="all-usines"${open || isStaff() ? " open" : ""}><summary>Toutes les usines et places restantes</summary>
-    ${Object.entries(TAILLE_USINE).map(([t, [label, max]]) => `<h3 class="sec">${label} <small>${max} max par usine sur le serveur</small></h3>
+    ${Object.entries(TAILLE_USINE).map(([t, [label]]) => `<h3 class="sec">${label} <small>${MAX[t]} max par usine sur le serveur</small></h3>
       <div class="usines">${D.usines.filter((u) => u.taille === t).map((u) => {
         const takers = D.choix.filter((c) => c.usine_id === u.id);
-        const has = myFid && takers.some((c) => c.faction_id === myFid);
-        const fromProjet = myFid && takers.some((c) => c.faction_id === myFid && c.projet_faction_id);
-        const full = takers.length >= max;
-        const can = myFid && canEditFac(myFid) && (open || isStaff()) && !fromProjet;
-        return `<div class="usine${has ? " has" : ""}${full ? " full" : ""}"><div><b>${esc(u.nom)}</b>
-          <span class="muted small">${takers.length}/${max}</span></div>
-          <div class="takers">${takers.map((c) => `<span class="chip">${c.projet_faction_id ? "★ " : ""}${esc(facName(c.faction_id))}</span>`).join("")}</div>
-          ${can ? `<button class="btn small ${has ? "ghost" : ""}" data-us="${u.id}" data-on="${has ? 0 : 1}"${!has && !isStaff() && (full || mine >= (+D.settings.usines_max || 3)) ? " disabled" : ""}>${has ? "Retirer" : "Choisir"}</button>` : ""}</div>`;
+        const mineC = myFid && takers.find((c) => c.faction_id === myFid);
+        const full = takers.length >= MAX[t];
+        const oldTour = mineC && (mineC.tour || 1) !== tour;
+        const can = myFid && canEditFac(myFid) && (open || isStaff()) && !(mineC && mineC.projet_faction_id) && !(oldTour && !isStaff());
+        const blocked = !mineC && !isStaff() && (full || !canAdd(t));
+        return `<div class="usine${mineC ? " has" : ""}${full ? " full" : ""}"><div><b>${esc(u.nom)}</b>
+          <span class="muted small">${takers.length}/${MAX[t]}</span></div>
+          <div class="takers">${takers.map((c) => { const f = fac(c.faction_id); return f ? `<a class="chip" href="#communaute/faction/${f.id}">${c.projet_faction_id ? "★ " : ""}${esc(f.name)}${(c.tour || 1) > 1 ? ` <small>T${c.tour}</small>` : ""}</a>` : ""; }).join("")}</div>
+          ${can ? `<button class="btn small ${mineC ? "ghost" : ""}" data-us="${u.id}" data-on="${mineC ? 0 : 1}"${blocked ? ` disabled title="${full ? "Plus de place sur le serveur" : "Pas possible avec les règles du tour"}"` : ""}>${mineC ? "Retirer" : "Choisir"}</button>` : mineC && oldTour && !mineC.projet_faction_id ? `<span class="muted small">Choisie au ${(mineC.tour || 1) === 1 ? "1er" : mineC.tour + "e"} tour</span>` : ""}</div>`;
       }).join("")}</div>`).join("")}</details>`);
   if (isStaff()) $("usFac").onchange = (e) => { staffFaction = e.target.value ? +e.target.value : null; usines(); };
   document.querySelectorAll("[data-us]").forEach((b) => (b.onclick = () =>
@@ -623,7 +648,7 @@ function tirageTable(myFid) {
   const cell = (fid, t) => D.choix.filter((c) => c.faction_id === fid && (usine(c.usine_id) || {}).taille === t).map(usineChip).join(" ") || '<span class="muted">—</span>';
   return `<div class="card"><h3>Résultats du tirage</h3>
     <div class="tbl-wrap"><table class="tbl left tirage"><thead><tr><th>Ordre</th><th>Faction</th><th>Grosse</th><th>Moyenne</th><th>Petite</th></tr></thead><tbody>
-    ${fs.map((f) => `<tr${f.id === myFid ? ' class="mine"' : ""}><td>${f.tirage ? f.tirage + "ᵉ" : "–"}</td><td><b>${esc(f.name)}</b></td>
+    ${fs.map((f) => `<tr${f.id === myFid ? ' class="mine"' : ""}><td>${f.tirage ? f.tirage + "ᵉ" : "–"}</td><td><b>${flink(f)}</b></td>
       <td>${cell(f.id, "grosse")}</td><td>${cell(f.id, "moyenne")}</td><td>${cell(f.id, "petite")}</td></tr>`).join("")}</tbody></table></div></div>`;
 }
 
@@ -767,7 +792,7 @@ function staff() {
     <section class="card form" id="st-reglages"><h3>Réglages</h3>
       <label>Élection<select id="setElection">${opt(ELECTION, s.election)}</select></label>
       <label>Choix d'usines<select id="setUsOpen"><option value="1"${s.usines_ouvertes === "1" ? " selected" : ""}>Ouverts</option><option value="0"${s.usines_ouvertes !== "1" ? " selected" : ""}>Fermés</option></select></label>
-      <label>Usines max par faction<input id="setUsMax" type="number" min="1" max="20" value="${esc(s.usines_max || 3)}"></label>
+      <label>Tour de choix d'usines<select id="setUsTour">${Object.entries(D.usineTours || {}).map(([k, r]) => `<option value="${k}"${String(s.usine_tour || "1") === k ? " selected" : ""}>${esc(r.nom)} : ${esc(r.combos.map(comboTxt).join(" / "))}</option>`).join("")}</select></label>
       <div class="wide actions"><button class="btn small" id="saveSettings">Enregistrer les réglages</button></div></section>
     <section class="card" id="st-import"><h3>Importer le Google Sheet</h3>
       <p class="muted small">Fichier JSON produit par <code>tools/import_sheet.py</code>. L'import ajoute ce qui manque et complète les champs vides, sans rien écraser.</p>
@@ -776,7 +801,7 @@ function staff() {
       <div id="auditList" class="audit-scroll"><p class="empty">Chargement…</p></div><button class="btn small ghost" id="auditMore" hidden>Plus ancien</button></section>`);
   document.querySelectorAll("[data-jump]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); $(a.dataset.jump).scrollIntoView({ behavior: "smooth", block: "start" }); }));
   $("saveSettings").onclick = () => act(() => call("PUT", "/api/admin/settings",
-    { election: $("setElection").value, usines_ouvertes: $("setUsOpen").value, usines_max: $("setUsMax").value }), "Réglages enregistrés");
+    { election: $("setElection").value, usines_ouvertes: $("setUsOpen").value, usine_tour: $("setUsTour").value }), "Réglages enregistrés");
   document.querySelectorAll("[data-ren-go]").forEach((b) => (b.onclick = () => {
     const sel = document.querySelector(`select[data-ren="${b.dataset.renGo}"]`), p = D.players.find((x) => x.id === +b.dataset.renGo);
     if (!sel.value) return toast("Choisis d'abord le pseudo du serveur.", true);
@@ -885,5 +910,7 @@ function show(a, s, x) {
 }
 window.addEventListener("hashchange", renderAcct);
 start();
-window.Espace = { show, data: () => D };
+// Pour les autres onglets : retrouver la faction de l'Espace depuis le mod (id) ou un nom d'équipe
+const facByName = (n) => (D && n ? D.factions.find((f) => { const e = ecoFac(f); return [f.name, e && e.tag, e && e.id].map(norm).includes(norm(n)); }) || null : null);
+window.Espace = { show, data: () => D, facOfEco: (id) => ecoToFac(id), facByName };
 })();
