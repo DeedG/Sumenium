@@ -1053,7 +1053,7 @@ function renderStatus(){
 }
 async function loadStatus(){
   if(location.hostname==="deedg.github.io")return;
-  try{const r=await fetch("/api/status");if(r.ok)STATUS=await r.json()}catch(e){}
+  try{const r=await fetch("/api/status",{cache:"no-store"});if(r.ok)STATUS=await r.json()}catch(e){}
   renderStatus();
 }
 
@@ -1301,7 +1301,8 @@ window.addEventListener("hashchange",()=>{const t=location.hash.slice(1).split(/
   Object.entries(TIERS).forEach(([k,v])=>{if(CAT.some(e=>e.tier===k))$("tier").add(new Option(v,k))});
   lootOptions();
   setupWho();
-  loadStatus();setInterval(loadStatus,60000);
+  loadStatus();setInterval(()=>{if(!document.hidden)loadStatus()},15000);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)loadStatus()});
   await Promise.all([loadData(),loadStats()]);
   lootOptions();refreshHome();
   setInterval(()=>{loadData();loadStats()},120000);

@@ -884,7 +884,7 @@ async function revert(env, s, auditId) {
 }
 
 /* ------------------------------------------------- statut du serveur Minecraft */
-// « Server List Ping » (le même échange que la liste des serveurs du jeu) : MOTD, version, joueurs. Gardé 30 s en cache.
+// « Server List Ping » (le même échange que la liste des serveurs du jeu) : MOTD, version, joueurs. Gardé 10 s en cache.
 const vint = (n) => { const out = []; do { let b = n & 0x7f; n >>>= 7; if (n) b |= 0x80; out.push(b); } while (n); return out; };
 const mcString = (str) => { const b = [...new TextEncoder().encode(str)]; return [...vint(b.length), ...b]; };
 const packet = (body) => new Uint8Array([...vint(body.length), ...body]);
@@ -930,9 +930,9 @@ async function serverStatus(env, ctx) {
     out = { online: false, error: String(e && e.message || e).slice(0, 120) };
   }
   out.checked = new Date().toISOString();
-  const res = json(out, 200, { "cache-control": "public, max-age=30" });
-  ctx.waitUntil(cache.put(key, res.clone()));
-  return res;
+  // 10 s en cache côté Cloudflare (un seul ping pour tous les visiteurs), rien côté navigateur
+  ctx.waitUntil(cache.put(key, json(out, 200, { "cache-control": "public, max-age=10" })));
+  return json(out, 200, { "cache-control": "no-store" });
 }
 
 async function allData(env, s) {
