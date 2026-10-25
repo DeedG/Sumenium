@@ -65,6 +65,19 @@ La bordure est tracée en jaune et mise à jour à chaque passage. Tout ce qui e
 
 La dernière version publiée de BlueMap (5.23) ne gère pas le format de la 26.3. Sa version en développement oui : l'image la compile depuis le code source (commit fixé par `BLUEMAP_COMMIT` dans `carte/Dockerfile`). La première construction prend quelques minutes. Quand une version officielle compatible sortira, on pourra revenir à un simple téléchargement.
 
+## Sauvegarde de la base du site
+
+Le service `sauvegarde` copie chaque semaine (lundi 4 h par défaut) toute la base du site (fiches, factions, usines, projets, candidatures, votes, historique) dans `homelab/sauvegardes/sumenium-AAAA-MM-JJ.json.gz`, et garde les 12 dernières. Ce dossier contient des données personnelles : il reste sur le NAS (fichiers lisibles par toi seul), jamais dans Git.
+
+1. Choisis un jeton : `openssl rand -hex 32`.
+2. Mets-le dans les secrets GitHub du dépôt sous le nom `BACKUP_TOKEN`, puis relance « Déployer l'Espace » (onglet Actions).
+3. Mets le même dans `.env` : `BACKUP_TOKEN=…` (et `PUID`/`PGID` = résultat de la commande `id`).
+4. `mkdir -p sauvegardes && docker compose up -d sauvegarde`, puis `docker compose logs sauvegarde` : la première sauvegarde part tout de suite.
+
+Sauvegarde immédiate : `docker compose run --rm sauvegarde python /app/sauvegarde.py --once`.
+
+Restaurer (sur une base D1 vide) : `python3 sauvegarde/restaurer.py sauvegardes/sumenium-AAAA-MM-JJ.json.gz > restauration.sql`, puis depuis `worker/` : `npx wrangler d1 execute sumenium --remote --file ../homelab/restauration.sql`.
+
 ## Commandes utiles
 
 ```bash

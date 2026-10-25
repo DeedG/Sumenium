@@ -91,6 +91,19 @@ Le cron de GitHub Actions est souvent retardé de plusieurs heures (limite de Gi
 2. *Repository access* : seulement `DeedG/Sumenium`. *Permissions → Repository → Actions : Read and write*. Expiration : 1 an.
 3. Copier le jeton dans un secret du dépôt nommé `GH_DISPATCH_TOKEN`, puis relancer *Déployer l'Espace*.
 
+## Annonces Discord du tirage des usines
+
+Pendant le choix des usines, le Worker poste dans un salon Discord : ouverture du tour (ordre de passage), chaque usine prise ou retirée, chaque validation (« au tour de … ») et le récapitulatif de fin.
+
+1. Discord → paramètres du salon → *Intégrations → Webhooks → Nouveau webhook* → *Copier l'URL*.
+2. Coller l'URL dans un secret du dépôt nommé `DISCORD_WEBHOOK_TIRAGE` (ne l'envoyer à personne : elle permet d'écrire dans le salon), puis relancer *Déployer l'Espace*.
+
+Les annonces partent seulement quand les choix sont ouverts (Outils staff › Réglages) ; aucune mention (@everyone, rôles) n'est déclenchée.
+
+## Sauvegarde de la base
+
+Le NAS copie chaque semaine toute la base D1 (voir `homelab/README.md`, service `sauvegarde`). Il faut un secret `BACKUP_TOKEN` (32 caractères ou plus, par exemple `openssl rand -hex 32`), le même dans GitHub et dans le `.env` du NAS, puis relancer *Déployer l'Espace*.
+
 ## Économie (mod Sumenium Economy)
 
 Toutes les 5 minutes, la mise à jour lit `sumenium-data/` à la racine du serveur (jamais `sumenium-data/data/`, réservé au mod) :

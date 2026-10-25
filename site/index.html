@@ -93,6 +93,7 @@ body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);margin:0}
 .home-hero{display:grid;gap:8px}
 .home-status{display:flex;align-items:center;gap:12px}
 .home-status b{display:block;font:600 1.25rem var(--display)}
+.home-status span.small{display:block}
 .home-status .ip-dot{width:12px;height:12px;flex:none}
 .home-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
 a.stat{color:inherit;text-decoration:none;transition:transform .12s}
@@ -225,7 +226,35 @@ footer{margin-top:32px;color:var(--muted);font-size:.86rem;max-width:75ch}
 .tabs-list{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
 .tabs-list::-webkit-scrollbar{display:none}
 /* Compte : « Se connecter » ou tête du skin + pseudo en jeu */
-.acct{flex:none;display:flex;align-items:center}
+.acct{flex:none;display:flex;align-items:center;gap:6px}
+/* Cloche des notifications */
+.bell-wrap{position:relative}
+.bell{position:relative;display:inline-grid;place-items:center;width:36px;height:36px;border-radius:50%;border:0;background:var(--surface);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line);cursor:pointer}
+.bell:hover{box-shadow:inset 0 0 0 2px var(--sun)}
+.bell-n{position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#e5484d;color:#fff;font:700 .7rem/18px var(--display);text-align:center}
+.bell-panel{position:fixed;z-index:60;width:min(360px,calc(100vw - 32px));max-height:70vh;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  box-shadow:0 14px 34px rgba(0,0,0,.25);padding:10px;display:grid;gap:4px}
+.bell-panel[hidden]{display:none}
+.bell-h{font:700 .95rem var(--display);padding:2px 6px 6px}
+.tabs .bell-panel a.ntf,.ntf{display:flex;gap:10px;align-items:flex-start;padding:8px;border:0;border-radius:10px;color:var(--fg);text-decoration:none;font:500 .9rem/1.35 var(--body);white-space:normal}
+.ntf.new,.tabs .bell-panel a.ntf.new{background:color-mix(in srgb,var(--sun) 12%,transparent)}
+.tabs .bell-panel a.ntf:hover,.ntf:hover{background:var(--bg);color:var(--fg)}
+.ntf.new{background:color-mix(in srgb,var(--sun) 12%,transparent)}
+.ntf.warn .ntf-i{filter:saturate(1.4)}
+.ntf-i{flex:none;width:22px;text-align:center}
+/* Demandes (factions, projets) et listes du staff */
+.dem-list{list-style:none;margin:8px 0;padding:0;display:grid;gap:8px}
+.dem{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:6px}
+.dem p{margin:0}
+.pick-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 10px;max-height:240px;overflow:auto;padding:6px;border:1px solid var(--line);border-radius:10px;margin-top:6px}
+.pick-list label[hidden]{display:none}
+.pick-list label small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.order-list{margin:8px 0;padding-left:24px;display:grid;gap:4px}
+.order-list li{display:flex;align-items:center;gap:6px}
+.cmd-list{list-style:none;padding:0;margin:8px 0;display:grid;gap:4px}
+.cmd-list code{word-break:break-all}
+.cmds-box{margin:6px 0}
 .acct a.tabs-me,.acct a.tabs-login{display:inline-flex;align-items:center;gap:8px;border:0;padding:6px 10px;border-radius:999px;font:600 .92rem var(--display);text-decoration:none;white-space:nowrap}
 .acct a.tabs-login{background:#5865f2;color:#fff}
 .acct a.tabs-login:hover{background:#4752c4}
@@ -579,6 +608,20 @@ body.busy{cursor:progress}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:60;background:var(--leaf-ink);color:#fff;font-weight:700;padding:10px 18px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:calc(100vw - 32px)}
 .toast.bad{background:var(--warn)}
 @media (max-width:640px){.fac-grid{grid-template-columns:1fr}.audit{grid-template-columns:1fr}.audit>.btn,.audit>.chip{grid-row:auto;grid-column:1;justify-self:start}}
+/* Tableau du tirage sur téléphone : une carte par faction (rang, nom, état, puis les usines) */
+@media (max-width:640px){
+  .tbl-wrap:has(table.tbl.tirage){overflow:visible;border:0;background:none}
+  table.tbl.tirage thead{display:none}
+  table.tbl.tirage,table.tbl.tirage tbody{display:block}
+  table.tbl.tirage tr{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:var(--surface)}
+  table.tbl.tirage td{display:block;padding:0;border:0}
+  table.tbl.tirage td[data-l]{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  table.tbl.tirage td[data-l]::before{content:attr(data-l);font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);min-width:68px}
+  table.tbl.tirage td.st{justify-self:end}
+  table.tbl.tirage tr.mine{background:var(--sun-soft)}
+  table.tbl.tirage tr.turn{background:color-mix(in srgb,var(--sun) 14%,var(--surface));border-color:var(--sun)}
+  table.tbl.tirage tr.mine td,table.tbl.tirage tr.turn td{background:none}
+}
 </style>
 </head>
 <body>
@@ -1070,6 +1113,10 @@ function renderHome(){
   const el=D&&D.settings&&D.settings.election;
   if(el&&el!=="fermee"){const lab={candidatures:"Candidatures ouvertes pour la mairie",tour1:"Vote du 1er tour en cours",tour2:"Vote du 2nd tour en cours",resultats:"Résultats de l'élection publiés"}[el];
     if(lab)now.push(`<li><span class="chip warn">Élection</span> <a href="#communaute/elections">${lab}</a>${D.candidats&&D.candidats.length?` · ${D.candidats.map(c=>plink(c.mc_name)).join(", ")}`:""}</li>`)}
+  // Tirage des usines en cours : qui a la main
+  if(D&&D.settings&&D.settings.usines_ouvertes==="1"&&D.usineTours){const t=+D.settings.usine_tour||1,done=new Set((D.usineFini||[]).filter(x=>x.tour===t).map(x=>x.faction_id));
+    const cur=[...D.factions].sort((a,b)=>(a.tirage==null)-(b.tirage==null)||(a.tirage??0)-(b.tirage??0)).find(f=>!done.has(f.id));
+    now.unshift(`<li><span class="chip warn">Usines</span> <a href="#communaute/usines">Choix des usines en direct (${esc((D.usineTours[t]||{}).nom||"")})</a>${cur?` · au tour de <b>${esc(cur.name)}</b>`:" · terminé"}</li>`)}
   if(E&&E.hdv){E.hdv.filter(a=>a.fin&&a.fin>Date.now()).sort((a,b)=>a.fin-b.fin).slice(0,3).forEach(a=>{
     const h=Math.round((a.fin-Date.now())/3600000);
     now.push(`<li><span class="chip">Enchère</span> <a href="#marche/hdv">${esc(NAMES[String(a.item).replace("minecraft:","")]||a.nom||a.item)}${a.quantite>1?` × ${fmt(a.quantite)}`:""}</a> · finit ${h<1?"dans moins d'une heure":h<48?`dans ${h} h`:`dans ${Math.round(h/24)} jours`}</li>`)})}
@@ -1081,7 +1128,8 @@ function renderHome(){
       <div class="home-status">
         <span class="ip-dot${s?(s.online?"":" off"):" wait"}" aria-hidden="true"></span>
         <div><b>${s?(s.online?"Serveur en ligne":"Serveur injoignable"):"Statut du serveur…"}</b>
-          <span class="muted small">${p?`${fmt(p.online)} / ${fmt(p.max)} joueurs${s.version?` · ${esc(s.version)}`:""}`:"play.sumenium.com"}</span></div>
+          <span class="muted small">${p?`${fmt(p.online)} / ${fmt(p.max)} joueurs${s.version?` · ${esc(s.version)}`:""}`:"play.sumenium.com"}</span>
+          <span class="muted small">Saison 7 ouverte le vendredi 9 octobre 2026 · jour ${Math.floor((Date.now()-new Date("2026-10-09T21:00:00+02:00"))/86400000)+1}</span></div>
       </div>
       ${s&&s.online&&s.motd?`<div class="motd big">${motdHtml(s.motd)}</div>`:""}
       ${p&&p.sample&&p.sample.length?`<ul class="ip-players inline">${p.sample.map(n=>`<li><a href="#communaute/joueur/${encodeURIComponent(n)}">${headImg(n,20)}${esc(n)}</a></li>`).join("")}</ul>`:""}

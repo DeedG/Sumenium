@@ -39,6 +39,29 @@ services:
       - "127.0.0.1:8100:8080"
     networks: [carte]
 
+  # Sauvegarde hebdomadaire de la base du site (fiches, factions, usines, votes…) dans ./sauvegardes
+  sauvegarde:
+    image: python:3.12-alpine
+    container_name: sumenium-sauvegarde
+    restart: unless-stopped
+    command: ["python", "-u", "/app/sauvegarde.py"]
+    environment:
+      BACKUP_TOKEN: ${BACKUP_TOKEN:-}
+      SITE_URL: ${SITE_URL:-https://sumenium.com}
+      BACKUP_KEEP: ${BACKUP_KEEP:-12}
+      BACKUP_WEEKDAY: ${BACKUP_WEEKDAY:-0}
+      BACKUP_HOUR: ${BACKUP_HOUR:-4}
+      TZ: ${TZ:-Europe/Paris}
+    user: "${PUID:-1000}:${PGID:-1000}"
+    volumes:
+      - ./sauvegarde:/app:ro
+      - ./sauvegardes:/sauvegardes
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    mem_limit: 256m
+
 networks:
   carte:
     name: carte

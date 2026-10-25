@@ -97,6 +97,22 @@ const members = (fid) => D.players.filter((p) => p.faction_id === fid);
 const usine = (id) => D.usines.find((u) => u.id === id);
 const projet = (id) => (D.projets || []).find((x) => x.id === id);
 const canEditFac = (fid) => isStaff() || (canWrite() && me() && me().faction_id === fid);
+// Chef de faction : rôle « chef » dans le mod (eco.json). Lui seul (et le staff) modifie la fiche de sa faction.
+const isChefOf = (fid) => { const p = me(), f = fid && fac(fid), e = f && ecoFac(f);
+  return !!(p && p.faction_id === fid && e && (e.membres || []).some((m) => norm(m.nom) === norm(p.mc_name) && m.role === "chef")); };
+const canManageFac = (fid) => isStaff() || (canWrite() && isChefOf(fid));
+const MC_COL = { black: ["Noir", "#000000"], dark_blue: ["Bleu foncé", "#0000AA"], dark_green: ["Vert foncé", "#00AA00"], dark_aqua: ["Cyan foncé", "#00AAAA"],
+  dark_red: ["Rouge foncé", "#AA0000"], dark_purple: ["Violet", "#AA00AA"], gold: ["Or", "#FFAA00"], gray: ["Gris", "#AAAAAA"], dark_gray: ["Gris foncé", "#555555"],
+  blue: ["Bleu", "#5555FF"], green: ["Vert", "#55FF55"], aqua: ["Cyan", "#55FFFF"], red: ["Rouge", "#FF5555"], light_purple: ["Rose", "#FF55FF"], yellow: ["Jaune", "#FFFF55"], white: ["Blanc", "#FFFFFF"] };
+// Commandes en jeu pour créer une faction du site sur le serveur (mod + équipe vanilla pour la couleur dans la tablist)
+function facCmds(name, couleur, names) {
+  const id = norm(name).slice(0, 16) || "faction", tag = name.replace(/\s+/g, "").slice(0, 16), c = MC_COL[couleur] ? couleur : "white";
+  const out = [`/faction admin creer ${id} ${tag} ${c}`];
+  names.forEach((n) => { const cur = ECO && (ECO.factions || []).find((f) => (f.membres || []).some((m) => norm(m.nom) === norm(n)));
+    if (cur) out.push(`/faction admin retirer ${n}`); out.push(`/faction admin ajouter ${n} ${id}`); });
+  out.push(`/team add ${id}`, `/team modify ${id} color ${c}`, `/team modify ${id} prefix "[${name}] "`, ...names.map((n) => `/team join ${id} ${n}`));
+  return out;
+}
 const opt = (obj, cur) => Object.entries(obj).map(([k, v]) => `<option value="${esc(k)}"${k === (cur ?? "") ? " selected" : ""}>${esc(v)}</option>`).join("");
 const facOpts = (cur, none = "Sans faction (solo)") => `<option value="">${none}</option>` + D.factions.map((f) =>
   `<option value="${f.id}"${f.id === cur ? " selected" : ""}>${esc(f.name)} (${members(f.id).length}/8)</option>`).join("");
@@ -129,9 +145,105 @@ function renderAcct() {
   if (ME) {
     const p = me(), n = p ? p.mc_name : ME.name;
     const pic = p ? face(p.mc_name, 24) : ME.avatar ? `<img src="${esc(ME.avatar)}" alt="" width="24" height="24" style="border-radius:50%">` : "";
-    el.innerHTML = `<a class="tabs-me" href="#espace/fiche" aria-current="${here}" aria-label="Mon espace (${esc(n)})" title="Mon espace : ma fiche, mon historique${isStaff() ? ", outils staff" : ""}">${pic}<span>${esc(n)}</span></a>`;
+    el.innerHTML = bellHtml() + `<a class="tabs-me" href="#espace/fiche" aria-current="${here}" aria-label="Mon espace (${esc(n)})" title="Mon espace : ma fiche, mon historique${isStaff() ? ", outils staff" : ""}">${pic}<span>${esc(n)}</span></a>`;
+    bindBell();
   } else el.innerHTML = `<a class="tabs-login" href="/api/auth/login" data-login aria-label="Se connecter avec Discord" title="Se connecter avec Discord">${DISCORD_SVG}<span>Se connecter</span></a>`;
 }
+
+/* ---------- notifications (cloche à côté de Mon espace) ----------
+   Calculées à partir des données déjà chargées : elles disparaissent d'elles-mêmes quand la situation est réglée.
+   « Vu » est retenu dans ce navigateur seulement (pastille du nombre de nouveautés). */
+const SEEN_KEY = "sumenium-notifs-vues";
+const BELL_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-2 2v1h18v-1Z"/></svg>';
+let bellOpen = false;
+const seenGet = () => { try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || "[]")); } catch (e) { return new Set(); } };
+const seenSet = (keys) => { try { localStorage.setItem(SEEN_KEY, JSON.stringify([...keys].slice(-300))); } catch (e) {} };
+const stockPct = (b) => (b.capacite > 0 && b.stock != null ? Math.round((b.stock / b.capacite) * 100) : null);
+// Stock faible : moins de 10 % du coffre (si le mod donne la capacité), sinon de quoi faire moins de 3 ventes
+const lowStock = (b) => !b.rupture && b.stock != null && b.type !== "service" && (b.capacite > 0 ? b.stock / b.capacite < 0.1 : b.stock < 3 * (b.quantite || 1));
+function notifs() {
+  if (!D || !ME) return [];
+  const out = [], add = (key, icon, text, href, level = "") => out.push({ key, icon, text, href, level });
+  const p = me(), st = D.settings || {};
+  if (!p) add("lier", "🔗", "Relie ton pseudo Minecraft pour remplir ta fiche.", "#espace/fiche", "warn");
+  else {
+    const miss = [!p.metier && "métier RP", !p.mort && "mourir ou survivre"].filter(Boolean);
+    if (miss.length && canWrite()) add("fiche:" + miss.join(","), "📝", `Complète ta fiche : ${miss.join(", ")}.`, "#espace/fiche", "warn");
+    if (canWrite() && !p.taille_fixe && !p.taille_cm) add("taille", "📏", "Indique ta taille IRL, ou coche « garder la taille normale ».", "#espace/fiche");
+  }
+  // Élection
+  const tourV = st.election === "tour1" ? 1 : st.election === "tour2" ? 2 : 0;
+  if (tourV && p && !D.myVotes[tourV]) add("vote:" + tourV, "🗳️", `Le vote est ouvert (${tourV === 1 ? "1er" : "2nd"} tour) : tu n'as pas encore voté.`, "#communaute/elections", "warn");
+  if (st.election === "candidatures") add("cand", "🏛️", "Les candidatures pour la mairie sont ouvertes.", "#communaute/elections");
+  if (st.election === "resultats") add("res", "🏆", "Les résultats de l'élection sont publiés.", "#communaute/elections");
+  // Tirage des usines
+  const tourU = +st.usine_tour || 1;
+  if (st.usines_ouvertes === "1" && (D.usineTours || {})[tourU]) {
+    const T = turnState(tourU), fid = p && p.faction_id;
+    if (fid && T.cur && T.cur.id === fid) add("usine-tour:" + tourU, "🏭", "C'est au tour de ta faction de choisir ses usines !", "#communaute/usines", "warn");
+    else if (T.cur) add("usine-ouvert:" + tourU, "🏭", `Choix des usines en cours : au tour de ${T.cur.name}.`, "#communaute/usines");
+  }
+  // Boutiques (les miennes et celles de ma faction)
+  if (p && ECO && ECO.boutiques) {
+    const ef = p.faction_id && fac(p.faction_id) ? ecoFac(fac(p.faction_id)) : null;
+    ECO.boutiques.filter((b) => (b.proprietaireType === "joueur" && norm(b.proprietaire) === norm(p.mc_name)) || (ef && b.proprietaireType === "faction" && b.faction === ef.id))
+      .forEach((b) => {
+        const what = `${b.type === "lot" ? "lot" : itemFr(b.item, b.nom)}${b.proprietaireType === "faction" ? " (boutique de faction)" : ""}`;
+        if (b.rupture) add("rupture:" + b.id, "📦", `Rupture de stock : ${what}.`, `#communaute/joueur/${encodeURIComponent(p.mc_name)}`, "warn");
+        else if (lowStock(b)) add("faible:" + b.id, "📉", `Stock faible : ${what} (${stockPct(b) != null ? stockPct(b) + " % du coffre" : fmt(b.stock) + " restants"}).`, `#communaute/joueur/${encodeURIComponent(p.mc_name)}`);
+      });
+  }
+  // Hôtel des ventes : mes annonces qui se terminent dans moins de 24 h
+  if (p && ECO && ECO.hdv) ECO.hdv.filter((a) => norm(a.vendeur) === norm(p.mc_name) && a.fin > Date.now() && a.fin - Date.now() < 86400000)
+    .forEach((a) => add("hdv:" + a.id, "⏳", `Ton annonce « ${itemFr(a.item, a.nom)} » se termine dans ${Math.max(1, Math.round((a.fin - Date.now()) / 3600000))} h.`, "#marche/hdv"));
+  // Réponses du staff aux demandes
+  (D.factionDemandes || []).filter((d) => p && d.player_id === p.id && (d.statut === "acceptee" || d.statut === "refusee"))
+    .forEach((d) => add(`fdem:${d.id}:${d.statut}`, d.statut === "acceptee" ? "✅" : "❌", `Ta demande de faction « ${d.name} » a été ${d.statut === "acceptee" ? "acceptée" : "refusée"}${d.reponse ? " : " + d.reponse : ""}.`, "#communaute/factions"));
+  (D.projetDemandes || []).filter((d) => p && d.faction_id === p.faction_id && (d.statut === "acceptee" || d.statut === "refusee"))
+    .forEach((d) => add(`pdem:${d.id}:${d.statut}`, d.statut === "acceptee" ? "✅" : "❌", `Projet « ${(projet(d.projet_id) || {}).nom || "?"} » ${d.statut === "acceptee" ? "validé" : "refusé"}${d.reponse ? " : " + d.reponse : ""}.`, "#communaute/projets"));
+  // Staff : ce qui attend une action
+  if (isStaff()) {
+    const fd = (D.factionDemandes || []).filter((d) => d.statut === "attente").length, pd = (D.projetDemandes || []).filter((d) => d.statut === "attente").length;
+    if (fd) add("st-fd:" + fd, "🛡️", `${plural(fd, "demande", "demandes")} de nouvelle faction à traiter.`, "#espace/staff", "staff");
+    if (pd) add("st-pd:" + pd, "🛡️", `${plural(pd, "projet", "projets")} à valider.`, "#espace/staff", "staff");
+    const wl = D.wlSynced ? D.players.filter((x) => !x.whitelisted && ficheOk(x)).length : 0;
+    if (wl) add("st-wl:" + wl, "🛡️", `${plural(wl, "joueur", "joueurs")} à whitelister.`, "#espace/staff", "staff");
+    const tl = D.players.filter((x) => x.taille_cm && !x.taille_fixe && (x.taille_appliquee == null || Math.abs(x.taille_appliquee - scaleOf(x.taille_cm)) >= 0.0005)).length;
+    if (tl) add("st-tl:" + tl, "🛡️", `${plural(tl, "taille RP", "tailles RP")} à appliquer en jeu.`, "#espace/staff", "staff");
+  }
+  return out;
+}
+function bellHtml() {
+  const list = notifs(), seen = seenGet(), n = list.filter((x) => !seen.has(x.key)).length;
+  return `<div class="bell-wrap"><button type="button" class="bell" id="bellBtn" aria-expanded="${bellOpen}" aria-controls="bellPanel"
+      aria-label="Notifications${n ? ` (${n} nouvelle${n > 1 ? "s" : ""})` : ""}" title="Notifications">${BELL_SVG}${n ? `<span class="bell-n">${n > 9 ? "9+" : n}</span>` : ""}</button>
+    <div class="bell-panel" id="bellPanel"${bellOpen ? "" : " hidden"} role="dialog" aria-label="Notifications"><b class="bell-h">Notifications</b>
+      ${list.length ? list.map((x) => `<a class="ntf${x.level ? " " + x.level : ""}${seen.has(x.key) ? "" : " new"}" href="${x.href}"><span class="ntf-i" aria-hidden="true">${x.icon}</span><span>${esc(x.text)}</span></a>`).join("")
+        : '<p class="muted small">Rien de neuf pour l\'instant.</p>'}</div></div>`;
+}
+function bindBell() {
+  const b = $("bellBtn"), pnl = $("bellPanel");
+  if (!b) return;
+  // Panneau placé sous la cloche, toujours dans l'écran (téléphone compris)
+  const place = () => { const r = b.getBoundingClientRect(), w = Math.min(360, innerWidth - 32);
+    pnl.style.top = Math.round(r.bottom + 8) + "px"; pnl.style.left = Math.round(Math.max(16, Math.min(r.right - w, innerWidth - 16 - w))) + "px"; pnl.style.width = w + "px"; };
+  if (bellOpen) place();
+  b.onclick = (e) => { e.stopPropagation(); bellOpen = !bellOpen; if (bellOpen) place(); pnl.hidden = !bellOpen; b.setAttribute("aria-expanded", bellOpen);
+    if (bellOpen) { const seen = seenGet(); notifs().forEach((x) => seen.add(x.key)); seenSet(seen); const c = b.querySelector(".bell-n"); if (c) c.remove(); } };
+  pnl.onclick = (e) => { if (e.target.closest("a")) { bellOpen = false; pnl.hidden = true; } e.stopPropagation(); };
+}
+document.addEventListener("click", () => { if (bellOpen) { bellOpen = false; const pnl = $("bellPanel"); if (pnl) pnl.hidden = true; const b = $("bellBtn"); if (b) b.setAttribute("aria-expanded", "false"); } });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && bellOpen) { bellOpen = false; renderAcct(); } });
+// Relecture discrète toutes les 2 min (onglet visible) : la cloche suit sans recharger la page affichée
+setInterval(async () => {
+  if (!LIVE || !ME || busy || document.hidden || !D) return;
+  try {
+    const [d, eco] = await Promise.all([call("GET", "/api/data"), fetch("eco.json?t=" + Date.now()).then((r) => (r.ok ? r.json() : null)).catch(() => null)]);
+    if (busy) return;
+    const L = d; L.choix = D.choix && area === "communaute" && sub === "usines" ? D.choix : L.choix;
+    D = L; if (eco) ECO = eco; lastLoad = Date.now(); renderAcct();
+  } catch (e) {}
+}, 120000);
 
 /* ---------- squelette ---------- */
 function render() {
@@ -368,10 +480,66 @@ function factions() {
   view(head("Factions", "De 3 à 8 joueurs par faction. Les coordonnées ne sont visibles que par les membres de la faction et le staff.") +
     `${isStaff() ? '<form class="bar inline" id="addFac"><input name="name" required maxlength="40" placeholder="Nom de la faction" aria-label="Nom de la nouvelle faction"><button class="btn small">Créer une faction</button></form>' : ""}
     ${loginHint("Pour modifier ta faction ou ajouter ses coordonnées,")}
-    <div class="fac-grid">${list.map(facCard).join("") || '<p class="empty">Aucune faction.</p>'}</div>`);
+    <div class="fac-grid">${list.map(facCard).join("") || '<p class="empty">Aucune faction.</p>'}</div>
+    ${newFacCard()}`);
+  bindNewFac();
   bindMap();
   if (isStaff()) $("addFac").onsubmit = (e) => { e.preventDefault(); act(() => call("POST", "/api/factions", { name: e.target.name.value.trim() }), "Faction créée"); };
   bindFac();
+}
+/* ---------- Nouvelle faction : demande d'un joueur, validée par le staff ---------- */
+const colTag = (c, name) => `<span class="ftag" style="--fc:${(MC_COL[c] || MC_COL.white)[1]}">${esc(name)}</span>`;
+function facDemItem(d) {
+  const mine = me() && me().id === d.player_id;
+  return `<li class="dem"><div>${colTag(d.couleur, d.name)} <span class="muted small">proposée par ${plink(d.auteur)} · ${new Date(d.ts * 1000).toLocaleDateString("fr-FR")}</span></div>
+    <div class="small">${d.membres.map(plink).join(", ")} <span class="muted">(${d.membres.length} joueurs)</span></div>
+    ${d.theme ? `<p class="small">${esc(d.theme)}</p>` : ""}
+    <div class="actions">${isStaff() ? `<button class="btn small" data-fd-ok="${d.id}">Accepter</button><button class="btn small ghost danger" data-fd-no="${d.id}">Refuser</button>` : ""}
+      ${mine ? `<button class="btn small ghost" data-fd-cancel="${d.id}">Annuler ma demande</button>` : ""}</div></li>`;
+}
+function newFacCard() {
+  const open = D.settings.factions_ouvertes === "1", p = me();
+  const pend = (D.factionDemandes || []).filter((d) => d.statut === "attente");
+  const myPend = p && pend.find((d) => d.player_id === p.id);
+  const mineDone = p && (D.factionDemandes || []).filter((d) => d.player_id === p.id && (d.statut === "refusee" || d.statut === "acceptee"));
+  return `<section class="card" id="newFac"><h3>Créer une nouvelle faction</h3>
+    ${!open && !isStaff() ? '<p class="muted">La création de nouvelles factions est fermée pour le moment : les factions actuelles ne sont pas encore toutes complètes. Tu peux rejoindre une faction existante (contact « Recrutement » sur sa fiche).</p>'
+      : !ME ? loginHint("Pour proposer une faction,") : !p ? '<p class="muted">Relie d\'abord ton pseudo Minecraft dans Mon espace.</p>'
+      : myPend ? '<p>Ta demande est en attente de validation par le staff.</p>'
+      : `<p class="small muted">De 3 à 8 joueurs (toi compris), chacun avec une fiche sur le site. Le staff valide la demande et crée la faction en jeu.</p>
+        <form id="newFacForm" class="form compact">
+          <label>Nom<input name="name" required minlength="2" maxlength="40" placeholder="Nom de la faction"></label>
+          <label>Couleur en jeu<select name="couleur">${Object.entries(MC_COL).map(([k, [l]]) => `<option value="${k}"${k === "white" ? " selected" : ""}>${l}</option>`).join("")}</select></label>
+          <label class="wide">Thème, projet<textarea name="theme" rows="2" maxlength="2000" placeholder="Ce que la faction veut construire"></textarea></label>
+          <fieldset class="wide pick"><legend>Membres <span class="muted small" id="nfCount">1 / 8</span></legend>
+            <input type="search" id="nfQ" placeholder="Chercher un joueur" aria-label="Chercher un joueur">
+            <div class="pick-list">${[...D.players].sort((a, b) => (!!a.faction_id - !!b.faction_id) || a.mc_name.localeCompare(b.mc_name)).map((x) =>
+              `<label class="chk" data-n="${esc(norm(x.mc_name))}"><input type="checkbox" name="m" value="${esc(x.mc_name)}"${x.id === p.id ? " checked disabled" : ""}> ${esc(x.mc_name)}${x.faction_id ? ` <small class="muted">${esc(facName(x.faction_id))}</small>` : ""}</label>`).join("")}</div>
+          </fieldset>
+          <div class="wide actions"><button class="btn small">Envoyer la demande</button></div></form>`}
+    ${mineDone && mineDone.length ? mineDone.map((d) => `<p class="small">${d.statut === "acceptee" ? "✅" : "❌"} Ta demande « ${esc(d.name)} » a été ${d.statut === "acceptee" ? "acceptée" : "refusée"}${d.reponse ? ` : ${esc(d.reponse)}` : ""}.</p>`).join("") : ""}
+    ${pend.length ? `<h4>Demandes en attente</h4><ul class="dem-list">${pend.map(facDemItem).join("")}</ul>` : ""}</section>`;
+}
+function bindNewFac() {
+  const f = $("newFacForm");
+  if (f) {
+    const count = () => ($("nfCount").textContent = `${f.querySelectorAll('input[name="m"]:checked').length} / 8`);
+    f.addEventListener("change", count);
+    $("nfQ").oninput = (e) => { const q = norm(e.target.value); f.querySelectorAll(".pick-list label").forEach((l) => (l.hidden = q && !l.dataset.n.includes(q))); };
+    f.onsubmit = (e) => { e.preventDefault();
+      const membres = [...f.querySelectorAll('input[name="m"]:checked')].map((x) => x.value);
+      act(() => call("POST", "/api/factions/demandes", { name: f.name.value.trim(), couleur: f.couleur.value, theme: f.theme.value, membres }), "Demande envoyée au staff"); };
+  }
+  bindFacDem();
+}
+function bindFacDem() {
+  document.querySelectorAll("[data-fd-ok]").forEach((b) => (b.onclick = () => { const d = D.factionDemandes.find((x) => x.id === +b.dataset.fdOk);
+    confirm(`Créer la faction « ${d.name} » avec ${d.membres.join(", ")} ? Ils seront placés dans cette faction sur le site. Pense ensuite aux commandes en jeu (Outils staff).`)
+      && act(() => call("PUT", `/api/factions/demandes/${d.id}`, { action: "accepter" }), "Faction créée"); }));
+  document.querySelectorAll("[data-fd-no]").forEach((b) => (b.onclick = () => { const why = prompt("Raison du refus (visible par le joueur, facultatif) :");
+    if (why !== null) act(() => call("PUT", `/api/factions/demandes/${b.dataset.fdNo}`, { action: "refuser", reponse: why }), "Demande refusée"); }));
+  document.querySelectorAll("[data-fd-cancel]").forEach((b) => (b.onclick = () => confirm("Annuler ta demande ?")
+    && act(() => call("PUT", `/api/factions/demandes/${b.dataset.fdCancel}`, { action: "annuler" }), "Demande annulée")));
 }
 function bindFac() {
   document.querySelectorAll("[data-fac-edit]").forEach((b) => (b.onclick = () => facEdit(+b.dataset.facEdit)));
@@ -404,7 +572,9 @@ function facCard(f) {
     <p class="members">${ms.map((p) => { const r = ef && (ef.membres.find((m) => norm(m.nom) === norm(p.mc_name)) || {}).role;
       return `<span>${plink(p.mc_name)}${ROLE_MOD[r] ? ` <small class="muted">${ROLE_MOD[r]}</small>` : ""}</span>`; }).join("") || '<span class="muted">Aucun membre</span>'}</p>
     ${ef ? `<p class="fac-bank"><b>${suE(ef.banque)}</b> <span class="muted small">en banque</span></p>` : ""}
-    <dl>${row("Thème", f.theme)}${row("Hub et usines prévues", f.hub)}${row("Autres projets", f.autres_projets)}${row("Recrutement", f.recrutement)}
+    <dl>${row("Thème", f.theme)}${row("Hub et usines prévues", f.hub)}${row("Autres projets", f.autres_projets)}
+      ${f.recrutement ? (() => { const c = ms.find((p) => norm(p.mc_name) === norm(f.recrutement));
+        return `<dt>Recrutement</dt><dd>${c ? `Contacter ${plink(c.mc_name)}` : esc(f.recrutement)}</dd>`; })() : ""}
       ${f.tirage ? `<dt>Tirage des usines</dt><dd>${f.tirage}ᵉ</dd>` : ""}
       ${ch.length ? `<dt>Usines</dt><dd>${ch.map(usineChip).join(" ")}</dd>` : ""}
       <dt>Projets communautaires validés</dt><dd>${pr.length ? pr.map((r) => `<a class="chip" href="#communaute/projets">${esc((projet(r.projet_id) || {}).nom || "?")}</a>`).join(" ") : '<span class="muted">Aucun pour l\'instant</span>'}</dd></dl>
@@ -415,18 +585,23 @@ function facCard(f) {
       ${canEditFac(f.id) ? `<form class="inline coords" data-base-add="${f.id}"><select name="type" aria-label="Type"><option value="base">Base</option><option value="hub">Hub</option><option value="usine">Usine</option></select>
         <input name="nom" placeholder="Nom" maxlength="80" aria-label="Nom"><input name="x" type="number" placeholder="X" required aria-label="X"><input name="y" type="number" placeholder="Y" aria-label="Y"><input name="z" type="number" placeholder="Z" required aria-label="Z">
         <button class="btn small">Ajouter</button></form>` : ""}</details>` : ""}
-    ${canEditFac(f.id) ? `<div class="actions"><button class="btn small ghost" data-fac-edit="${f.id}">Modifier</button>${isStaff() ? `<button class="btn small danger" data-fac-del="${f.id}">Supprimer</button>` : ""}</div>` : ""}
+    ${canManageFac(f.id) ? `<div class="actions"><button class="btn small ghost" data-fac-edit="${f.id}">Modifier</button>${isStaff() ? `<button class="btn small danger" data-fac-del="${f.id}">Supprimer</button>` : ""}</div>`
+      : mine ? '<p class="muted small">Seul le chef de la faction (rôle en jeu) peut modifier cette fiche.</p>' : ""}
   </article>`;
 }
 function facEdit(fid) {
   const f = fac(fid);
   const card = $("fac-" + fid);
   card.innerHTML = `<form class="form compact"><h3>${esc(f.name)}</h3>
-    ${isStaff() ? `<label>Nom<input name="name" value="${esc(f.name)}" maxlength="40"></label><label>Ordre au tirage<input name="tirage" type="number" min="1" value="${f.tirage ?? ""}"></label>` : ""}
+    <label>Nom<input name="name" value="${esc(f.name)}" maxlength="40" required></label>
     <label class="wide">Thème<textarea name="theme" rows="2">${esc(f.theme)}</textarea></label>
     <label class="wide">Hub et usines prévues<textarea name="hub" rows="2">${esc(f.hub)}</textarea></label>
     <label class="wide">Autres projets<textarea name="autres_projets" rows="2">${esc(f.autres_projets)}</textarea></label>
-    <label class="wide">Recrutement (contact)<input name="recrutement" value="${esc(f.recrutement)}"></label>
+    ${(() => { const ms = members(fid), cur = f.recrutement || "", inList = ms.some((p) => p.mc_name === cur);
+      return `<label>Contact recrutement<select name="recrutement"><option value="">— personne —</option>
+        ${cur && !inList ? `<option value="${esc(cur)}" selected>Texte actuel : ${esc(cur.slice(0, 40))}</option>` : ""}
+        ${ms.map((p) => `<option${p.mc_name === cur ? " selected" : ""}>${esc(p.mc_name)}</option>`).join("")}</select></label>`; })()}
+    <p class="muted small wide">L'ordre au tirage des usines est donné par le tirage au sort (le staff peut le corriger dans Communauté › Usines).</p>
     <div class="wide actions"><button class="btn small">Enregistrer</button><button type="button" class="btn small ghost" id="facCancel">Annuler</button></div></form>`;
   card.querySelector("form").onsubmit = (e) => { e.preventDefault(); act(() => call("PUT", `/api/factions/${fid}`, formData(e.target)), "Faction enregistrée"); };
   $("facCancel").onclick = () => render();
@@ -442,11 +617,12 @@ function projets() {
     <div class="card steps">
       <ol>
         <li><b>Réalise le projet</b> avec ta faction.</li>
-        <li><b>Ouvre un ticket sur Discord</b> (DraftBot) en indiquant le projet réalisé et l'usine souhaitée.</li>
+        <li><b>Demande la validation</b> avec le bouton « Demander la validation » ci-dessous (ou ouvre un ticket sur Discord avec DraftBot, comme avant) : dis ce qui a été fait, où, et l'usine souhaitée.</li>
         <li><b>Le staff valide</b> : le projet et l'usine apparaissent ici et sur la fiche de ta faction.</li>
       </ol>
       <p class="small muted">Règles : un projet <b>unique</b> ne peut être fait que par une seule faction sur tout le serveur. Les autres : une fois par faction. L'organisation d'un évènement n'a pas de limite.</p>
     </div>
+    ${projDemCard()}
     ${isStaff() ? projetStaffForm() : ""}
     <div class="tbl-wrap tips"><table class="tbl left projets"><thead><tr><th>Projet</th><th>Usine débloquée</th><th>Règle</th><th>Réalisé par</th>${myF ? "<th>Pour ma faction</th>" : ""}</tr></thead><tbody>
     ${P.map((pr) => {
@@ -454,7 +630,10 @@ function projets() {
       return `<tr><td>${projetNom(pr)}</td><td>${esc(taillesTxt(pr.tailles))}</td><td>${reglesProjet(pr)}</td>
         <td>${done.map((r) => `<a href="#communaute/faction/${r.faction_id}" class="chip${r.faction_id === myF ? " ok" : ""}" title="${esc(r.note || "")}">${esc(facName(r.faction_id))}${r.usine_id ? ` → ${esc((usine(r.usine_id) || {}).nom || "")}` : ""}</a>`).join(" ") || '<span class="muted">—</span>'}
           ${isStaff() ? done.map((r) => `<button class="x" data-pf-del="${r.id}" title="Retirer ce projet de ${esc(facName(r.faction_id))}" aria-label="Retirer">✕</button>`).join("") : ""}</td>
-        ${myF ? `<td>${c === true ? '<span class="chip ok">Disponible</span>' : pr.unique_srv ? '<span class="chip muted">Déjà pris</span>' : '<span class="chip muted">Déjà fait</span>'}</td>` : ""}</tr>`;
+        ${myF ? `<td>${c === true ? (() => { const pd = (D.projetDemandes || []).find((d) => d.projet_id === pr.id && d.faction_id === myF && d.statut === "attente");
+          return pd ? `<span class="chip warn">Demande envoyée</span> <button class="x" data-pd-cancel="${pd.id}" title="Annuler la demande" aria-label="Annuler la demande">✕</button>`
+            : `<span class="chip ok">Disponible</span>${canWrite() ? ` <button class="btn small ghost" data-pd-ask="${pr.id}">Demander la validation</button>` : ""}`; })()
+          : pr.unique_srv ? '<span class="chip muted">Déjà pris</span>' : '<span class="chip muted">Déjà fait</span>'}</td>` : ""}</tr>`;
     }).join("") || '<tr><td colspan="5" class="empty">Aucun projet.</td></tr>'}</tbody></table></div>
     ${isStaff() ? projetListEditor() : ""}`);
   bindProjets();
@@ -464,6 +643,39 @@ function projetNom(pr) {
   return `<span class="ptip" tabindex="0"><b>${esc(pr.nom)}</b><span class="ptip-i" aria-hidden="true">?</span>
     <span class="ptip-box" role="tooltip"><b>${esc(pr.nom)}</b>${esc(pr.description)}
       <span class="ptip-meta">Débloque une usine ${esc(taillesTxt(pr.tailles))} · ${pr.unique_srv ? "unique sur le serveur" : pr.illimite ? "sans limite" : "1 fois par faction"}</span></span></span>`;
+}
+// Demandes de validation : en attente (staff : toutes ; joueur : celles de sa faction) et réponses récentes
+function projDemCard() {
+  const L = D.projetDemandes || [], pend = L.filter((d) => d.statut === "attente"), done = L.filter((d) => d.statut === "acceptee" || d.statut === "refusee");
+  if (!pend.length && !done.length) return "";
+  return `<section class="card" id="projDem"><h3>${isStaff() ? "Demandes de validation" : "Demandes de ta faction"}</h3>
+    ${pend.length ? `<ul class="dem-list">${pend.map(projDemItem).join("")}</ul>` : '<p class="muted small">Aucune demande en attente.</p>'}
+    ${done.length ? `<details><summary>Réponses récentes (${done.length})</summary><ul class="dem-list">${done.map((d) => `<li class="dem small">${d.statut === "acceptee" ? "✅" : "❌"} <b>${esc((projet(d.projet_id) || {}).nom || "?")}</b> · ${esc(facName(d.faction_id))}${d.reponse ? ` : ${esc(d.reponse)}` : ""}</li>`).join("")}</ul></details>` : ""}</section>`;
+}
+function projDemItem(d) {
+  const pr = projet(d.projet_id) || { nom: "?", tailles: "" }, ok = pr.tailles.split(",");
+  return `<li class="dem" data-pd="${d.id}"><div><b>${esc(pr.nom)}</b> · <a href="#communaute/faction/${d.faction_id}">${esc(facName(d.faction_id))}</a>
+      <span class="muted small">demandé par ${plink(d.auteur)} · ${new Date(d.ts * 1000).toLocaleDateString("fr-FR")}</span></div>
+    <p class="small">${esc(d.note)}</p>
+    ${isStaff() ? `<div class="actions inline"><select data-pd-usine aria-label="Usine débloquée"><option value="">Aucune usine pour l'instant</option>${D.usines.filter((u) => ok.includes(u.taille)
+        && !D.choix.some((c) => c.faction_id === d.faction_id && c.usine_id === u.id)).map((u) => { const n = D.choix.filter((c) => c.usine_id === u.id).length;
+          return `<option value="${u.id}">${esc(u.nom)} (${u.taille}, ${n}/${TAILLE_USINE[u.taille][1]})</option>`; }).join("")}</select>
+      <button class="btn small" data-pd-ok="${d.id}">Valider</button><button class="btn small ghost danger" data-pd-no="${d.id}">Refuser</button></div>`
+      : `<button class="btn small ghost" data-pd-cancel="${d.id}">Annuler</button>`}</li>`;
+}
+function bindProjDem() {
+  document.querySelectorAll("[data-pd-ask]").forEach((b) => (b.onclick = () => {
+    const pr = projet(+b.dataset.pdAsk), note = prompt(`Demander la validation de « ${pr.nom} »\nDécris ce qui a été fait, où (coordonnées) et l'usine souhaitée :`);
+    if (note !== null) act(() => call("POST", "/api/projets/demandes", { projet_id: pr.id, note }), "Demande envoyée au staff");
+  }));
+  document.querySelectorAll("[data-pd-cancel]").forEach((b) => (b.onclick = () => confirm("Annuler cette demande ?")
+    && act(() => call("PUT", `/api/projets/demandes/${b.dataset.pdCancel}`, { action: "annuler" }), "Demande annulée")));
+  document.querySelectorAll("[data-pd-ok]").forEach((b) => (b.onclick = () => {
+    const li = b.closest("[data-pd]"), u = li.querySelector("[data-pd-usine]").value;
+    act(() => call("PUT", `/api/projets/demandes/${b.dataset.pdOk}`, { action: "accepter", usine_id: u ? +u : null }), "Projet validé");
+  }));
+  document.querySelectorAll("[data-pd-no]").forEach((b) => (b.onclick = () => { const why = prompt("Raison du refus (visible par la faction, facultatif) :");
+    if (why !== null) act(() => call("PUT", `/api/projets/demandes/${b.dataset.pdNo}`, { action: "refuser", reponse: why }), "Demande refusée"); }));
 }
 function projetStaffForm() {
   return `<form id="pfForm" class="card form compact"><h3>Valider un projet (après le ticket)</h3>
@@ -484,6 +696,7 @@ function projetListEditor() {
     <form class="actions inline" id="prAdd"><input name="nom" required maxlength="80" placeholder="Nom du nouveau projet" aria-label="Nom du nouveau projet"><button class="btn small ghost">Ajouter un projet</button></form></details>`;
 }
 function bindProjets() {
+  bindProjDem();
   document.querySelectorAll("[data-pf-del]").forEach((b) => (b.onclick = () => confirm("Retirer ce projet à la faction ? L'usine qu'il a débloquée sera retirée aussi.")
     && act(() => call("DELETE", `/api/projets/realises/${b.dataset.pfDel}`), "Projet retiré")));
   const f = $("pfForm");
@@ -528,7 +741,8 @@ function shopRows(list, withOwner) {
     const ench = b.details && b.details.enchantements ? b.details.enchantements.map((e) => esc((e.nom || String(e.id).replace(/^minecraft:/, "")) + (e.niveau > 1 ? " " + e.niveau : ""))).join(", ") : "";
     const owner = b.proprietaireType === "faction" ? (ecoToFac(b.faction) ? flink(ecoToFac(b.faction)) : esc(b.proprietaire)) : plink(b.proprietaire);
     return `<tr><td><span class="shop-name">${b.type === "service" ? "🎫" : icoE(first)}<span><b>${esc(name)}</b>${!lot && b.quantite > 1 ? ` <span class="muted small">× ${fmt(b.quantite)}</span>` : ""}${ench ? `<small class="muted"> · ${ench}</small>` : ""}</span></span></td><td>${suE(b.prix)}</td>
-      <td>${b.type === "service" ? '<span class="chip ok">illimité</span>' : b.rupture ? '<span class="chip warn">Rupture</span>' : b.stock != null ? fmt(b.stock) : ""}</td>${withOwner ? `<td>${owner}</td>` : ""}<td>${mapBtn(b)}</td></tr>`;
+      <td>${b.type === "service" ? '<span class="chip ok">illimité</span>' : b.rupture ? '<span class="chip warn">Rupture</span>'
+        : b.stock != null ? `${fmt(b.stock)}${stockPct(b) != null ? ` <small class="muted">(${stockPct(b)} %)</small>` : ""}${lowStock(b) ? ' <span class="chip warn">faible</span>' : ""}` : ""}</td>${withOwner ? `<td>${owner}</td>` : ""}<td>${mapBtn(b)}</td></tr>`;
   }).join("")}</tbody></table></div>`;
 }
 function bindMap() {
@@ -645,7 +859,10 @@ function usines() {
     ${isStaff() ? `<div class="card staff-tirage"><h3>Ordre du tirage (staff)</h3>
       <p class="muted small">À faire une seule fois en début de saison : l'ordre est tiré au hasard parmi les factions existantes. Pour corriger un rang à la main : « Modifier » sur la fiche de la faction.</p>
       <div class="actions"><button class="btn small" id="tirageGo">Tirer l'ordre au sort</button>
-        <label class="chk"><input type="checkbox" id="tirageForce"> refaire le tirage (remplace l'ordre actuel)</label></div></div>` : ""}
+        <label class="chk"><input type="checkbox" id="tirageForce"> refaire le tirage (remplace l'ordre actuel)</label></div>
+      <details><summary>Corriger l'ordre à la main</summary><ol class="order-list">${T.order.map((f, i) => `<li>${flink(f)}
+        <button class="x" data-ord="${i}" data-dir="-1"${i === 0 ? " disabled" : ""} aria-label="Monter ${esc(f.name)}">↑</button>
+        <button class="x" data-ord="${i}" data-dir="1"${i === T.order.length - 1 ? " disabled" : ""} aria-label="Descendre ${esc(f.name)}">↓</button></li>`).join("")}</ol></details></div>` : ""}
     <details class="all-usines"${open || isStaff() ? " open" : ""}><summary>Toutes les usines et places restantes</summary>
     ${Object.entries(TAILLE_USINE).map(([t, [label]]) => `<h3 class="sec">${label} <small>${MAX[t]} max par usine sur le serveur</small></h3>
       <div class="usines">${D.usines.filter((u) => u.taille === t).map((u) => {
@@ -668,6 +885,11 @@ function usines() {
     const msg = on ? (isStaff() && fid !== realFid ? `Valider le tour de ${f.name} et passer la main à la faction suivante ?` : "Valider les choix de ta faction ? Tu ne pourras plus les changer, la main passe à la faction suivante.")
       : `Rendre la main à ${f.name} ? Elle pourra de nouveau choisir.`;
     if (confirm(msg)) act(() => call("POST", `/api/factions/${fid}/usines/fini`, { tour, on }), on ? "Choix validés" : "Main rendue");
+  }));
+  document.querySelectorAll("[data-ord]").forEach((b) => (b.onclick = () => {
+    const ids = T.order.map((f) => f.id), i = +b.dataset.ord, j = i + +b.dataset.dir;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    act(() => call("POST", "/api/admin/tirage", { order: ids }), "Ordre mis à jour");
   }));
   const tg = $("tirageGo");
   if (tg) tg.onclick = () => confirm($("tirageForce").checked ? "Refaire le tirage ? L'ordre actuel sera remplacé." : "Tirer au sort l'ordre des factions ?")
@@ -705,13 +927,13 @@ function startLive() {
 }
 function tirageTable(myFid, T) {
   const fs = [...D.factions].sort((a, b) => (a.tirage ?? 999) - (b.tirage ?? 999) || a.name.localeCompare(b.name));
-  const state = (f) => !T ? "" : T.done.has(f.id) ? `<td><span class="chip ok">✓ validé</span>${isStaff() ? ` <button class="x" data-fini="${f.id}" data-on="0" title="Rendre la main à ${esc(f.name)}" aria-label="Rendre la main">↺</button>` : ""}</td>`
-    : T.cur && T.cur.id === f.id ? '<td><span class="chip warn">▶ choisit</span></td>' : '<td><span class="muted small">en attente</span></td>';
+  const state = (f) => !T ? "" : T.done.has(f.id) ? `<td class="st"><span class="chip ok">✓ validé</span>${isStaff() ? ` <button class="x" data-fini="${f.id}" data-on="0" title="Rendre la main à ${esc(f.name)}" aria-label="Rendre la main">↺</button>` : ""}</td>`
+    : T.cur && T.cur.id === f.id ? '<td class="st"><span class="chip warn">▶ choisit</span></td>' : '<td class="st"><span class="muted small">en attente</span></td>';
   const cell = (fid, t) => D.choix.filter((c) => c.faction_id === fid && (usine(c.usine_id) || {}).taille === t).map(usineChip).join(" ") || '<span class="muted">—</span>';
   return `<div class="card"><h3>Résultats du tirage</h3>
     <div class="tbl-wrap"><table class="tbl left tirage"><thead><tr><th>Ordre</th><th>Faction</th>${T ? "<th>Tour en cours</th>" : ""}<th>Grosse</th><th>Moyenne</th><th>Petite</th></tr></thead><tbody>
     ${fs.map((f) => `<tr class="${f.id === myFid ? "mine" : ""}${T && T.cur && T.cur.id === f.id ? " turn" : ""}"><td>${f.tirage ? f.tirage + "ᵉ" : "–"}</td><td><b>${flink(f)}</b></td>${state(f)}
-      <td>${cell(f.id, "grosse")}</td><td>${cell(f.id, "moyenne")}</td><td>${cell(f.id, "petite")}</td></tr>`).join("")}</tbody></table></div></div>`;
+      <td data-l="Grosse">${cell(f.id, "grosse")}</td><td data-l="Moyenne">${cell(f.id, "moyenne")}</td><td data-l="Petite">${cell(f.id, "petite")}</td></tr>`).join("")}</tbody></table></div></div>`;
 }
 
 /* ---------- Élections ---------- */
@@ -838,9 +1060,20 @@ function staff() {
   const fixes = D.players.filter((p) => p.taille_fixe);
   const todo = tailles.filter(({ p, sc }) => p.taille_appliquee == null || Math.abs(p.taille_appliquee - sc) >= 0.0005);
   const aWl = D.wlSynced ? D.players.filter((p) => !p.whitelisted).sort((a, b) => ficheOk(b) - ficheOk(a) || a.mc_name.localeCompare(b.mc_name)) : [];
-  const nav = [["st-wl", `À whitelister (${aWl.filter(ficheOk).length})`], ["st-taille", `Tailles RP (${todo.length})`], ["st-bordure", "Bordure"], ["st-hist", "Historique d'un joueur"], ["st-reglages", "Réglages"], ["st-import", "Import"], ["st-histo", "Historique"]];
+  const fDem = (D.factionDemandes || []).filter((d) => d.statut === "attente"), pDem = (D.projetDemandes || []).filter((d) => d.statut === "attente");
+  const absentes = D.factions.filter((f) => ECO && !ecoFac(f));
+  const nav = [["st-dem", `Demandes (${fDem.length + pDem.length})`], ["st-wl", `À whitelister (${aWl.filter(ficheOk).length})`], ["st-taille", `Tailles RP (${todo.length})`], ["st-bordure", "Bordure"], ["st-hist", "Historique d'un joueur"], ["st-reglages", "Réglages"], ["st-import", "Import"], ["st-histo", "Historique"]];
   view(head("Outils staff", "Whitelist, tailles RP, bordure, réglages et historique de toutes les modifications.") +
     `<nav class="anchors">${nav.map(([id, l]) => `<a href="#" data-jump="${id}">${l}</a>`).join("")}</nav>
+    <section class="card" id="st-dem"><h3>Demandes des joueurs</h3>
+      <h4>Nouvelles factions</h4>${fDem.length ? `<ul class="dem-list">${fDem.map(facDemItem).join("")}</ul>` : '<p class="muted small">Aucune demande.</p>'}
+      <h4>Projets communautaires</h4>${pDem.length ? `<ul class="dem-list">${pDem.map(projDemItem).join("")}</ul>` : '<p class="muted small">Aucune demande.</p>'}
+      ${absentes.length ? `<h4>Factions du site absentes du serveur</h4>
+        <p class="muted small">Pas encore créées dans le mod (aucune faction en jeu ne correspond). Lance ces commandes en jeu, dans l'ordre : le premier joueur ajouté devient chef.</p>
+        ${absentes.map((f) => { const d = (D.factionDemandes || []).find((x) => x.faction_id === f.id), names = d ? d.membres : members(f.id).map((p) => p.mc_name);
+          return `<details class="cmds-box"><summary>${colTag(d ? d.couleur : "white", f.name)} <span class="muted small">${names.length} joueurs${d ? "" : " · couleur à choisir (white par défaut)"}</span></summary>
+            <ul class="cmd-list">${facCmds(f.name, d ? d.couleur : "white", names).map((c) => `<li>${copyBtn(c)}</li>`).join("")}</ul></details>`; }).join("")}` : ""}
+    </section>
     <section class="card" id="st-wl"><h3>À whitelister</h3>
       ${D.wlSynced ? `<p class="muted small">Joueurs avec une fiche mais absents de la whitelist. Vérifie la candidature, lance la commande en jeu : ils disparaissent d'ici la prochaine synchronisation (10 min).</p>
       ${D.wlFree && D.wlFree.length ? `<p class="muted small">Si une fiche porte un pseudo Discord ou une faute de frappe alors que le joueur est déjà whitelisté, choisis son vrai pseudo dans « Pseudo du serveur » et renomme la fiche (${plural(D.wlFree.length, "pseudo whitelisté", "pseudos whitelistés")} sans fiche).</p>` : ""}
@@ -871,6 +1104,7 @@ function staff() {
     <section class="card form" id="st-reglages"><h3>Réglages</h3>
       <label>Élection<select id="setElection">${opt(ELECTION, s.election)}</select></label>
       <label>Choix d'usines<select id="setUsOpen"><option value="1"${s.usines_ouvertes === "1" ? " selected" : ""}>Ouverts</option><option value="0"${s.usines_ouvertes !== "1" ? " selected" : ""}>Fermés</option></select></label>
+      <label>Création de factions par les joueurs<select id="setFacOpen"><option value="0"${s.factions_ouvertes !== "1" ? " selected" : ""}>Fermée</option><option value="1"${s.factions_ouvertes === "1" ? " selected" : ""}>Ouverte</option></select></label>
       <label>Tour de choix d'usines<select id="setUsTour">${Object.entries(D.usineTours || {}).map(([k, r]) => `<option value="${k}"${String(s.usine_tour || "1") === k ? " selected" : ""}>${esc(r.nom)} : ${esc(r.combos.map(comboTxt).join(" / "))}</option>`).join("")}</select></label>
       <div class="wide actions"><button class="btn small" id="saveSettings">Enregistrer les réglages</button></div></section>
     <section class="card" id="st-import"><h3>Importer le Google Sheet</h3>
@@ -880,7 +1114,8 @@ function staff() {
       <div id="auditList" class="audit-scroll"><p class="empty">Chargement…</p></div><button class="btn small ghost" id="auditMore" hidden>Plus ancien</button></section>`);
   document.querySelectorAll("[data-jump]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); $(a.dataset.jump).scrollIntoView({ behavior: "smooth", block: "start" }); }));
   $("saveSettings").onclick = () => act(() => call("PUT", "/api/admin/settings",
-    { election: $("setElection").value, usines_ouvertes: $("setUsOpen").value, usine_tour: $("setUsTour").value }), "Réglages enregistrés");
+    { election: $("setElection").value, usines_ouvertes: $("setUsOpen").value, usine_tour: $("setUsTour").value, factions_ouvertes: $("setFacOpen").value }), "Réglages enregistrés");
+  bindFacDem(); bindProjDem();
   document.querySelectorAll("[data-ren-go]").forEach((b) => (b.onclick = () => {
     const sel = document.querySelector(`select[data-ren="${b.dataset.renGo}"]`), p = D.players.find((x) => x.id === +b.dataset.renGo);
     if (!sel.value) return toast("Choisis d'abord le pseudo du serveur.", true);

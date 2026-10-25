@@ -109,7 +109,7 @@ def build(sftp, read, j, log, out_path):
                           "proprietaire": s.get("proprietaire"), "faction": f, "monde": s.get("monde"),
                           "x": s.get("x"), "y": s.get("y"), "z": s.get("z"), "item": s.get("item"), "nom": s.get("nom"),
                           "service": s.get("service"), "quantite": s.get("quantite") or 1, "prix": _num(s.get("prix")),
-                          "stock": s.get("stock"), "rupture": bool(s.get("rupture")), "ventes": s.get("ventes") or 0,
+                          "stock": s.get("stock"), "capacite": s.get("capacite") if isinstance(s.get("capacite"), int) and s.get("capacite") > 0 else None, "rupture": bool(s.get("rupture")), "ventes": s.get("ventes") or 0,
                           "itemsEchanges": s.get("itemsEchanges") or 0, "chiffreAffaires": _num(s.get("chiffreAffaires")) or 0,
                           "creeLe": s.get("creeLe"), "details": _details(s.get("details")),
                           # Boutique de lot (mod 2.4) : 2 à 9 items différents vendus ensemble

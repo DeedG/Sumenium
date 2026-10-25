@@ -22,6 +22,8 @@ jobs:
       DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
       GUILD_ID: ${{ vars.DISCORD_GUILD_ID || secrets.DISCORD_GUILD_ID }}
       GITHUB_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
+      DISCORD_WEBHOOK_TIRAGE: ${{ secrets.DISCORD_WEBHOOK_TIRAGE }}
+      BACKUP_TOKEN: ${{ secrets.BACKUP_TOKEN }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -75,7 +77,9 @@ jobs:
       - name: Déployer le Worker
         run: |
           umask 077
-          jq -n --arg s "$DISCORD_CLIENT_SECRET" --arg g "$GITHUB_DISPATCH_TOKEN" '{DISCORD_CLIENT_SECRET:$s} + (if $g != "" then {GITHUB_DISPATCH_TOKEN:$g} else {} end)' > "$RUNNER_TEMP/secrets.json"
+          jq -n --arg s "$DISCORD_CLIENT_SECRET" --arg g "$GITHUB_DISPATCH_TOKEN" --arg w "$DISCORD_WEBHOOK_TIRAGE" --arg b "$BACKUP_TOKEN" \
+            '{DISCORD_CLIENT_SECRET:$s} + (if $g != "" then {GITHUB_DISPATCH_TOKEN:$g} else {} end)
+             + (if $w != "" then {DISCORD_WEBHOOK_TIRAGE:$w} else {} end) + (if $b != "" then {BACKUP_TOKEN:$b} else {} end)' > "$RUNNER_TEMP/secrets.json"
           set +e
           npx wrangler deploy --secrets-file "$RUNNER_TEMP/secrets.json" 2>&1 | tee "$RUNNER_TEMP/deploy.log"
           status=${PIPESTATUS[0]}
@@ -85,5 +89,7 @@ jobs:
             echo "::error::Déploiement refusé par Cloudflare : ${msg:-voir le journal}"
             exit 1
           fi
+          [ -n "$DISCORD_WEBHOOK_TIRAGE" ] || echo "::notice::Secret DISCORD_WEBHOOK_TIRAGE absent : pas d'annonce du tirage des usines sur Discord."
+          [ -n "$BACKUP_TOKEN" ] || echo "::notice::Secret BACKUP_TOKEN absent : la sauvegarde hebdomadaire du NAS sera refusée."
           [ -n "$GITHUB_DISPATCH_TOKEN" ] || echo "::warning::Secret GH_DISPATCH_TOKEN absent : la mise à jour du site dépend du cron de GitHub (souvent en retard)."
           echo "::notice::Espace déployé sur https://sumenium.com"
