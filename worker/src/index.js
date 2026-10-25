@@ -49,7 +49,7 @@ export default {
       return json({ error: "L'espace n'est pas encore configuré." }, 503);
     }
     try {
-      const res = await api(req, env, url);
+      const res = await api(req, env, url, ctx);
       if (req.__cookie) res.headers.append("set-cookie", req.__cookie);
       return res;
     } catch (e) {
@@ -262,7 +262,7 @@ const pick = (o, cols) => Object.fromEntries(cols.map((c) => [c, o ? o[c] : null
 
 /* ---------------------------------------------------------------------- API */
 
-async function api(req, env, url) {
+async function api(req, env, url, ctx) {
   const p = url.pathname;
   const m = req.method;
   const body = m === "GET" || m === "HEAD" ? {} : await req.json().catch(() => ({}));
@@ -324,10 +324,11 @@ async function api(req, env, url) {
   }
 
   /* ---- toutes les données lisibles ---- */
+  // Sans connexion : la partie publique (fiches RP, factions, usines, projets, élections). Les modifications demandent la connexion.
   if (p === "/api/data" && m === "GET") {
-    const s = await need(req, env, "attente");
-    return json(await allData(env, s));
+    return json(await allData(env, await session(req, env)));
   }
+  if (p === "/api/status" && m === "GET") return serverStatus(env, ctx);
 
   /* ---- ma fiche ---- */
   if (p === "/api/me/claim" && m === "POST") {
@@ -442,12 +443,11 @@ async function api(req, env, url) {
   // Affiche de candidature : image stockée dans D1 (réduite à moins de 1 Mo par le navigateur)
   if ((mm = p.match(/^\/api\/candidats\/(\d+)\/affiche$/))) {
     const cid = Number(mm[1]);
-    if (m === "GET") {
-      await need(req, env, "attente");
+    if (m === "GET") {  // public, comme les candidatures
       const a = await env.DB.prepare("SELECT a.mime, a.data FROM affiches a JOIN candidats c ON c.id = a.candidat_id WHERE a.candidat_id = ? AND c.deleted = 0").bind(cid).first();
       if (!a) fail(404, "Pas d'affiche.");
       return new Response(new Uint8Array(a.data), { headers: securityHeaders(new Headers({
-        "content-type": a.mime, "cache-control": "private, max-age=86400", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
+        "content-type": a.mime, "cache-control": "public, max-age=86400", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
         "content-disposition": "inline" })) });
     }
     if (m !== "PUT" && m !== "DELETE") fail(405, "Méthode refusée.");
@@ -795,8 +795,62 @@ async function revert(env, s, auditId) {
   return { ok: true };
 }
 
+/* ------------------------------------------------- statut du serveur Minecraft */
+// « Server List Ping » (le même échange que la liste des serveurs du jeu) : MOTD, version, joueurs. Gardé 30 s en cache.
+const vint = (n) => { const out = []; do { let b = n & 0x7f; n >>>= 7; if (n) b |= 0x80; out.push(b); } while (n); return out; };
+const mcString = (str) => { const b = [...new TextEncoder().encode(str)]; return [...vint(b.length), ...b]; };
+const packet = (body) => new Uint8Array([...vint(body.length), ...body]);
+async function pingMinecraft(host, port, label) {
+  const { connect } = await import("cloudflare:sockets");
+  const sock = connect({ hostname: host, port });
+  const t0 = Date.now();
+  const timer = new Promise((_, ko) => setTimeout(() => ko(new Error("délai dépassé")), 4000));
+  const run = (async () => {
+    const w = sock.writable.getWriter();
+    const portB = [(port >> 8) & 0xff, port & 0xff];
+    await w.write(packet([0x00, ...vint(767), ...mcString(label), ...portB, 0x01]));  // handshake → état « status »
+    await w.write(packet([0x00]));                                                     // demande de statut
+    const r = sock.readable.getReader();
+    let buf = new Uint8Array(0);
+    const readVar = (pos) => { let v = 0, i = 0, b; do { if (pos + i >= buf.length) return null; b = buf[pos + i]; v |= (b & 0x7f) << (7 * i); i++; } while (b & 0x80 && i < 5); return [v, pos + i]; };
+    for (;;) {
+      const { value, done } = await r.read();
+      if (done) throw new Error("connexion fermée");
+      const nb = new Uint8Array(buf.length + value.length); nb.set(buf); nb.set(value, buf.length); buf = nb;
+      const len = readVar(0); if (!len) continue;
+      if (buf.length < len[1] + len[0]) continue;
+      const id = readVar(len[1]); const sl = readVar(id[1]);
+      const text = new TextDecoder().decode(buf.slice(sl[1], sl[1] + sl[0]));
+      return { data: JSON.parse(text), ms: Date.now() - t0 };
+    }
+  })();
+  try { return await Promise.race([run, timer]); } finally { try { sock.close(); } catch (_) {} }
+}
+async function serverStatus(env, ctx) {
+  const cache = caches.default, key = new Request(new URL("/__cache/status", env.PUBLIC_URL).toString());
+  const hit = await cache.match(key);
+  if (hit) return hit;
+  const host = env.MC_HOST || "play.sumenium.com", port = Number(env.MC_PORT || 25565);
+  let out;
+  try {
+    const { data, ms } = await pingMinecraft(host, port, env.MC_ADDRESS || "play.sumenium.com");
+    const pl = data.players || {};
+    out = { online: true, ms, motd: data.description ?? "", version: (data.version || {}).name || "",
+      players: { online: pl.online || 0, max: pl.max || 0, sample: (pl.sample || []).map((x) => x.name).filter((n) => /^[A-Za-z0-9_]{1,16}$/.test(n)) },
+      favicon: typeof data.favicon === "string" && data.favicon.startsWith("data:image/png;base64,") && data.favicon.length < 20000 ? data.favicon : null };
+  } catch (e) {
+    out = { online: false, error: String(e && e.message || e).slice(0, 120) };
+  }
+  out.checked = new Date().toISOString();
+  const res = json(out, 200, { "cache-control": "public, max-age=30" });
+  ctx.waitUntil(cache.put(key, res.clone()));
+  return res;
+}
+
 async function allData(env, s) {
-  // Une seule requête groupée vers la base (un aller-retour au lieu de quinze)
+  // Une seule requête groupée vers la base (un aller-retour au lieu de quinze). s = null : visiteur non connecté.
+  const pub = !s;
+  s = s || { id: "", level: null };
   const staff = s.level === "staff";
   const Q = (sql, ...a) => env.DB.prepare(sql).bind(...a);
   const myFaction = "(SELECT faction_id FROM players WHERE discord_id = ? AND deleted = 0)";
@@ -824,18 +878,20 @@ async function allData(env, s) {
   const players = playersR.results.map((p) => {
     const own = me && me.id === p.id;
     const out = { id: p.id, mc_name: p.mc_name, faction_id: p.faction_id, metier: p.metier, metier_desc: p.metier_desc,
-      perso_desc: p.perso_desc, activite: p.activite, mort: p.mort, linked: !!p.discord_id, whitelisted: !!p.wl, taille_appliquee: p.taille_appliquee };
+      perso_desc: p.perso_desc, activite: p.activite, mort: p.mort };
+    if (!pub) Object.assign(out, { linked: !!p.discord_id, whitelisted: !!p.wl, taille_appliquee: p.taille_appliquee });
     if (staff || own) Object.assign(out, { taille_cm: p.taille_cm, discord_name: p.discord_name || null });
     return out;
   });
-  const settings = Object.fromEntries(settingsR.results.map((r) => [r.key, r.value]));
+  let settings = Object.fromEntries(settingsR.results.map((r) => [r.key, r.value]));
+  if (!staff) settings = { election: settings.election, usines_ouvertes: settings.usines_ouvertes, usines_max: settings.usines_max };
   return {
-    user: { id: s.id, name: s.name, avatar: s.avatar, level: s.level },
+    user: pub ? null : { id: s.id, name: s.name, avatar: s.avatar, level: s.level },
     players, factions: factionsR.results, usines: usinesR.results, choix: choixR.results, projets: projetsR.results,
-    realises: realisesR.results, prix: prixR.results, settings, bases: basesR.results, candidats: candidatsR.results,
+    realises: realisesR.results, settings, bases: basesR.results, candidats: candidatsR.results,
     myVotes: Object.fromEntries(votesR.results.map((v) => [v.tour, v.candidat_id])),
     results: staff || settings.election === "resultats" ? resultsR.results : null,
-    meId: me ? me.id : null, wlSynced: wlCountR.results[0].n > 0, wlFree: staff ? wlFreeR.results.map((r) => r.mc_name) : null,
+    meId: me ? me.id : null, wlSynced: !pub && wlCountR.results[0].n > 0, wlFree: staff ? wlFreeR.results.map((r) => r.mc_name) : null,
   };
 }
 

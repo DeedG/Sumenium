@@ -1,10 +1,12 @@
-/* Onglet Économie : données du mod Sumenium Economy (site/eco.json, relu toutes les 2 min).
+/* Données du mod Sumenium Economy (site/eco.json, relu toutes les 2 min) : onglet Marché, Classements › Richesse, Aide › Commandes.
    Montants des exports en Su. Chaque partie affiche « données indisponibles » si son fichier manque. */
 (() => {
 const $ = (id) => document.getElementById(id);
 const E_ = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-let E = null, loaded = false, sub = "apercu", timer = null, tick = null;
-const SUBS = [["apercu", "Aperçu"], ["boutiques", "Boutiques"], ["hdv", "Hôtel des ventes"], ["fisc", "FISC"], ["factions", "Factions"], ["baltop", "Baltop"], ["commandes", "Commandes"]];
+let E = null, loaded = false, mode = "marche", sub = "boutiques", timer = null, tick = null;
+// Marché : ses sous-onglets. Richesse et Commandes sont affichés ailleurs (Classements, Aide), sans sous-onglets.
+const SUBS = [["boutiques", "Acheter / vendre"], ["hdv", "Hôtel des ventes"], ["fisc", "FISC"], ["economie", "Économie du serveur"]];
+const ROOTS = { marche: "ecoRoot", richesse: "richRoot", commandes: "cmdRoot" };
 const f = { q: "", owner: "", fac: "", type: "", stock: false, sort: "recent" };  // type : "" | "item" | "service"
 
 const SYM = () => (E && E.monnaie) || "Su";
@@ -51,6 +53,8 @@ function det(d) {
 const nomPerso = (o) => { const d = o.details; const n = d ? d.nomPerso : o.nom; const base = itemName(o.item, o.nom);  // avec details (v2.2), seul le vrai renommage compte
   return n && n !== base && n.toLowerCase() !== idOf(o.item).replace(/_/g, " ") ? `<span class="muted small nom">« ${E_(n)} »</span>` : ""; };
 const facById = (id) => (E && E.factions || []).find((x) => x.id === id);
+const head = (t, s2) => `<div class="sec-head"><h3>${t}</h3>${s2 ? `<p class="sub2">${s2}</p>` : ""}</div>`;
+const plinkE = (n) => (typeof plink === "function" && /^[A-Za-z0-9_]{2,16}$/.test(n || "") ? plink(n) : E_(n));
 const facColor = (c) => (typeof col === "function" ? col(c) : null) || (/^#[0-9a-f]{3,8}$/i.test(c || "") ? c : null) || "var(--muted)";
 const facTag = (id) => { const x = facById(id); if (!x) return id ? `<span class="chip">${E_(id)}</span>` : "";
   return `<span class="ftag" style="--fc:${E_(facColor(x.couleur))}">${E_(x.tag)}</span>`; };
@@ -66,21 +70,29 @@ async function load() {
   } catch (e) { E = null; }
   loaded = true;
   render();
+  if (window.refreshHome) window.refreshHome();
 }
 
 function render() {
-  const root = $("ecoRoot");
+  const root = $(ROOTS[mode]);
   if (!root) return;
+  Object.values(ROOTS).forEach((id) => { if (id !== ROOTS[mode] && $(id)) $(id).innerHTML = ""; });  // un seul #ecoView à la fois
+  if (mode === "commandes") { root.innerHTML = head("Commandes du mod", "Tout ce qui se fait en jeu avec le mod Sumenium Economy : boutiques, factions, hôtel des ventes.") + '<div id="ecoView"></div>'; commandes($("ecoView")); return; }
   if (!loaded) { root.innerHTML = '<p class="empty">Chargement…</p>'; return; }
   const when = E && E.genereLe ? (typeof ago === "function" ? ago(E.genereLe) : "") : "";
-  root.innerHTML = `<nav class="subtabs" aria-label="Économie">${SUBS.map(([k, l]) =>
-      `<a href="#economie/${k}" aria-current="${k === sub ? "page" : "false"}">${l}</a>`).join("")}</nav>
-    ${E ? `<p class="muted small eco-when">Données du serveur ${E_(when)} · synchronisées toutes les 5 minutes</p>` : ""}
-    <div id="ecoView"></div>`;
+  const stamp = E ? `<p class="muted small eco-when">Données du serveur ${E_(when)} · synchronisées toutes les 5 minutes</p>` : "";
+  if (mode === "richesse") {
+    root.innerHTML = head("Richesse", "Les joueurs les plus riches et les banques de faction (mod Sumenium Economy).") + stamp + '<div id="ecoView"></div>';
+    const view = $("ecoView");
+    if (!E) { view.innerHTML = unavailable(); return; }
+    baltop(view); return;
+  }
+  root.innerHTML = `<nav class="subtabs" aria-label="Marché">${SUBS.map(([k, l]) =>
+      `<a href="#marche/${k}" aria-current="${k === sub ? "page" : "false"}">${l}</a>`).join("")}</nav>
+    ${stamp}<div id="ecoView"></div>`;
   const view = $("ecoView");
-  if (sub === "commandes") { commandes(view); return; }  // le guide ne dépend pas des données du serveur
   if (!E) { view.innerHTML = unavailable(); return; }
-  ({ apercu, boutiques, hdv, fisc, factions, baltop, commandes })[sub](view);
+  ({ economie: apercu, boutiques, hdv, fisc })[sub](view);
   view.querySelectorAll("[data-map]").forEach((b) => (b.onclick = () => { const [x, y, z] = b.dataset.map.split(",").map(Number); showOnMap(x, y, z); }));
 }
 
@@ -277,7 +289,8 @@ function boutiques(view) {
   const owners = [...new Set(all.map((s) => s.proprietaire).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const facs = [...new Set(all.map((s) => s.faction).filter(Boolean))];
   const q = f.q.toLowerCase();
-  const match = (s) => !q || [itemName(s.item, s.nom), s.nom, s.service, s.item, s.proprietaire, detText(s.details)].join(" ").toLowerCase().includes(q);
+  const match = (s) => !q || [itemName(s.item, s.nom), s.nom, s.service, s.item, s.proprietaire, detText(s.details),
+    ...(s.lot || []).flatMap((x) => [itemName(x.item, x.nom), x.item, detText(x.details)])].join(" ").toLowerCase().includes(q);
   const fq = q && E.fisc ? [...(E.fisc.rachat || []), ...(E.fisc.vente || [])].filter((r) => [itemName(r.item, r.nom), r.nom, r.item].join(" ").toLowerCase().includes(q)).length : 0;
   let list = all.filter((s) => match(s)
     && (!f.owner || s.proprietaire === f.owner) && (!f.fac || s.faction === f.fac)
@@ -294,26 +307,30 @@ function boutiques(view) {
       <select id="bt" aria-label="Type"><option value="">Objets et services</option><option value="item"${f.type === "item" ? " selected" : ""}>Objets</option><option value="service"${f.type === "service" ? " selected" : ""}>Services</option></select>
       <select id="bs" aria-label="Tri"><option value="recent">Tri : plus récentes</option><option value="prix"${f.sort === "prix" ? " selected" : ""}>Tri : prix à l'unité</option><option value="ventes"${f.sort === "ventes" ? " selected" : ""}>Tri : plus vendues</option><option value="az"${f.sort === "az" ? " selected" : ""}>Tri : A → Z</option></select>
       <label class="chk"><input type="checkbox" id="bk"${f.stock ? " checked" : ""}> En stock</label></div>
-    <p class="count">${n0(list.length)} boutique${list.length > 1 ? "s" : ""}${rupt ? ` · ${n0(rupt)} en rupture sur le serveur` : ""} · <a href="#economie/fisc">${fq ? `${n0(fq)} prix du FISC pour « ${E_(f.q)} »` : "prix du FISC"} dans l'onglet FISC</a></p>
+    <p class="count">${n0(list.length)} boutique${list.length > 1 ? "s" : ""}${rupt ? ` · ${n0(rupt)} en rupture sur le serveur` : ""} · <a href="#marche/fisc">${fq ? `${n0(fq)} prix du FISC pour « ${E_(f.q)} »` : "prix du FISC"} dans l'onglet FISC</a></p>
     <div class="shop-grid">${list.map(shopCard).join("") || '<p class="empty">Aucune boutique ne correspond.</p>'}</div>`;
   const keep = (id, k, val) => { $(id).oninput = $(id).onchange = (e) => { f[k] = val ? val(e.target) : e.target.value; const pos = id === "bq" ? e.target.selectionStart : null; render();
     if (pos !== null) { const el = $("bq"); el.focus(); el.setSelectionRange(pos, pos); } }; };
   keep("bq", "q"); keep("bo", "owner"); keep("bf", "fac"); keep("bt", "type"); keep("bs", "sort"); keep("bk", "stock", (t) => t.checked);
 }
 const unit = (s) => (s.prix || 0) / Math.max(1, s.quantite || 1);
+// Boutique de lot (mod 2.4) : plusieurs items différents vendus ensemble
+function lotHtml(s) {
+  return `<ul class="lot">${(s.lot || []).map((x) => `<li>${ico(x.item)}<span><b>${E_(itemName(x.item, x.nom))}</b> × ${n0(x.quantite)}${x.details && x.details.enchantements ? `<small class="muted"> · ${E_(x.details.enchantements.map(enchName).join(", "))}</small>` : ""}</span></li>`).join("")}</ul>`;
+}
 function shopCard(s) {
-  const svc = s.type === "service", fiscS = s.proprietaireType === "fisc";
-  const name = svc ? (s.service || "Service") : itemName(s.item, s.nom);
+  const svc = s.type === "service", fiscS = s.proprietaireType === "fisc", lot = s.type === "lot";
+  const name = svc ? (s.service || "Service") : lot ? `Lot de ${(s.lot || []).length} objets` : itemName(s.item, s.nom);
   const stock = svc ? '<span class="chip ok">Stock illimité</span>' : s.rupture ? '<span class="chip warn">Rupture</span>'
     : s.stock === null || s.stock === undefined ? "" : `<span class="chip">${n0(s.stock)} en stock</span>`;
   const label = fiscS ? (s.type === "fisc_rachat" ? "Le FISC rachète" : "Le FISC vend") : "";
   return `<article class="shop${s.rupture ? " out" : ""}">
-    <header>${ico(s.item)}<div><b>${E_(name)}</b>${s.quantite > 1 ? `<span class="muted small"> × ${n0(s.quantite)}</span>` : ""}
-      ${svc ? "" : nomPerso(s)}</div></header>
-    ${svc ? "" : det(s.details)}
-    <p class="price">${label ? `<span class="muted small">${label} </span>` : ""}${su(s.prix)}${s.quantite > 1 ? `<span class="muted small"> · ${su(unit(s))} l'unité</span>` : ""}</p>
+    <header>${ico(lot ? ((s.lot || [])[0] || {}).item : s.item)}<div><b>${E_(name)}</b>${!lot && s.quantite > 1 ? `<span class="muted small"> × ${n0(s.quantite)}</span>` : ""}
+      ${svc || lot ? "" : nomPerso(s)}</div></header>
+    ${lot ? lotHtml(s) : svc ? "" : det(s.details)}
+    <p class="price">${label ? `<span class="muted small">${label} </span>` : ""}${su(s.prix)}${lot ? '<span class="muted small"> le lot</span>' : s.quantite > 1 ? `<span class="muted small"> · ${su(unit(s))} l'unité</span>` : ""}</p>
     <div class="tags">${stock}${s.ventes ? `<span class="chip muted">${n0(s.ventes)} vente${s.ventes > 1 ? "s" : ""}</span>` : ""}</div>
-    <p class="owner">${fiscS ? "<b>FISC</b>" : `<b>${E_(s.proprietaire)}</b>`} ${s.proprietaireType === "faction" ? '<span class="muted small">boutique de faction</span>' : ""} ${facTag(s.faction)}</p>
+    <p class="owner">${fiscS ? "<b>FISC</b>" : `<b>${s.proprietaireType === "joueur" ? plinkE(s.proprietaire) : E_(s.proprietaire)}</b>`} ${s.proprietaireType === "faction" ? '<span class="muted small">boutique de faction</span>' : ""} ${facTag(s.faction)}</p>
     <p class="pos">${mapLink(s)}</p>
   </article>`;
 }
@@ -331,7 +348,7 @@ function hdv(view) {
       ${det(a.details)}
       <p class="price">${a.offreActuelle ? su(a.offreActuelle) : su(a.prixDepart)}<span class="muted small"> ${a.offreActuelle ? `offre de ${E_(a.meilleurEncherisseur || "?")} · ${n0(a.nbOffres)} offre${a.nbOffres > 1 ? "s" : ""}` : "prix de départ, aucune offre"}</span></p>
       <div class="tags">${a.achatImmediat ? `<span class="chip ok">Achat immédiat ${su(a.achatImmediat)}</span>` : '<span class="chip muted">Pas d\'achat immédiat</span>'}</div>
-      <p class="owner">Vendu par <b>${E_(a.vendeur)}</b></p>
+      <p class="owner">Vendu par <b>${plinkE(a.vendeur)}</b></p>
       <p class="countdown" data-fin="${a.fin || ""}">${remain(a.fin)}</p></article>`).join("") || '<p class="empty">Aucune annonce en cours.</p>'}</div>`;
 }
 function remain(fin) {
@@ -355,20 +372,6 @@ function fisc(view) {
     <div class="board" style="margin-top:14px"><h3>Ce que le FISC vend<small>stock illimité</small></h3>${table(F.vente, true)}</div>`;
 }
 
-/* ---------------- Factions ---------------- */
-const ROLE = { chef: ["Chef", "lvl-staff"], tresorier: ["Trésorier", "lvl-attente"], membre: ["Membre", "muted"] };
-function factions(view) {
-  const F = E.factions;
-  if (!F) { view.innerHTML = unavailable("factions"); return; }
-  const order = { chef: 0, tresorier: 1, membre: 2 };
-  view.innerHTML = `<div class="fac-grid">${F.slice().sort((a, b) => b.banque - a.banque).map((x) => `<article class="card fac">
-    <header><h3><span class="ftag big" style="--fc:${E_(facColor(x.couleur))}">${E_(x.tag)}</span></h3><span class="chip">${n0(x.membres.length)} membre${x.membres.length > 1 ? "s" : ""}</span></header>
-    <p class="price">${su(x.banque)}<span class="muted small"> en banque</span></p>
-    <ul class="roster">${x.membres.slice().sort((a, b) => (order[a.role] ?? 3) - (order[b.role] ?? 3) || a.nom.localeCompare(b.nom)).map((m) =>
-      `<li>${E_(m.nom)} <span class="chip ${(ROLE[m.role] || ROLE.membre)[1]}">${(ROLE[m.role] || ROLE.membre)[0]}</span></li>`).join("")}</ul>
-  </article>`).join("") || '<p class="empty">Aucune faction.</p>'}</div>`;
-}
-
 /* ---------------- Baltop ---------------- */
 function baltop(view) {
   const J = E.joueurs, F = E.factions;
@@ -383,9 +386,10 @@ function baltop(view) {
   </div>`;
 }
 
-/* ---------------- Commandes (doc « Commandes Suménium Economy », v2.2.0) ---------------- */
+/* ---------------- Commandes (doc « Commandes Suménium Economy », v2.4.0) ---------------- */
 const SANS_COMMANDE = [
   ["Acheter dans une boutique", "Clic droit sur le coffre ou son panneau. Le chat affiche l'item (survolable), le prix et le stock. Taper ensuite la quantité dans le chat : un nombre, « tout » ou « annuler » (30 s pour répondre, invisible pour les autres)."],
+  ["Acheter un lot", "Pareil qu'une boutique normale, mais on tape un nombre de lots. Le chat et le panneau montrent le contenu du lot (chaque item est survolable). Si un seul item du lot manque dans le coffre, la boutique est en rupture : on ne paie jamais un lot incomplet."],
   ["Vendre au FISC", "Clic droit sur le coffre du FISC, puis taper la quantité à vendre ou « tout »."],
   ["Ravitailler sa boutique", "Le propriétaire et, pour une boutique de faction, tous les membres ouvrent le coffre normalement. Le stock et le panneau se mettent à jour à la fermeture."],
   ["Acheter dans la boutique de sa faction", "Avec son compte perso (/compte perso), cliquer sur le panneau : l'argent va dans la banque de faction."],
@@ -394,7 +398,9 @@ const SANS_COMMANDE = [
   ["Dépôt de service (optionnel)", "Un coffre ou tonneau relié à un service avec /boutique depot. Le client y pose son bon et referme le coffre : si le bon est valide pour ce service, il est consommé (un par fermeture) et le coffre émet un signal de redstone d'1 seconde pour lancer l'usine ou ouvrir une porte. Un bon déjà utilisé ou d'un autre service est refusé et reste dans le coffre. Tout le monde peut ouvrir un dépôt ; seuls les membres du service le cassent."],
   ["Hôtel des ventes", "Clic droit sur le PNJ du spawn : un menu affiche toutes les annonces (45 par page, survolables). Clic sur un item puis taper son offre dans le chat, « achat » pour l'achat immédiat ou « annuler ». L'argent de l'offre est bloqué et rendu si quelqu'un surenchérit. Une offre dans les 5 dernières minutes prolonge l'enchère de 5 minutes."],
   ["Boîte aux lettres", "Clic droit sur la boîte aux lettres du spawn : chacun y retrouve ses items gagnés aux enchères et ses invendus. On ne peut que retirer, pas déposer."],
-  ["Annuaire", "Le livre sur le lutrin de l'entrée de la zone commerciale liste les boutiques des joueurs (propriétaire, item, prix, rupture, coordonnées), sans le FISC. Il se met à jour tout seul et revient si quelqu'un le prend."],
+  ["Annuaire", "Le livre sur le lutrin de l'entrée de la zone commerciale liste toutes les boutiques des joueurs, sans le FISC (propriétaire, item, prix, rupture, coordonnées). Il se met à jour tout seul et revient si quelqu'un le prend."],
+  ["Marchand de têtes", "Clic droit sur le PNJ : plus de 100 000 têtes décoratives classées par catégorie puis par nom. La boussole lance une recherche (taper un mot dans le chat, souvent en anglais : cat, pumpkin…). Un clic sur une tête l'achète pour 150 Su, avec le compte utilisé (perso ou faction)."],
+  ["AFK", "Sans bouger la caméra, marcher ni écrire dans le chat pendant 2 min 30, le joueur passe [AFK] dans le tab (un autoclicker ne compte pas comme une activité). Les joueurs AFK ne sont pas comptés pour passer la nuit."],
 ];
 const JOUEURS = [
   { titre: "Compte", lignes: [
@@ -409,9 +415,10 @@ const JOUEURS = [
   { titre: "Boutiques", intro: "Regarder le coffre (ou le tonneau) de la boutique pour toutes ces commandes.", lignes: [
     ["/boutique creer item <prix> <quantité>", "Crée une boutique, l'item à vendre en main. Ex. /boutique creer item 20 16 = 16 items pour 20 Su. Frais : 150 Su, ou 50 Su si on a déjà une boutique de la même famille (couleurs, essences de bois)", "Tous"],
     ["/boutique creer service <prix> <nom du bon>", "Boutique de service, stock infini : l'acheteur reçoit un bon à ce nom. Frais : 300 Su", "Tous"],
+    ["/boutique creer lot <prix>", "Boutique qui vend un lot de 2 à 9 items différents. Un menu s'ouvre : y poser un exemplaire de chaque item avec la bonne quantité, puis le fermer (les items sont rendus). Remplir ensuite le coffre en vrac ; le stock est le nombre de lots complets. Ex. /boutique creer lot 500 puis 4 diamants + 16 fers dans le menu. Frais : 300 Su", "Tous"],
     ["/boutique info", "Offre, stock, ventes et chiffre d'affaires", "Tous (stats : membres)"],
     ["/boutique liste", "Toutes ses boutiques et celles de sa faction, avec stock et coordonnées", "Tous"],
-    ["/boutique prix <prix> [quantité]", "Change le prix (et la quantité par lot)", "Membres de la boutique"],
+    ["/boutique prix <prix> [quantité]", "Change le prix (et, pour une boutique d'item, la quantité vendue à chaque achat)", "Membres de la boutique"],
     ["/boutique panneau", "Réécrit le panneau, en reprend un accroché au coffre ou en pose un neuf", "Membres de la boutique"],
     ["/boutique faction", "Donne sa boutique perso à sa faction : tous les membres ravitaillent, les ventes vont à la banque", "Propriétaire"],
     ["/boutique perso", "Reprend une boutique de faction en perso", "Chef, créateur de la boutique"],
@@ -459,11 +466,11 @@ function commandes(view) {
   const live = /(^|\.)sumenium\.com$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
   if (live && !staffTried) {
     staffTried = true;  // réservé au staff : le Worker ne renvoie la liste qu'aux comptes Discord staff
-    fetch("/api/admin/commandes", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).then((d) => { STAFF_CMD = d; if (sub === "commandes") render(); }).catch(() => {});
+    fetch("/api/admin/commandes", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).then((d) => { STAFF_CMD = d; if (mode === "commandes") render(); }).catch(() => {});
   }
   const sans = SANS_COMMANDE.filter((l) => match("en jeu", ...l));
   view.innerHTML = `<div class="bar"><input type="search" id="cq" placeholder="Chercher une commande ou une action (boutique, bon, faction, hdv…)" value="${E_(cq)}" aria-label="Chercher une commande"></div>
-    <p class="small muted">Mod Sumenium Economy 2.0.0. Les montants s'écrivent avec un point (3.5). Entre &lt; &gt; : obligatoire ; entre [ ] : facultatif.</p>
+    <p class="small muted">Mod Sumenium Economy 2.4.0. Les montants s'écrivent avec un point (3.5). Entre &lt; &gt; : obligatoire ; entre [ ] : facultatif.</p>
     ${sans.length ? `<section class="board cmd-sec"><h3>En jeu, sans commande</h3><p class="small muted">Acheter, vendre au FISC et ravitailler se fait en cliquant sur les coffres, pas avec des commandes.</p>
       <div class="tbl-wrap"><table class="tbl left cmds"><thead><tr><th>Action</th><th>Comment</th></tr></thead><tbody>
       ${sans.map((l) => `<tr><td><b>${E_(l[0])}</b></td><td>${E_(l[1])}</td></tr>`).join("")}</tbody></table></div></section>` : ""}
@@ -477,16 +484,20 @@ function commandes(view) {
 }
 
 /* ---------------- entrée ---------------- */
-function show(s) {
-  if (s && SUBS.some(([k]) => k === s)) sub = s;
+const visible = () => (mode === "marche" && !$("p-marche").hidden) || (mode === "richesse" && !$("p-classements").hidden);
+function show(m, s) {
+  mode = ROOTS[m] ? m : "marche";
+  if (mode === "marche") sub = SUBS.some(([k]) => k === s) ? s : "boutiques";
   if (!loaded) load(); else render();
-  if (!timer) timer = setInterval(() => { if (!$("p-economie").hidden) load(); }, 120000);
+  if (!timer) timer = setInterval(() => { if (visible()) load(); }, 120000);
   if (!tick) tick = setInterval(() => {
-    if ($("p-economie").hidden || sub !== "hdv") return;
+    if (mode !== "marche" || $("p-marche").hidden || sub !== "hdv") return;
     document.querySelectorAll(".countdown[data-fin]").forEach((el) => { if (el.dataset.fin) el.innerHTML = remain(+el.dataset.fin); });
   }, 1000);
 }
 let rz = null;
-window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (sub === "apercu" && !$("p-economie").hidden && E) render(); }, 200); });
-window.Economie = { show };
+window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (mode === "marche" && sub === "economie" && !$("p-marche").hidden && E) render(); }, 200); });
+window.Economie = { show, data: () => E };
+// Chargé tout de suite : l'accueil et les fiches joueur / faction s'en servent aussi
+if (location.hostname !== "deedg.github.io") load();
 })();

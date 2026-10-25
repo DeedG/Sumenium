@@ -64,8 +64,67 @@ body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);margin:0}
   .brand h1{font-size:1.6rem}.season{font-size:.7rem;padding:4px 7px}
   .ip-pill{font-size:.88rem;gap:8px;padding:7px 7px 7px 11px}.ip-act{min-width:0;padding:5px 7px;font-size:.7rem}
 }
+.ip-wrap{position:relative;display:inline-block}
+.ip-count{font:700 .78rem var(--body);color:#b9f3a4;background:rgba(111,220,75,.14);padding:3px 7px;border-radius:7px;white-space:nowrap}
+.ip-dot.off{background:#f0614d;box-shadow:0 0 0 3px rgba(240,97,77,.25);animation:none}
+.ip-dot.wait{background:#9aa39a;box-shadow:none;animation:none}
+.ip-tip{position:absolute;left:0;top:calc(100% + 10px);z-index:30;width:max-content;max-width:min(360px,86vw);background:#1b2418;color:#eaf6e2;border-radius:12px;padding:12px 14px;
+  box-shadow:0 14px 30px rgba(0,0,0,.35);opacity:0;visibility:hidden;transform:translateY(-4px);transition:opacity .15s,transform .15s,visibility .15s;font-size:.9rem}
+.ip-tip::before{content:"";position:absolute;left:22px;top:-6px;border:6px solid transparent;border-top:0;border-bottom-color:#1b2418}
+.ip-wrap:hover .ip-tip,.ip-wrap:focus-within .ip-tip{opacity:1;visibility:visible;transform:none}
+.ip-tip p{margin:6px 0 0}.ip-tip .muted{color:#a9b8a4}
+.motd{font:500 .98rem/1.35 "Pixelify Sans",monospace;background:#0e130c;color:#aaa;border-radius:8px;padding:8px 10px;white-space:normal}
+.motd.big{font-size:1.08rem;margin:4px 0}
+.ip-line{color:#eaf6e2}
+.ip-players{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px}
+.ip-players li,.ip-players a{display:flex;align-items:center;gap:6px;min-width:0;color:inherit;text-decoration:none}
+.ip-players img{width:20px;height:20px;border-radius:3px;image-rendering:pixelated;flex:none}
+@media (max-width:560px){.ip-tip{left:auto;right:0}.ip-tip::before{left:auto;right:22px}}
+.ip-players.inline{display:flex;flex-wrap:wrap;gap:6px}
+.ip-players.inline a{background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 10px 3px 4px;font-weight:700;font-size:.88rem}
+.ip-players.inline a:hover{border-color:var(--grass)}
+/* Accueil */
+.home-hero{display:grid;gap:8px}
+.home-status{display:flex;align-items:center;gap:12px}
+.home-status b{display:block;font:600 1.25rem var(--display)}
+.home-status .ip-dot{width:12px;height:12px;flex:none}
+.home-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+a.stat{color:inherit;text-decoration:none;transition:transform .12s}
+a.stat:hover{transform:translateY(-2px)}
+.now{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.now li{line-height:1.45}
+.now a{color:var(--crystal);font-weight:700;text-decoration:none}
+.go-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:10px}
+.go{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;color:inherit;text-decoration:none;transition:border-color .12s,transform .12s}
+.go:hover{border-color:var(--grass);transform:translateY(-2px)}
+.go-ico{grid-row:span 2;font-size:1.7rem}
+.go b{font:600 1.05rem var(--display)}
+.go span:last-child{color:var(--muted);font-size:.88rem}
+.lot{list-style:none;margin:0 0 8px;padding:0;display:grid;gap:4px}
+.lot li{display:flex;align-items:center;gap:8px;font-size:.9rem}
+.lot .eco-ico{width:22px;height:22px}
+.login-hint{background:var(--crystal-soft);border-radius:10px;padding:8px 12px;font-size:.9rem;margin:14px 0}
+.login-hint a{color:var(--crystal);font-weight:700}
+.crumbs{margin:0 0 10px}.crumbs a{color:var(--muted);font-weight:700;text-decoration:none}.crumbs a:hover{color:var(--fg)}
+.profile-head{display:flex;gap:16px;align-items:center}
+.profile-head h3{font:600 1.6rem/1.15 var(--display);margin:0 0 6px}
+.profile-head .face{border-radius:10px;image-rendering:pixelated;flex:none}
+.profile-head .tags{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}
+.profile-head .metier{margin:0;font-weight:700}
+.pcard.mini{display:flex;gap:10px;align-items:center;text-decoration:none;color:inherit;padding:10px 12px}
+.pcard.mini div{display:grid;min-width:0}
+.pcard.mini:hover{border-color:var(--grass)}
+.faclink{text-decoration:none}
+.fac-grid.one{grid-template-columns:1fr}
+.fac-grid.one .members{display:none}
+.plink{color:inherit;text-decoration:none;border-bottom:1px dotted currentColor}
+.plink:hover{color:var(--crystal)}
 .ip-sub{display:block;margin-top:6px;color:var(--muted);font-weight:600;font-size:.8rem}
 .season{display:inline-block;background:var(--sun);color:#3b2a00;font:600 .8rem/1 var(--display);padding:5px 9px;border-radius:999px;margin-left:6px;vertical-align:4px;letter-spacing:.04em}
+.brand-home{color:inherit;text-decoration:none}
+.brand-home img{display:block}
+a.border-card{color:inherit;text-decoration:none;transition:transform .12s}
+a.border-card:hover{transform:translateY(-2px)}
 .border-card{background:var(--surface);border-radius:18px;padding:14px 22px;box-shadow:0 6px 20px rgba(20,60,30,.12);text-align:center;min-width:220px}
 .border-card small{display:block;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-size:.72rem}
 .border-card b{display:block;font:700 3.4rem/1.05 var(--display);color:var(--crystal);font-variant-numeric:tabular-nums}
@@ -145,7 +204,18 @@ footer{margin-top:32px;color:var(--muted);font-size:.86rem;max-width:75ch}
 
 /* Navigation par onglets */
 .tabs{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:2px solid var(--line)}
-.tabs-in{max-width:1080px;margin:0 auto;padding-inline:16px;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.tabs-in{max-width:1080px;margin:0 auto;padding-inline:16px;display:flex;align-items:center;gap:8px}
+.tabs-list{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
+.tabs-list::-webkit-scrollbar{display:none}
+/* Compte : « Se connecter » ou tête du skin + pseudo en jeu */
+.acct{flex:none;display:flex;align-items:center}
+.acct a.tabs-me,.acct a.tabs-login{display:inline-flex;align-items:center;gap:8px;border:0;padding:6px 10px;border-radius:999px;font:600 .92rem var(--display);text-decoration:none;white-space:nowrap}
+.acct a.tabs-login{background:#5865f2;color:#fff}
+.acct a.tabs-login:hover{background:#4752c4}
+.acct a.tabs-me{background:var(--surface);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line)}
+.acct a.tabs-me[aria-current="page"]{box-shadow:inset 0 0 0 2px var(--sun)}
+.acct a.tabs-me img{border-radius:4px;image-rendering:pixelated}
+@media (max-width:560px){.acct a.tabs-me span,.acct a.tabs-login span{display:none}.acct a.tabs-login{padding:8px 10px}}
 .tabs a{font:600 1rem var(--display);color:var(--muted);text-decoration:none;padding:12px 14px;border-bottom:3px solid transparent;white-space:nowrap}
 .tabs a:hover{color:var(--fg)}
 .tabs a[aria-current="page"]{color:var(--fg);border-bottom-color:var(--sun)}
@@ -473,48 +543,73 @@ body.busy{cursor:progress}
 <header class="hero">
   <div class="hero-in">
     <div class="brand">
-      <img src="logo.png" alt="Logo Suménium Saison 7" width="84" height="84">
+      <a href="#accueil" class="brand-home" aria-label="Accueil Suménium"><img src="logo.png" alt="" width="84" height="84"></a>
       <div>
-        <h1>Suménium <span class="season">SAISON 7</span></h1>
-        <p>Classements, succès, statistiques, carte et espace joueurs</p>
-        <button type="button" class="ip-pill" id="ipCopy" title="Copier l'adresse du serveur" aria-label="Copier l'adresse du serveur play.sumenium.com">
-          <span class="ip-dot" aria-hidden="true"></span>
-          <span class="ip-addr">play.sumenium.com</span>
-          <span class="ip-act" id="ipAct">Copier</span>
-        </button>
-        <small class="ip-sub">Minecraft Java 26.3</small>
+        <h1><a href="#accueil" class="brand-home">Suménium</a> <span class="season">SAISON 7</span></h1>
+        <p>Carte, succès, factions, marché et classements</p>
+        <div class="ip-wrap" id="ipWrap">
+          <button type="button" class="ip-pill" id="ipCopy" aria-describedby="ipTip" aria-label="Copier l'adresse du serveur play.sumenium.com">
+            <span class="ip-dot" id="ipDot" aria-hidden="true"></span>
+            <span class="ip-addr">play.sumenium.com</span>
+            <span class="ip-count" id="ipCount" hidden></span>
+            <span class="ip-act" id="ipAct">Copier</span>
+          </button>
+          <div class="ip-tip" id="ipTip" role="tooltip"><p class="muted small">Statut du serveur en cours de lecture…</p></div>
+        </div>
+        <small class="ip-sub" id="ipSub">Minecraft Java 26.3</small>
       </div>
     </div>
-    <div class="border-card">
+    <a class="border-card" href="#monde/succes" title="Voir les succès qui agrandissent la bordure">
       <small>Taille du monde</small>
       <b id="size">–</b>
       <span id="sizeSub">blocs depuis le centre</span>
-    </div>
+    </a>
   </div>
   <div class="grass" aria-hidden="true"></div>
 </header>
 <nav class="tabs" aria-label="Sections">
   <div class="tabs-in">
-    <a href="#classement" data-tab="classement">Classement</a>
-    <a href="#succes" data-tab="succes">Succès &amp; bordure</a>
-    <a href="#stats" data-tab="stats">Statistiques</a>
-    <a href="#economie" data-tab="economie">Économie</a>
-    <a href="#carte" data-tab="carte">Carte</a>
-    <a href="#espace" data-tab="espace">Espace joueurs</a>
+    <div class="tabs-list">
+      <a href="#accueil" data-tab="accueil">Accueil</a>
+      <a href="#monde" data-tab="monde">Monde</a>
+      <a href="#communaute" data-tab="communaute">Communauté</a>
+      <a href="#marche" data-tab="marche">Marché</a>
+      <a href="#classements" data-tab="classements">Classements</a>
+      <a href="#aide" data-tab="aide">Aide</a>
+    </div>
+    <div class="acct" id="acct"></div>
   </div>
 </nav>
 <div id="tip" hidden></div>
 <main class="wrap">
   <div class="updated"><span class="dot" id="dot"></span><span id="updated">Chargement des données…</span></div>
   <div class="banner" id="err" hidden></div>
-  <section class="panel" id="p-classement" hidden>
-    <h2 class="ttl">Classement</h2>
-    <p class="sub2">Les trois compteurs du tableau en jeu (touche Tab), puis le total par faction.</p>
-    <div class="boards boards-2" id="tabBoards"><p class="empty">Chargement…</p></div>
-    <h2 class="ttl">Factions</h2>
-    <div class="tbl-wrap"><table class="tbl" id="teamTable"><thead><tr><th>#</th><th>Faction</th><th>Membres</th><th>Succès</th><th>Premiers succès</th><th>Morts</th><th>Blocs de bordure</th></tr></thead><tbody></tbody></table></div>
+
+  <section class="panel" id="p-accueil" hidden>
+    <div id="homeRoot"><p class="empty">Chargement…</p></div>
   </section>
-  <section class="panel" id="p-succes" hidden>
+
+  <section class="panel" id="p-monde" hidden>
+    <nav class="subtabs" aria-label="Monde" data-area="monde">
+      <a href="#monde/carte" data-sub="carte">Carte</a><a href="#monde/succes" data-sub="succes">Bordure &amp; succès</a><a href="#monde/projets" data-sub="projets">Projets communautaires</a>
+    </nav>
+    <div class="subpanel" data-sub="carte">
+  <section class="mapbox" id="mapbox">
+    <div class="maphead">
+      <div>
+        <h2>Carte du monde</h2>
+        <p>Overworld uniquement, en 3D. La bordure est tracée en jaune ; au-delà, la carte est masquée sauf si tu choisis de la voir.</p>
+      </div>
+      <div class="mapactions">
+        <label class="chk"><input type="checkbox" id="spoil"> Voir toute la carte (spoil)</label>
+        <a id="mapfull" target="_blank" rel="noopener">Plein écran</a>
+      </div>
+    </div>
+    <iframe id="mapframe" title="Carte de l'Overworld de Suménium" loading="lazy" allow="fullscreen"></iframe>
+  </section>
+    </div>
+    <div class="subpanel" data-sub="succes">
+      <div class="sec-head"><h3>Bordure &amp; succès</h3><p class="sub2">Chaque succès obtenu pour la première fois agrandit la bordure du monde. Suis ta progression critère par critère.</p></div>
   <div class="stats">
     <div class="stat sun"><b id="sRem">–</b><span>Succès restants</span></div>
     <div class="stat leaf"><b id="sDone">–</b><span>Déjà obtenus</span></div>
@@ -550,43 +645,60 @@ body.busy{cursor:progress}
     Chaque succès agrandit la bordure une seule fois, pour le premier joueur qui l'obtient. Le gain s'ajoute au diamètre, donc la moitié de chaque côté. Sans joueur choisi, « À faire » et « Obtenus » parlent du serveur et la progression affichée est celle du joueur le plus avancé ; avec un joueur choisi, ils parlent de ce joueur.
     Les données sont relues sur le serveur toutes les 10 minutes environ, et Minecraft les enregistre toutes les 5 minutes.
   </footer>
-  </section>
-  <section class="panel" id="p-stats" hidden>
-    <h2 class="ttl">Statistiques</h2>
-    <p class="sub2">Toutes les statistiques Minecraft des joueurs, avec le classement de chacune.</p>
-    <div class="explorer">
-      <div class="picker">
-        <select id="statCat" aria-label="Catégorie de statistiques"></select>
-        <input id="statQ" type="search" placeholder="Chercher une statistique…" aria-label="Chercher une statistique">
-        <div class="statlist" id="statList"></div>
-      </div>
-      <div class="statview board" id="statView"><p class="empty">Choisis une statistique.</p></div>
     </div>
+    <div class="subpanel" data-sub="projets"><div id="projRoot"></div></div>
   </section>
-  <section class="panel" id="p-economie" hidden>
-    <h2 class="ttl">Économie</h2>
-    <p class="sub2" id="ecoSub">Boutiques, hôtel des ventes, FISC, factions et argent en circulation (mod Sumenium Economy).</p>
+
+  <section class="panel" id="p-communaute" hidden>
+    <div id="comRoot"><p class="empty">Chargement…</p></div>
+  </section>
+
+  <section class="panel" id="p-marche" hidden>
     <div id="ecoRoot"><p class="empty">Chargement…</p></div>
   </section>
-  <section class="panel" id="p-carte" hidden>
-  <section class="mapbox" id="mapbox">
-    <div class="maphead">
-      <div>
-        <h2>Carte du monde</h2>
-        <p>Overworld uniquement, en 3D. La bordure est tracée en jaune ; au-delà, la carte est masquée sauf si tu choisis de la voir.</p>
-      </div>
-      <div class="mapactions">
-        <label class="chk"><input type="checkbox" id="spoil"> Voir toute la carte (spoil)</label>
-        <a id="mapfull" target="_blank" rel="noopener">Plein écran</a>
+
+  <section class="panel" id="p-classements" hidden>
+    <nav class="subtabs" aria-label="Classements" data-area="classements">
+      <a href="#classements/tableau" data-sub="tableau">Tableau en jeu</a><a href="#classements/richesse" data-sub="richesse">Richesse</a><a href="#classements/stats" data-sub="stats">Statistiques</a>
+    </nav>
+    <div class="subpanel" data-sub="tableau">
+      <div class="sec-head"><h3>Tableau en jeu</h3><p class="sub2">Les trois compteurs du Tab, les blocs ajoutés à la bordure, puis le total par faction.</p></div>
+      <div class="boards boards-2" id="tabBoards"><p class="empty">Chargement…</p></div>
+      <h3 class="sec">Factions</h3>
+      <div class="tbl-wrap"><table class="tbl" id="teamTable"><thead><tr><th>#</th><th>Faction</th><th>Membres</th><th>Succès</th><th>Premiers succès</th><th>Morts</th><th>Blocs de bordure</th></tr></thead><tbody></tbody></table></div>
+    </div>
+    <div class="subpanel" data-sub="richesse"><div id="richRoot"></div></div>
+    <div class="subpanel" data-sub="stats">
+      <div class="sec-head"><h3>Statistiques</h3><p class="sub2">Toutes les statistiques Minecraft des joueurs, avec le classement de chacune.</p></div>
+      <div class="explorer">
+        <div class="picker">
+          <select id="statCat" aria-label="Catégorie de statistiques"></select>
+          <input id="statQ" type="search" placeholder="Chercher une statistique…" aria-label="Chercher une statistique">
+          <div class="statlist" id="statList"></div>
+        </div>
+        <div class="statview board" id="statView"><p class="empty">Choisis une statistique.</p></div>
       </div>
     </div>
-    <iframe id="mapframe" title="Carte de l'Overworld de Suménium" loading="lazy" allow="fullscreen"></iframe>
   </section>
-  </section>
+
   <section class="panel" id="p-espace" hidden>
-    <h2 class="ttl">Espace joueurs</h2>
-    <p class="sub2">Ta fiche, ton historique, les factions, projets, usines et élections, avec ton compte Discord.</p>
     <div id="espaceRoot"></div>
+  </section>
+
+  <section class="panel" id="p-aide" hidden>
+    <nav class="subtabs" aria-label="Aide" data-area="aide">
+      <a href="#aide/rejoindre" data-sub="rejoindre">Rejoindre le serveur</a><a href="#aide/commandes" data-sub="commandes">Commandes</a><a href="confidentialite.html">Confidentialité</a>
+    </nav>
+    <div class="subpanel" data-sub="rejoindre">
+      <div class="sec-head"><h3>Rejoindre le serveur</h3><p class="sub2">Serveur Minecraft Java sur liste blanche, pour les joueurs du Discord Suménium.</p></div>
+      <div class="card steps"><ol>
+        <li><b>Rejoins le Discord Suménium</b> et passe la candidature avec le staff.</li>
+        <li><b>Connecte-toi ici avec Discord</b> (bouton en haut à droite), puis relie ton pseudo Minecraft Java dans <a href="#espace/fiche">Ma fiche</a> et remplis-la.</li>
+        <li><b>Le staff t'ajoute à la liste blanche</b> une fois ta candidature validée.</li>
+        <li><b>En jeu</b> : Multijoueur → Ajouter un serveur → adresse <code>play.sumenium.com</code>, version <span id="joinVer">Java 26.3</span>.</li>
+      </ol></div>
+    </div>
+    <div class="subpanel" data-sub="commandes"><div id="cmdRoot"></div></div>
   </section>
 </main>
 <p class="site-foot">Site communautaire du serveur Minecraft Suménium, sans lien avec Mojang, Microsoft ou Discord · <a href="confidentialite.html">Confidentialité</a></p>
@@ -667,7 +779,7 @@ function item(e){
     extra+=r.done?`<div class="prog small">Bordure déjà agrandie${r.by?` par <b>${esc(r.by)}</b>`:""} : plus de blocs à gagner avec celui-ci.</div>`
       :(r.p&&r.pw!==PROG.name?`<div class="prog small">Le plus avancé : ${esc(r.pw)} (${r.p}/${n})</div>`:"");
   }else if(r.done){
-    extra=`<div class="prog">Obtenu${r.by?` par <b>${esc(r.by)}</b>${r.team?` (${esc(r.team)})`:""}`:""}${r.at?` · ${fdate(r.at)}`:""}</div>`;
+    extra=`<div class="prog">Obtenu${r.by?` par <b>${plink(r.by)}</b>${r.team?` (${esc(r.team)})`:""}`:""}${r.at?` · ${fdate(r.at)}`:""}</div>`;
   }else if(r.p){
     extra=`<div class="prog"><i><s style="width:${Math.round(r.p/n*100)}%"></s></i><span><b>${r.p}/${n}</b> · ${esc(r.pw)}${r.team?` (${esc(r.team)})`:""}</span></div>`;
   }
@@ -812,6 +924,103 @@ $("loot").onchange=e=>{st.loot=e.target.value;if(st.loot.startsWith("i:")&&st.so
 $("trophies").onchange=e=>{st.trophies=e.target.checked;lootOptions();set("trophies",st.trophies)};
 $("more").onclick=()=>{st.limit+=300;render()};
 
+// ---------- Statut du serveur Minecraft (Worker /api/status, relu toutes les minutes) ----------
+let STATUS=null;
+// MOTD : composant texte JSON de Minecraft (couleurs, gras…) et codes « § » à l'ancienne
+const LEG={"0":"black","1":"dark_blue","2":"dark_green","3":"dark_aqua","4":"dark_red","5":"dark_purple","6":"gold","7":"gray","8":"dark_gray","9":"blue",a:"green",b:"aqua",c:"red",d:"light_purple",e:"yellow",f:"white"};
+function motdHtml(c,inh){
+  inh=inh||{};
+  if(c==null)return "";
+  if(typeof c==="string")c={text:c};
+  if(Array.isArray(c))return c.map(x=>motdHtml(x,inh)).join("");
+  const sty={color:c.color??inh.color,bold:c.bold??inh.bold,italic:c.italic??inh.italic,underlined:c.underlined??inh.underlined,strikethrough:c.strikethrough??inh.strikethrough};
+  let out="",cur=Object.assign({},sty);
+  const span=(t,o)=>{if(!t)return "";const css=[o.color?`color:${col(o.color)}`:"",o.bold?"font-weight:700":"",o.italic?"font-style:italic":"",
+    o.underlined||o.strikethrough?`text-decoration:${[o.underlined?"underline":"",o.strikethrough?"line-through":""].join(" ")}`:""].filter(Boolean).join(";");
+    return `<span style="${css}">${esc(t).replace(/\n/g,"<br>")}</span>`};
+  String(c.text??c.translate??"").split(/(§[0-9a-fk-or])/i).forEach(part=>{
+    const m=/^§([0-9a-fk-or])$/i.exec(part);
+    if(!m){out+=span(part,cur);return}
+    const k=m[1].toLowerCase();
+    if(LEG[k])cur=Object.assign({},sty,{color:LEG[k],bold:false,italic:false,underlined:false,strikethrough:false});
+    else if(k==="l")cur.bold=true;else if(k==="o")cur.italic=true;else if(k==="n")cur.underlined=true;else if(k==="m")cur.strikethrough=true;else if(k==="r")cur=Object.assign({},sty);
+  });
+  return out+(c.extra||[]).map(x=>motdHtml(x,cur)).join("");
+}
+const headImg=(n,s=24)=>`<img class="face" src="https://mc-heads.net/avatar/${encodeURIComponent(n)}/${s}" alt="" width="${s}" height="${s}" loading="lazy">`;
+function statusTip(){
+  const s=STATUS;
+  if(!s)return '<p class="muted small">Statut du serveur en cours de lecture…</p>';
+  if(!s.online)return '<p><b>Serveur injoignable pour l\'instant</b></p><p class="muted small">Il redémarre peut-être. Nouvel essai dans une minute.</p>';
+  const p=s.players||{},list=p.sample||[];
+  return `<div class="motd">${motdHtml(s.motd)||"Suménium"}</div>
+    <p class="ip-line"><b>${fmt(p.online)}</b> / ${fmt(p.max)} joueurs en ligne${s.version?` · ${esc(s.version)}`:""}</p>
+    ${list.length?`<ul class="ip-players">${list.map(n=>`<li>${headImg(n,20)}${esc(n)}</li>`).join("")}</ul>${p.online>list.length?`<p class="muted small">et ${fmt(p.online-list.length)} autre${p.online-list.length>1?"s":""}</p>`:""}`
+      :(p.online?'<p class="muted small">Le serveur ne publie pas la liste des joueurs.</p>':'<p class="muted small">Personne en ligne pour le moment.</p>')}
+    <p class="muted small">Clique pour copier l'adresse</p>`;
+}
+function renderStatus(){
+  const s=STATUS,dot=$("ipDot"),cnt=$("ipCount");
+  dot.className="ip-dot"+(s?(s.online?"":" off"):" wait");
+  if(s&&s.online){cnt.hidden=false;cnt.textContent=`${fmt(s.players.online)}/${fmt(s.players.max)}`;$("ipCopy").setAttribute("aria-label",`Copier l'adresse play.sumenium.com, ${s.players.online} joueurs en ligne`)}
+  else cnt.hidden=true;
+  if(s&&s.version){$("ipSub").textContent=`Minecraft ${s.version}`;const j=$("joinVer");if(j)j.textContent=s.version}
+  $("ipTip").innerHTML=statusTip();
+  refreshHome();
+}
+async function loadStatus(){
+  if(location.hostname==="deedg.github.io")return;
+  try{const r=await fetch("/api/status");if(r.ok)STATUS=await r.json()}catch(e){}
+  renderStatus();
+}
+
+// ---------- Accueil ----------
+function refreshHome(){if(!$("p-accueil").hidden)renderHome()}
+function renderHome(){
+  const s=STATUS,E=window.Economie&&window.Economie.data(),D=window.Espace&&window.Espace.data();
+  const rem=CAT.filter(e=>!rec(e).done),blocks=Math.round(rem.reduce((a,e)=>a+rec(e).b,0));
+  const card=(href,ico,t,txt)=>`<a class="go" href="${href}"><span class="go-ico" aria-hidden="true">${ico}</span><b>${t}</b><span>${txt}</span></a>`;
+  const now=[];
+  const el=D&&D.settings&&D.settings.election;
+  if(el&&el!=="fermee"){const lab={candidatures:"Candidatures ouvertes pour la mairie",tour1:"Vote du 1er tour en cours",tour2:"Vote du 2nd tour en cours",resultats:"Résultats de l'élection publiés"}[el];
+    if(lab)now.push(`<li><span class="chip warn">Élection</span> <a href="#communaute/elections">${lab}</a>${D.candidats&&D.candidats.length?` · ${fmt(D.candidats.length)} candidat${D.candidats.length>1?"s":""}`:""}</li>`)}
+  if(E&&E.hdv){E.hdv.filter(a=>a.fin&&a.fin>Date.now()).sort((a,b)=>a.fin-b.fin).slice(0,3).forEach(a=>{
+    const h=Math.round((a.fin-Date.now())/3600000);
+    now.push(`<li><span class="chip">Enchère</span> <a href="#marche/hdv">${esc(NAMES[String(a.item).replace("minecraft:","")]||a.nom||a.item)}${a.quantite>1?` × ${fmt(a.quantite)}`:""}</a> · finit ${h<1?"dans moins d'une heure":h<48?`dans ${h} h`:`dans ${Math.round(h/24)} jours`}</li>`)})}
+  Object.entries(DATA.adv||{}).filter(([,r])=>r.done&&r.at&&r.by).sort((a,b)=>String(b[1].at).localeCompare(String(a[1].at))).slice(0,5).forEach(([id,r])=>{
+    const e=CAT.find(x=>x.id===id);if(e)now.push(`<li><span class="chip ok">Succès</span> ${plink(r.by)} a obtenu <b>${esc(e.title)}</b>${r.b?` (+${fmtB(Math.round(r.b))} blocs)`:""} · ${fdate(r.at)}</li>`)});
+  const p=s&&s.online?s.players:null;
+  $("homeRoot").innerHTML=`
+    <section class="home-hero card">
+      <div class="home-status">
+        <span class="ip-dot${s?(s.online?"":" off"):" wait"}" aria-hidden="true"></span>
+        <div><b>${s?(s.online?"Serveur en ligne":"Serveur injoignable"):"Statut du serveur…"}</b>
+          <span class="muted small">${p?`${fmt(p.online)} / ${fmt(p.max)} joueurs${s.version?` · ${esc(s.version)}`:""}`:"play.sumenium.com"}</span></div>
+      </div>
+      ${s&&s.online&&s.motd?`<div class="motd big">${motdHtml(s.motd)}</div>`:""}
+      ${p&&p.sample&&p.sample.length?`<ul class="ip-players inline">${p.sample.map(n=>`<li><a href="#communaute/joueur/${encodeURIComponent(n)}">${headImg(n,20)}${esc(n)}</a></li>`).join("")}</ul>`:""}
+      <div class="home-actions"><button type="button" class="btn" id="homeCopy">Copier l'adresse play.sumenium.com</button><a class="btn ghost" href="#aide/rejoindre">Comment rejoindre</a></div>
+    </section>
+    <div class="stats home-stats">
+      <a class="stat" href="#monde/succes"><b>${hasData()?fmt(DATA.worldSize*2):"–"}</b><span>Largeur du monde (blocs)</span></a>
+      <a class="stat sun" href="#monde/succes"><b>${hasData()?"+"+fmt(blocks):"–"}</b><span>Blocs encore à gagner</span></a>
+      <a class="stat leaf" href="#marche/boutiques"><b>${E&&E.boutiques?fmt(E.boutiques.filter(b=>b.proprietaireType!=="fisc").length):"–"}</b><span>Boutiques des joueurs</span></a>
+      <a class="stat" href="#communaute/joueurs"><b>${D&&D.players?fmt(D.players.length):"–"}</b><span>Joueurs inscrits</span></a>
+    </div>
+    <h3 class="sec">En ce moment</h3>
+    <div class="card"><ul class="now">${now.join("")||'<li class="muted">Rien de particulier pour l\'instant.</li>'}</ul></div>
+    <h3 class="sec">Je veux…</h3>
+    <div class="go-grid">
+      ${card("#monde/carte","🗺️","Voir la carte","Le monde en 3D, les boutiques et la bordure")}
+      ${card("#marche/boutiques","🛒","Acheter ou vendre","Boutiques des joueurs, hôtel des ventes, FISC")}
+      ${card("#monde/succes","🏆","Agrandir la bordure","Les succès qui rapportent des blocs")}
+      ${card("#communaute/factions","🏰","Voir les factions","Membres, banque, usines, projets")}
+      ${card("#espace/fiche","🪪","Ma fiche","Mon personnage, mon historique")}
+      ${card("#aide/commandes","📖","Les commandes","Boutiques, factions, hôtel des ventes")}
+    </div>`;
+  $("homeCopy").onclick=()=>$("ipCopy").click();
+}
+
 // Carte hébergée sur le homelab (via le tunnel Cloudflare)
 // Adresse du serveur : copie en un clic
 (()=>{const b=document.getElementById("ipCopy"),a=document.getElementById("ipAct");if(!b)return;let t;
@@ -835,7 +1044,7 @@ function showOnMap(x,y,z){
   mapAt=`#overworld:${Math.round(x)}:${Math.round(y)}:${Math.round(z)}:60:0:0:0:0:perspective`;
   const f=$("mapframe");
   if(mapReady){f.src=MAP_URL+"?v="+Date.now()+mapAt;$("mapfull").href=MAP_URL+mapAt}
-  location.hash="carte";
+  location.hash="monde/carte";
 }
 
 async function loadData(){
@@ -844,7 +1053,7 @@ async function loadData(){
     if(r.ok){const d=await r.json();DATA=Object.assign({adv:{}},d);if(STATS)renderClassement();}
     else DATA={adv:{},error:"données introuvables"};
   }catch(e){DATA={adv:{},error:"données illisibles"};}
-  render();
+  render();refreshHome();
 }
 
 // ---------- Récompenses ----------
@@ -897,13 +1106,15 @@ window.addEventListener("scroll",()=>{if(tipFor)hideTip()},{passive:true});
 // ---------- Classements ----------
 let STATS=null, mapReady=false, statSel=null;
 const okName=n=>/^[A-Za-z0-9_]{2,16}$/.test(n);
+// Lien vers la fiche d'un joueur (Communauté › Joueurs)
+const plink=n=>`<a class="plink" href="#communaute/joueur/${encodeURIComponent(n)}">${esc(n)}</a>`;
 const teamOf=n=>(STATS&&STATS.playerTeams&&STATS.playerTeams[n])||"";
 function rankList(rows,fmtv,limit){
   rows=(rows||[]).filter(r=>okName(r[0])).slice(0,limit||1000);
   if(!rows.length)return '<p class="empty">Pas encore de données.</p>';
   const max=Math.max(...rows.map(r=>Math.abs(r[1])),1);
   return '<div class="rank-scroll"><ol class="rank">'+rows.map((r,i)=>{const t=teamOf(r[0]);
-    return `<li><span class="pos">${i+1}</span><span class="who">${esc(r[0])}${t?`<small>${esc(t)}</small>`:""}</span><span class="val">${fmtv(r[1])}</span><span class="bar2"><s style="width:${Math.max(2,Math.round(Math.abs(r[1])/max*100))}%"></s></span></li>`}).join("")+'</ol></div>';
+    return `<li><span class="pos">${i+1}</span><span class="who">${plink(r[0])}${t?`<small>${esc(t)}</small>`:""}</span><span class="val">${fmtv(r[1])}</span><span class="bar2"><s style="width:${Math.max(2,Math.round(Math.abs(r[1])/max*100))}%"></s></span></li>`}).join("")+'</ol></div>';
 }
 // Blocs de bordure gagnés : chaque succès compte pour le premier joueur qui l'a obtenu (et sa faction)
 function borderBlocks(){
@@ -911,6 +1122,8 @@ function borderBlocks(){
   Object.values(DATA.adv||{}).forEach(r=>{if(!r.done||!r.by||!r.b)return;p[r.by]=(p[r.by]||0)+r.b;if(r.team)t[r.team]=(t[r.team]||0)+r.b});
   return {players:Object.entries(p).sort((a,b)=>b[1]-a[1]),teams:t};
 }
+// Pour les fiches joueur / faction (espace.js)
+window.SiteData={stats:()=>STATS,data:()=>DATA,cat:()=>CAT,borderBlocks:()=>borderBlocks()};
 function renderClassement(){
   if(!STATS){$("tabBoards").innerHTML='<p class="empty">Les classements arrivent à la prochaine mise à jour du serveur.</p>';return}
   const bb=borderBlocks();
@@ -951,37 +1164,46 @@ function setupStats(){
 $("statCat").onchange=()=>{statSel=null;renderStatList()};
 $("statQ").oninput=()=>renderStatList();
 $("statList").onclick=e=>{const b=e.target.closest("button");if(!b)return;statSel=b.dataset.id;renderStatListSel();renderStatView()};
-function money(v){const e=STATS.economy;const n=fmt(Math.round(v*100)/100);return e.before?e.symbol+n:n+" "+e.symbol}
-function renderEco(){
-  const e=STATS&&STATS.economy;
-  if(!e){$("ecoBoards").innerHTML='<p class="empty">Pas encore de données économiques.</p>';return}
-  const rich=e.baltop.filter(r=>r[1]>0);
-  const tx=Object.entries(e.transactions||{}).filter(([k])=>!k.startsWith("ADMIN")).reduce((a,[,v])=>a+v,0);
-  $("ecoSub").textContent=`Argent en circulation : ${money(e.total)} · ${fmt(rich.length)} joueur${rich.length>1?"s":""} avec un solde · ${fmt(tx)} échanges enregistrés`;
-  const shopRows=(e.shops||[]);
-  $("ecoBoards").innerHTML=
-    `<div class="board"><h3>Baltop<small>${fmt(rich.length)} joueurs</small></h3>${rankList(rich,money)}</div>`+
-    `<div class="board"><h3>Plus gros dépensiers<small>Envoyé</small></h3>${rankList(e.sent,money)}</div>`+
-    `<div class="board"><h3>Plus gros encaissements<small>Reçu</small></h3>${rankList(e.received,money)}</div>`+
-    `<div class="board"><h3>Magasins<small>${fmt(e.adminShops)} du serveur</small></h3>${rankList(shopRows,fmt)}</div>`;
-}
 async function loadStats(){
   try{const r=await fetch("stats.json?t="+Date.now());if(r.ok)STATS=await r.json();}catch(e){}
-  renderClassement();setupStats();
+  renderClassement();setupStats();refreshHome();
 }
 
 // ---------- Onglets ----------
-const TABS=["classement","succes","stats","economie","carte","espace"];
+// Arborescence : onglet/sous-onglet[/détail]. Les anciens liens (#classement, #economie/boutiques…) renvoient au bon endroit.
+const TABS=["accueil","monde","communaute","marche","classements","espace","aide"];
+const SUBS={monde:["carte","succes","projets"],classements:["tableau","richesse","stats"],aide:["rejoindre","commandes"]};
+const LEGACY={classement:"classements/tableau",succes:"monde/succes",stats:"classements/stats",carte:"monde/carte",
+  "economie":"marche","economie/apercu":"marche/economie","economie/boutiques":"marche/boutiques","economie/hdv":"marche/hdv","economie/fisc":"marche/fisc",
+  "economie/factions":"communaute/factions","economie/baltop":"classements/richesse","economie/commandes":"aide/commandes",
+  "espace/factions":"communaute/factions","espace/joueurs":"communaute/joueurs","espace/usines":"communaute/usines","espace/elections":"communaute/elections",
+  "espace/projets":"monde/projets","espace/prix":"marche/fisc"};
 function route(){
-  const parts=location.hash.slice(1).split(/[/?]/);let t=parts[0];if(!TABS.includes(t))t="classement";
+  const raw=location.hash.slice(1),q=raw.includes("?")?raw.slice(raw.indexOf("?")):"",path=raw.split("?")[0];
+  const parts=path.split("/");
+  const legacy=LEGACY[parts.slice(0,2).join("/")]||(parts.length===1&&LEGACY[parts[0]]);
+  if(legacy){history.replaceState(null,"","#"+legacy+q);return route()}
+  let t=parts[0];if(!TABS.includes(t))t="accueil";
   TABS.forEach(x=>{$("p-"+x).hidden=x!==t});
-  document.querySelectorAll(".tabs a").forEach(a=>a.setAttribute("aria-current",a.dataset.tab===t?"page":"false"));
-  if(t==="carte"&&!mapReady){mapReady=true;setupMap()}
-  if(t==="espace"&&window.Espace)window.Espace.show(parts[1]);
-  if(t==="economie"&&window.Economie)window.Economie.show(parts[1]);
+  document.querySelectorAll(".tabs-list a").forEach(a=>a.setAttribute("aria-current",a.dataset.tab===t?"page":"false"));
+  let s=parts[1]||"";
+  if(SUBS[t]){
+    if(!SUBS[t].includes(s))s=SUBS[t][0];
+    document.querySelectorAll(`#p-${t} .subpanel`).forEach(d=>d.hidden=d.dataset.sub!==s);
+    document.querySelectorAll(`#p-${t} .subtabs a[data-sub]`).forEach(a=>a.setAttribute("aria-current",a.dataset.sub===s?"page":"false"));
+  }
+  document.title=({accueil:"Suménium · Saison 7",monde:"Monde · Suménium",communaute:"Communauté · Suménium",marche:"Marché · Suménium",classements:"Classements · Suménium",espace:"Mon espace · Suménium",aide:"Aide · Suménium"})[t];
+  if(t==="accueil")renderHome();
+  if(t==="monde"&&s==="carte"&&!mapReady){mapReady=true;setupMap()}
+  if(t==="monde"&&s==="projets"&&window.Espace)window.Espace.show("projets");
+  if(t==="communaute"&&window.Espace)window.Espace.show("communaute",parts[1],decodeURIComponent(parts.slice(2).join("/")));
+  if(t==="espace"&&window.Espace)window.Espace.show("espace",parts[1]);
+  if(t==="marche"&&window.Economie)window.Economie.show("marche",parts[1]);
+  if(t==="classements"&&s==="richesse"&&window.Economie)window.Economie.show("richesse");
+  if(t==="aide"&&s==="commandes"&&window.Economie)window.Economie.show("commandes");
 }
 let lastTab=null;
-window.addEventListener("hashchange",()=>{const t=location.hash.slice(1).split(/[/?]/)[0];route();if(t!==lastTab)window.scrollTo({top:0});lastTab=t});
+window.addEventListener("hashchange",()=>{const t=location.hash.slice(1).split(/[?]/)[0].split("/").slice(0,3).join("/");route();if(t!==lastTab)window.scrollTo({top:0});lastTab=t});
 
 (async()=>{
   route();
@@ -991,8 +1213,9 @@ window.addEventListener("hashchange",()=>{const t=location.hash.slice(1).split(/
   Object.entries(TIERS).forEach(([k,v])=>{if(CAT.some(e=>e.tier===k))$("tier").add(new Option(v,k))});
   lootOptions();
   setupWho();
+  loadStatus();setInterval(loadStatus,60000);
   await Promise.all([loadData(),loadStats()]);
-  lootOptions();
+  lootOptions();refreshHome();
   setInterval(()=>{loadData();loadStats()},120000);
 })();
 </script>

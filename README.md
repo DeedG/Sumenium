@@ -19,6 +19,20 @@ Toutes les 10 minutes, GitHub Actions lit le serveur en SFTP, calcule les donné
 2. **Pages** : dans *Settings → Pages*, choisir *Source : GitHub Actions*.
 3. **Premier lancement** : onglet *Actions → Mise à jour du site → Run workflow*. Le site est ensuite à l'adresse `https://sumenium.com/` (l'ancienne adresse `deedg.github.io/Sumenium` y renvoie).
 
+## Navigation du site
+
+| Onglet | Contenu |
+|---|---|
+| Accueil (`#accueil`, logo et nom) | Statut du serveur (MOTD, joueurs en ligne), chiffres clés, « en ce moment », raccourcis |
+| Monde | `#monde/carte`, `#monde/succes` (bordure et succès), `#monde/projets` |
+| Communauté | `#communaute/joueurs`, `factions`, `usines`, `elections`, fiches `#communaute/joueur/<pseudo>` et `#communaute/faction/<id>` |
+| Marché | `#marche/boutiques`, `hdv`, `fisc`, `economie` |
+| Classements | `#classements/tableau`, `richesse`, `stats` |
+| Aide | `#aide/rejoindre`, `#aide/commandes`, page Confidentialité |
+| Mon espace (bouton en haut à droite) | `#espace/fiche`, `historique`, `staff` |
+
+Tout se lit sans connexion ; voter, remplir sa fiche ou modifier sa faction demande la connexion Discord. Les anciens liens (`#classement`, `#economie/boutiques`, `#espace/factions`…) renvoient au bon endroit. Le statut du serveur vient de `/api/status` (le Worker interroge le serveur Minecraft comme la liste des serveurs du jeu, `MC_HOST`/`MC_PORT` dans `worker/wrangler.toml`, 30 s de cache).
+
 ## Ce que le script lit sur le serveur
 
 - `server.properties` : nom du monde

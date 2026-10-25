@@ -1,5 +1,5 @@
-/* Espace Suménium : fiches joueurs, factions, projets communautaires, usines, élections, outils staff.
-   Fonctionne uniquement sur l'adresse officielle (l'API et la connexion Discord y sont servies). */
+/* Communauté (joueurs, factions, usines, élections, fiches), Projets et Mon espace (ma fiche, historique, outils staff).
+   Lecture sans connexion ; toute modification demande la connexion Discord. Uniquement sur l'adresse officielle (API servie là). */
 (() => {
 const HOST = "sumenium.com";  // adresse officielle (l'API et la connexion Discord y sont servies)
 const LIVE = ["sumenium.com", "localhost", "127.0.0.1"].includes(location.hostname);
@@ -16,18 +16,17 @@ const LEVEL = { staff: "Staff", sumenien: "Suménien", attente: "En attente de v
 const ELECTION = { fermee: "Fermée", candidatures: "Candidatures ouvertes", tour1: "Vote : 1er tour", tour2: "Vote : 2nd tour", resultats: "Résultats publiés" };
 const TAILLE_USINE = { grosse: ["Grosses usines", 3], moyenne: ["Moyennes usines", 4], petite: ["Petites usines", 5] };
 const TAILLE_MOT = { grosse: "grosse", moyenne: "moyenne", petite: "petite" };
-// Sous-onglets, regroupés : ce qui me concerne / la vie du serveur / le staff
-const GROUPS = [
-  ["Moi", [["fiche", "Ma fiche"], ["historique", "Mon historique"]]],
-  ["Serveur", [["factions", "Factions"], ["projets", "Projets"], ["usines", "Usines"], ["joueurs", "Joueurs"], ["elections", "Élections"]]],
-  ["Staff", [["staff", "Outils staff"]]],
-];
-const SUBS = GROUPS.flatMap(([, l]) => l);
+// Zones rendues par ce fichier : chacune a sa racine dans la page et ses sous-onglets
+const AREAS = {
+  espace: { root: "espaceRoot", subs: [["fiche", "Ma fiche"], ["historique", "Mon historique"], ["staff", "Outils staff"]] },
+  communaute: { root: "comRoot", subs: [["joueurs", "Joueurs"], ["factions", "Factions"], ["usines", "Usines"], ["elections", "Élections"]] },
+  projets: { root: "projRoot", subs: [["projets", "Projets"]] },
+};
 // Échelle RP : 1,87 m IRL = taille normale (1), comme dans l'ancien tableau
 const scaleOf = (cm) => (cm ? Math.round((cm / 187) * 10000) / 10000 : null);
 
 let ECO = null;  // site/eco.json (mod Sumenium Economy) : soldes et banques, pour relier l'Espace à l'onglet Économie
-let ME = null, D = null, checking = true, sub = "fiche", busy = false, staffFaction = null, auditRows = [], auditEnd = false, WORLD = null;
+let ME = null, D = null, checking = true, area = "espace", sub = "fiche", arg = "", busy = false, lastLoad = 0, staffFaction = null, auditRows = [], auditEnd = false, WORLD = null;
 
 /* ---------- API ---------- */
 async function call(method, path, body) {
@@ -37,7 +36,7 @@ async function call(method, path, body) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const j = await r.json().catch(() => ({}));
-  if (r.status === 401 && ME) { ME = null; D = null; render(); }
+  if (r.status === 401 && ME) { ME = null; reload().catch(() => {}); }
   if (!r.ok) throw new Error(j.error || `Erreur ${r.status}`);
   return j;
 }
@@ -58,8 +57,10 @@ async function reload() {
   const eco = fetch("eco.json?t=" + Date.now()).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   D = await call("GET", "/api/data");
   ECO = await eco;
-  ME = D.user || ME;
+  ME = D.user || null;
+  lastLoad = Date.now();
   render();
+  if (window.refreshHome) window.refreshHome();
 }
 
 /* ---------- helpers ---------- */
@@ -84,7 +85,7 @@ function ecoFac(f) {
 const ecoPlayer = (name) => ECO && ECO.joueurs ? ECO.joueurs.find((j) => norm(j.nom) === norm(name)) || null : null;
 const suE = (v) => Number(v || 0).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + "\u00a0" + ((ECO && ECO.monnaie) || "Su");
 const facStyle = (f) => { const e = ecoFac(f); const c = e && typeof col === "function" ? col(e.couleur) : null; return c ? ` style="--fc:${esc(c)}"` : ""; };
-const facLabel = (fid) => { const f = fac(fid); return f ? `<span class="ftag"${facStyle(f)}>${esc(f.name)}</span>` : '<span class="chip muted">Solo</span>'; };
+const facLabel = (fid) => { const f = fac(fid); return f ? flink(f) : '<span class="chip muted">Solo</span>'; };
 const ROLE_MOD = { chef: "Chef", tresorier: "Trésorier" };
 const isStaff = () => ME && ME.level === "staff";
 const canWrite = () => ME && ME.level !== "attente";
@@ -102,6 +103,8 @@ const formData = (form) => Object.fromEntries(new FormData(form).entries());
 const para = (t) => (t ? `<p class="txt">${esc(t)}</p>` : "");
 const head = (title, sub2) => `<div class="sec-head"><h3>${title}</h3>${sub2 ? `<p class="sub2">${sub2}</p>` : ""}</div>`;
 const face = (n, size = 32) => `<img class="face" src="https://mc-heads.net/avatar/${encodeURIComponent(n)}/${size}" alt="" width="${size}" height="${size}" loading="lazy">`;
+const plink = (n) => `<a class="plink" href="#communaute/joueur/${encodeURIComponent(n)}">${esc(n)}</a>`;
+const flink = (f) => `<a class="faclink" href="#communaute/faction/${f.id}"><span class="ftag"${facStyle(f)}>${esc(f.name)}</span></a>`;
 const plural = (n, one, many) => `${fmt(n)} ${n > 1 ? many : one}`;
 const reglesProjet = (pr) => pr.unique_srv ? '<span class="chip lvl-staff">Unique sur le serveur</span>'
   : pr.illimite ? '<span class="chip ok">Sans limite</span>' : '<span class="chip">1 fois par faction</span>';
@@ -109,37 +112,66 @@ const taillesTxt = (t) => t.split(",").map((x) => TAILLE_MOT[x] || x).join(" ou 
 // Fiche suffisante pour être whitelisté : métier + « mourir ou survivre » (faction facultative : on peut jouer seul)
 const ficheOk = (p) => !!(p.metier && p.mort);
 
+/* ---------- connexion ---------- */
+// Après la connexion Discord, on revient sur la page où le joueur a cliqué « Se connecter »
+const NEXT_KEY = "sumenium-next";
+function rememberPage() { try { sessionStorage.setItem(NEXT_KEY, location.hash || "#accueil"); } catch (e) {} }
+document.addEventListener("click", (e) => { if (e.target.closest("a[data-login]")) rememberPage(); });
+const loginBtn = (label = "Se connecter avec Discord", cls = "btn discord") => `<a class="${cls}" href="/api/auth/login" data-login>${label}</a>`;
+const loginHint = (what) => !ME && LIVE ? `<p class="login-hint">${what} <a href="/api/auth/login" data-login>Connecte-toi avec Discord</a>.</p>` : "";
+const DISCORD_SVG = '<svg width="18" height="14" viewBox="0 0 71 55" aria-hidden="true"><path fill="currentColor" d="M60.1 4.9A58.5 58.5 0 0 0 45.6.4a40 40 0 0 0-1.9 3.8 54 54 0 0 0-16.2 0A40 40 0 0 0 25.6.4 58.4 58.4 0 0 0 11 4.9C1.6 18.7-.9 32.2.3 45.5a58.9 58.9 0 0 0 18 9.1 43 43 0 0 0 3.8-6.3 38 38 0 0 1-6-2.9l1.5-1.1a42 42 0 0 0 36 0l1.5 1.1a38 38 0 0 1-6 2.9 43 43 0 0 0 3.8 6.3 58.7 58.7 0 0 0 18-9.1c1.5-15.4-2.5-28.8-10.8-40.6ZM23.7 37.3c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.3 6.4 7.2c0 4-2.8 7.2-6.4 7.2Z"/></svg>';
+function renderAcct() {
+  const el = $("acct");
+  if (!el) return;
+  if (!LIVE || checking) { el.innerHTML = ""; return; }
+  const here = location.hash.startsWith("#espace") ? "page" : "false";
+  if (ME) {
+    const p = me(), n = p ? p.mc_name : ME.name;
+    const pic = p ? face(p.mc_name, 24) : ME.avatar ? `<img src="${esc(ME.avatar)}" alt="" width="24" height="24" style="border-radius:50%">` : "";
+    el.innerHTML = `<a class="tabs-me" href="#espace/fiche" aria-current="${here}" aria-label="Mon espace (${esc(n)})" title="Mon espace : ma fiche, mon historique${isStaff() ? ", outils staff" : ""}">${pic}<span>${esc(n)}</span></a>`;
+  } else el.innerHTML = `<a class="tabs-login" href="/api/auth/login" data-login aria-label="Se connecter avec Discord" title="Se connecter avec Discord">${DISCORD_SVG}<span>Se connecter</span></a>`;
+}
+
 /* ---------- squelette ---------- */
 function render() {
-  const root = $("espaceRoot");
+  renderAcct();
+  const A = AREAS[area], root = $(A.root);
+  if (!root) return;
+  Object.values(AREAS).forEach((x) => { if (x.root !== A.root && $(x.root)) $(x.root).innerHTML = ""; });  // un seul #espView à la fois
   if (!LIVE) {
-    root.innerHTML = `<div class="card center"><h3>L'espace joueurs est sur ${HOST}</h3>
-      <p>Fiches, factions, usines et élections se gèrent avec ton compte Discord, sur l'adresse du serveur.</p>
-      <a class="btn" href="https://${HOST}/#espace">Ouvrir l'Espace Suménium</a></div>`;
+    root.innerHTML = `<div class="card center"><h3>Cette partie est sur ${HOST}</h3>
+      <p>Fiches, factions, usines et élections sont servies par l'adresse officielle du site.</p>
+      <a class="btn" href="https://${HOST}/${esc(location.hash)}">Ouvrir sur ${HOST}</a></div>`;
     return;
   }
-  if (checking) { root.innerHTML = '<div class="card center loading-card"><span class="spinner" aria-hidden="true"></span><p>Chargement de ton espace…</p></div>'; return; }
-  if (!ME) {
-    const err = new URLSearchParams(location.hash.split("?")[1] || "").get("erreur");
-    root.innerHTML = `${err ? `<div class="banner">${esc(err)}</div>` : ""}<div class="card center">
-      <h3>Connecte-toi avec Discord</h3>
-      <p>L'espace est réservé aux membres du Discord Suménium. Tu restes connecté 30 jours sur cet appareil.</p>
-      <a class="btn discord" href="/api/auth/login" onclick="if(this.dataset.go)return false;this.dataset.go=1;this.textContent='Redirection vers Discord…';this.classList.add('wait')">Se connecter avec Discord</a>
-      <p class="muted small">Tu passes par la page officielle <b>discord.com</b> : vérifie l'adresse, et ne donne jamais ton mot de passe ailleurs. Le site reçoit seulement ton pseudo Discord et tes rôles sur le serveur Suménium, rien n'est publié sur Discord. <a href="confidentialite.html">Ce qu'on enregistre</a></p></div>`;
-    return;
-  }
-  if (!D) { root.innerHTML = '<p class="empty">Chargement…</p>'; return; }
-  if (!SUBS.some(([k]) => k === sub) || (sub === "staff" && !isStaff())) sub = "fiche";
-  const badge = { staff: isStaff() ? D.players.filter((p) => D.wlSynced && !p.whitelisted && ficheOk(p)).length : 0 };
-  root.innerHTML = `<div class="who-bar">
-      <div class="who-me">${ME.avatar ? `<img src="${esc(ME.avatar)}" alt="" width="36" height="36">` : ""}
-        <div><b>${esc(ME.name)}</b><span class="chip lvl-${esc(ME.level)}">${esc(LEVEL[ME.level])}</span></div></div>
-      <a class="link" href="/api/auth/logout">Se déconnecter</a></div>
-    ${ME.level === "attente" ? '<div class="banner info">Ton compte est en attente de vérification : tu peux tout consulter, et tu pourras remplir ta fiche une fois le vocal passé avec le staff.</div>' : ""}
-    <nav class="subtabs" aria-label="Espace joueurs">${GROUPS.filter(([g]) => g !== "Staff" || isStaff()).map(([g, items]) =>
-      `<span class="grp">${g}</span>` + items.map(([k, l]) => `<a href="#espace/${k}" aria-current="${k === sub ? "page" : "false"}">${l}${badge[k] ? ` <span class="badge">${badge[k]}</span>` : ""}</a>`).join("")).join("")}</nav>
-    <div id="espView"></div>`;
-  ({ fiche, historique, joueurs, factions, projets, usines, elections, staff })[sub]();
+  if (checking || !D) { root.innerHTML = '<div class="card center loading-card"><span class="spinner" aria-hidden="true"></span><p>Chargement…</p></div>'; return; }
+  if (area === "espace") {
+    if (!ME) {
+      const err = new URLSearchParams(location.hash.split("?")[1] || "").get("erreur");
+      root.innerHTML = `${err ? `<div class="banner">${esc(err)}</div>` : ""}<div class="card center">
+        <h3>Mon espace</h3>
+        <p>Connecte-toi avec Discord pour remplir ta fiche, voir ton historique, voter ou gérer ta faction. Tu restes connecté 30 jours sur cet appareil.</p>
+        ${loginBtn()}
+        <p class="muted small">Tu passes par la page officielle <b>discord.com</b> : vérifie l'adresse, et ne donne jamais ton mot de passe ailleurs. Le site reçoit seulement ton pseudo Discord et tes rôles sur le serveur Suménium, rien n'est publié sur Discord. <a href="confidentialite.html">Ce qu'on enregistre</a></p></div>`;
+      return;
+    }
+    if (sub === "staff" && !isStaff()) sub = "fiche";
+    const badge = { staff: isStaff() ? D.players.filter((p) => D.wlSynced && !p.whitelisted && ficheOk(p)).length : 0 };
+    root.innerHTML = `<div class="who-bar">
+        <div class="who-me">${ME.avatar ? `<img src="${esc(ME.avatar)}" alt="" width="36" height="36">` : ""}
+          <div><b>${esc(ME.name)}</b><span class="chip lvl-${esc(ME.level)}">${esc(LEVEL[ME.level])}</span></div></div>
+        <a class="link" href="/api/auth/logout">Se déconnecter</a></div>
+      ${ME.level === "attente" ? '<div class="banner info">Ton compte est en attente de vérification : tu peux tout consulter, et tu pourras remplir ta fiche une fois le vocal passé avec le staff.</div>' : ""}
+      <nav class="subtabs" aria-label="Mon espace">${A.subs.filter(([k]) => k !== "staff" || isStaff()).map(([k, l]) =>
+        `<a href="#espace/${k}" aria-current="${k === sub ? "page" : "false"}">${l}${badge[k] ? ` <span class="badge">${badge[k]}</span>` : ""}</a>`).join("")}</nav>
+      <div id="espView"></div>`;
+  } else if (area === "communaute") {
+    const cur = sub === "joueur" ? "joueurs" : sub === "faction" ? "factions" : sub;
+    root.innerHTML = `<nav class="subtabs" aria-label="Communauté">${A.subs.map(([k, l]) =>
+        `<a href="#communaute/${k}" aria-current="${k === cur ? "page" : "false"}">${l}</a>`).join("")}</nav>
+      <div id="espView"></div>`;
+  } else root.innerHTML = '<div id="espView"></div>';
+  ({ fiche, historique, staff, joueurs, factions, usines, elections, projets, joueur: joueurPage, faction: factionPage })[sub]();
 }
 const view = (h) => ($("espView").innerHTML = h);
 
@@ -172,8 +204,9 @@ function fiche() {
         ${e ? `<dt>Mon solde</dt><dd>${suE(e.solde)}</dd>` : ""}${ef ? `<dt>Banque de ${esc(f.name)}</dt><dd>${suE(ef.banque)}</dd>` : ""}</dl>` : ""; })()}
       <div class="profile-links">
         <a class="btn small ghost" href="#espace/historique">Mon historique</a>
-        <a class="btn small ghost" href="#succes" data-my-succes>Mes succès</a>
-        ${f ? `<a class="btn small ghost" href="#espace/factions">Ma faction</a>` : ""}
+        <a class="btn small ghost" href="#monde/succes" data-my-succes>Mes succès</a>
+        <a class="btn small ghost" href="#communaute/joueur/${encodeURIComponent(p.mc_name)}">Ma fiche publique</a>
+        ${f ? `<a class="btn small ghost" href="#communaute/faction/${f.id}">Ma faction</a>` : ""}
       </div>
     </aside>
     <form id="ficheForm" class="card form fiche-form">
@@ -285,7 +318,7 @@ function joueurs() {
 function playerCard(p) {
   const mine = p.id === D.meId;
   return `<article class="pcard${mine ? " mine" : ""}">
-    <header>${face(p.mc_name)}<div><b>${esc(p.mc_name)}</b>${facLabel(p.faction_id)}</div></header>
+    <header>${face(p.mc_name)}<div><b>${plink(p.mc_name)}</b>${facLabel(p.faction_id)}</div></header>
     ${p.metier ? `<p class="metier">${esc(p.metier)}</p>` : '<p class="metier muted">Métier non renseigné</p>'}
     <div class="tags">${p.mort ? `<span class="chip m-${esc(p.mort)}" title="${esc(MORT[p.mort])}">${esc(MORT_COURT[p.mort])}</span>` : ""}
       ${p.activite ? `<span class="chip">${esc(ACT_COURT[p.activite])}</span>` : ""}
@@ -327,8 +360,12 @@ function factions() {
   const list = [...D.factions].sort((a, b) => (b.id === myF) - (a.id === myF) || a.name.localeCompare(b.name));
   view(head("Factions", "De 3 à 8 joueurs par faction. Les coordonnées ne sont visibles que par les membres de la faction et le staff.") +
     `${isStaff() ? '<form class="bar inline" id="addFac"><input name="name" required maxlength="40" placeholder="Nom de la faction" aria-label="Nom de la nouvelle faction"><button class="btn small">Créer une faction</button></form>' : ""}
+    ${loginHint("Pour modifier ta faction ou ajouter ses coordonnées,")}
     <div class="fac-grid">${list.map(facCard).join("") || '<p class="empty">Aucune faction.</p>'}</div>`);
   if (isStaff()) $("addFac").onsubmit = (e) => { e.preventDefault(); act(() => call("POST", "/api/factions", { name: e.target.name.value.trim() }), "Faction créée"); };
+  bindFac();
+}
+function bindFac() {
   document.querySelectorAll("[data-fac-edit]").forEach((b) => (b.onclick = () => facEdit(+b.dataset.facEdit)));
   document.querySelectorAll("[data-fac-del]").forEach((b) => (b.onclick = () => {
     const f = fac(+b.dataset.facDel);
@@ -355,10 +392,10 @@ function facCard(f) {
   const ef = ecoFac(f);
   const row = (l, v) => (v ? `<dt>${l}</dt><dd>${esc(v)}</dd>` : "");
   return `<article class="card fac${mine ? " mine" : ""}" id="fac-${f.id}">
-    <header><h3><span class="ftag big"${facStyle(f)}>${esc(f.name)}</span>${mine ? ' <span class="chip ok">Ma faction</span>' : ""}</h3><span class="chip ${ok ? "ok" : "warn"}">${ms.length}/8 · ${ok ? "valide" : ms.length < 3 ? "3 minimum" : "trop de joueurs"}</span></header>
+    <header><h3><a class="faclink" href="#communaute/faction/${f.id}"><span class="ftag big"${facStyle(f)}>${esc(f.name)}</span></a>${mine ? ' <span class="chip ok">Ma faction</span>' : ""}</h3><span class="chip ${ok ? "ok" : "warn"}">${ms.length}/8 · ${ok ? "valide" : ms.length < 3 ? "3 minimum" : "trop de joueurs"}</span></header>
     <p class="members">${ms.map((p) => { const r = ef && (ef.membres.find((m) => norm(m.nom) === norm(p.mc_name)) || {}).role;
-      return `<span>${esc(p.mc_name)}${ROLE_MOD[r] ? ` <small class="muted">${ROLE_MOD[r]}</small>` : ""}</span>`; }).join("") || '<span class="muted">Aucun membre</span>'}</p>
-    ${ef ? `<p class="fac-bank"><b>${suE(ef.banque)}</b> <span class="muted small">en banque · <a href="#economie/factions">Économie</a></span></p>` : ""}
+      return `<span>${plink(p.mc_name)}${ROLE_MOD[r] ? ` <small class="muted">${ROLE_MOD[r]}</small>` : ""}</span>`; }).join("") || '<span class="muted">Aucun membre</span>'}</p>
+    ${ef ? `<p class="fac-bank"><b>${suE(ef.banque)}</b> <span class="muted small">en banque</span></p>` : ""}
     <dl>${row("Thème", f.theme)}${row("Hub et usines prévues", f.hub)}${row("Projet communautaire prévu", f.projet_commu)}${row("Autres projets", f.autres_projets)}${row("Recrutement", f.recrutement)}
       ${f.tirage ? `<dt>Tirage des usines</dt><dd>${f.tirage}ᵉ</dd>` : ""}
       ${ch.length ? `<dt>Usines</dt><dd>${ch.map(usineChip).join(" ")}</dd>` : ""}
@@ -465,12 +502,98 @@ function bindProjets() {
   if (add) add.onsubmit = (e) => { e.preventDefault(); act(() => call("POST", "/api/projets", { nom: e.target.nom.value.trim(), tailles: "petite" }), "Projet ajouté"); };
 }
 
+/* ---------- Fiche d'un joueur : tout ce qu'on sait de lui, réuni ---------- */
+const SD = () => window.SiteData || { stats: () => null, data: () => null, borderBlocks: () => ({ players: [], teams: {} }) };
+const okMc = (n) => /^[A-Za-z0-9_]{2,16}$/.test(n);
+const rankOf = (rows, name) => { rows = rows.filter((r) => okMc(r[0])); const i = rows.findIndex((r) => norm(r[0]) === norm(name)); return i < 0 ? null : { v: rows[i][1], rank: i + 1, n: rows.length }; };
+const tile = (label, v, rk, cls = "") => `<div class="stat ${cls}"><b>${v}</b><span>${label}${rk ? ` · ${rk.rank}ᵉ / ${rk.n}` : ""}</span></div>`;
+const itemFr = (id, nom) => { const k = String(id || "").replace(/^minecraft:/, ""); return (typeof NAMES !== "undefined" && NAMES[k]) || nom || k.replace(/_/g, " "); };
+const mapBtn = (o) => o && o.x !== undefined && o.x !== null && (!o.monde || o.monde === "minecraft:overworld")
+  ? `<button class="linkbtn" data-map="${o.x},${o.y},${o.z}" title="Voir sur la carte">📍 ${o.x} / ${o.y} / ${o.z}</button>` : "";
+function shopRows(list) {
+  if (!list.length) return '<p class="empty">Aucune.</p>';
+  return `<div class="tbl-wrap"><table class="tbl left"><thead><tr><th>Vend</th><th>Prix</th><th>Stock</th><th>Où</th></tr></thead><tbody>${list.map((b) => {
+    const name = b.type === "service" ? (b.service || "Service") : b.type === "lot" ? `Lot (${(b.lot || []).length} objets)` : itemFr(b.item, b.nom);
+    return `<tr><td><b>${esc(name)}</b>${b.quantite > 1 ? ` <span class="muted small">× ${fmt(b.quantite)}</span>` : ""}</td><td>${suE(b.prix)}</td>
+      <td>${b.type === "service" ? '<span class="chip ok">illimité</span>' : b.rupture ? '<span class="chip warn">Rupture</span>' : b.stock != null ? fmt(b.stock) : ""}</td><td>${mapBtn(b)}</td></tr>`;
+  }).join("")}</tbody></table></div>`;
+}
+function bindMap() {
+  document.querySelectorAll("#espView [data-map]").forEach((b) => (b.onclick = () => { const [x, y, z] = b.dataset.map.split(",").map(Number); if (window.showOnMap) window.showOnMap(x, y, z); }));
+}
+function notFound(what) {
+  view(`<div class="card center"><h3>${what} introuvable</h3><p class="muted">Le nom a peut-être changé.</p><a class="btn ghost" href="#communaute/${what === "Joueur" ? "joueurs" : "factions"}">Voir la liste</a></div>`);
+}
+function joueurPage() {
+  const p = D.players.find((x) => norm(x.mc_name) === norm(arg));
+  const name = p ? p.mc_name : arg;
+  const S = SD().stats(), bb = SD().borderBlocks();
+  const tabs = ((S && S.tab) || []).map((t) => [t.label, rankOf(t.rows, name)]);
+  const eco = ecoPlayer(name), rich = rankOf(((ECO && ECO.joueurs) || []).filter((j) => j.solde > 0).map((j) => [j.nom, j.solde]), name);
+  const border = rankOf(bb.players, name);
+  if (!p && !eco && !tabs.some(([, x]) => x) && !border) return notFound("Joueur");
+  const f = p && p.faction_id ? fac(p.faction_id) : null;
+  const shops = ((ECO && ECO.boutiques) || []).filter((b) => b.proprietaireType !== "fisc" && norm(b.proprietaire) === norm(name));
+  const hdv = ((ECO && ECO.hdv) || []).filter((a) => norm(a.vendeur) === norm(name) && (!a.fin || a.fin > Date.now()));
+  const cand = D.candidats.find((c) => norm(c.mc_name) === norm(name));
+  const team = S && S.playerTeams && S.playerTeams[name];
+  view(`<p class="crumbs"><a href="#communaute/joueurs">← Tous les joueurs</a></p>
+    <section class="card profile-head">
+      ${face(name, 80)}
+      <div><h3>${esc(name)}${p && p.id === D.meId ? ' <span class="chip ok">C\'est toi</span>' : ""}</h3>
+        <p class="tags">${f ? flink(f) : eco && eco.faction ? `<span class="chip">${esc(eco.faction)}</span>` : '<span class="chip muted">Solo</span>'}
+          ${team && (!f || norm(team) !== norm(f.name)) ? `<span class="chip muted" title="Équipe en jeu">${esc(team)}</span>` : ""}
+          ${p && p.mort ? `<span class="chip m-${esc(p.mort)}" title="${esc(MORT[p.mort])}">${esc(MORT_COURT[p.mort])}</span>` : ""}
+          ${p && p.activite ? `<span class="chip">${esc(ACT_COURT[p.activite])}</span>` : ""}
+          ${cand ? '<a class="chip warn" href="#communaute/elections">Candidat à la mairie</a>' : ""}</p>
+        ${p && p.metier ? `<p class="metier">${esc(p.metier)}</p>` : `<p class="muted">${p ? "Métier non renseigné" : "Pas encore de fiche RP sur le site"}</p>`}
+      </div>
+    </section>
+    <div class="stats">
+      ${tabs.map(([l, x]) => tile(l, x ? fmt(x.v) : "–", x)).join("")}
+      ${tile("Blocs de bordure", border ? "+" + fmt(Math.round(border.v)) : "–", border, "sun")}
+      ${tile("Solde", eco ? suE(eco.solde) : "–", rich, "leaf")}
+    </div>
+    ${p && (p.metier_desc || p.perso_desc) ? `<div class="boards boards-2">${p.metier_desc ? `<div class="board"><h3>Métier</h3>${para(p.metier_desc)}</div>` : ""}${p.perso_desc ? `<div class="board"><h3>Personnage</h3>${para(p.perso_desc)}</div>` : ""}</div>` : ""}
+    <div class="profile-links"><a class="btn small ghost" href="#monde/succes" data-who="${esc(name)}">Voir ses succès</a><a class="btn small ghost" href="#classements/stats">Statistiques</a></div>
+    <h3 class="sec">Boutiques <small>${fmt(shops.length)}</small></h3>${shopRows(shops)}
+    ${hdv.length ? `<h3 class="sec">À l'hôtel des ventes <small>${fmt(hdv.length)}</small></h3><ul class="now">${hdv.map((a) => `<li><a href="#marche/hdv">${esc(itemFr(a.item, a.nom))}${a.quantite > 1 ? ` × ${fmt(a.quantite)}` : ""}</a> · ${suE(a.offreActuelle || a.prixDepart)}</li>`).join("")}</ul>` : ""}`);
+  document.querySelectorAll("[data-who]").forEach((b) => (b.onclick = () => { try { localStorage.setItem("sumenium-who", b.dataset.who); } catch (e) {} if (window.setWho) window.setWho(b.dataset.who); }));
+  bindMap();
+}
+/* ---------- Fiche d'une faction ---------- */
+function factionPage() {
+  const f = D.factions.find((x) => String(x.id) === arg || norm(x.name) === norm(arg));
+  if (!f) return notFound("Faction");
+  const ef = ecoFac(f), S = SD().stats(), bb = SD().borderBlocks();
+  const keys = [f.name, ef && ef.tag, ef && ef.id].map(norm).filter(Boolean);
+  const t = ((S && S.teams) || []).find((x) => keys.includes(norm(x.team)));
+  const blocks = t ? bb.teams[t.team] || 0 : 0;
+  const ms = members(f.id);
+  const shops = ef ? ((ECO && ECO.boutiques) || []).filter((b) => b.proprietaireType !== "fisc" && b.faction === ef.id) : [];
+  view(`<p class="crumbs"><a href="#communaute/factions">← Toutes les factions</a></p>
+    <div class="stats">
+      ${tile("Membres", fmt(ms.length))}
+      ${tile("Banque", ef ? suE(ef.banque) : "–", null, "leaf")}
+      ${t ? tile("Succès", fmt(t.bac_advancements)) + tile("Premiers succès", fmt(t.bac_advfirst)) + tile("Morts", fmt(t.Morts)) : ""}
+      ${tile("Blocs de bordure", "+" + fmt(Math.round(blocks)), null, "sun")}
+    </div>
+    <div class="cards">${ms.map((p) => { const role = ef && (ef.membres.find((m) => norm(m.nom) === norm(p.mc_name)) || {}).role;
+      return `<a class="pcard mini" href="#communaute/joueur/${encodeURIComponent(p.mc_name)}">${face(p.mc_name, 32)}<div><b>${esc(p.mc_name)}</b>
+        <span class="muted small">${ROLE_MOD[role] ? ROLE_MOD[role] + " · " : ""}${esc(p.metier || "Métier non renseigné")}</span></div></a>`; }).join("") || '<p class="empty">Aucun membre.</p>'}</div>
+    ${loginHint("Pour modifier ta faction,")}
+    <div class="fac-grid one">${facCard(f)}</div>
+    <h3 class="sec">Boutiques de la faction et de ses membres <small>${fmt(shops.length)}</small></h3>${shopRows(shops)}`);
+  bindFac();
+  bindMap();
+}
+
 /* ---------- Usines ---------- */
 function usines() {
   const myFid = isStaff() ? staffFaction : me() && me().faction_id;
   const open = D.settings.usines_ouvertes === "1";
   const mine = myFid ? D.choix.filter((c) => c.faction_id === myFid && !c.projet_faction_id).length : 0;
-  view(head("Usines", "Résultats du tirage et places restantes. ★ = usine débloquée par un projet communautaire.") + `<div class="card">
+  view(head("Usines", "Résultats du tirage et places restantes. ★ = usine débloquée par un projet communautaire.") + (open ? loginHint("Pour choisir les usines de ta faction,") : "") + `<div class="card">
       <p><b>Règles :</b> chaque faction choisit 1 grosse + 1 moyenne + 1 petite, ou 2 moyennes + 1 petite, ou 3 petites
       (${esc(D.settings.usines_max || 3)} usines au total pour ce tour), dans l'ordre du tirage. Chaque usine est limitée sur le serveur : 3 grosses, 4 moyennes, 5 petites du même type.</p>
       <p>${open ? '<span class="chip ok">Choix ouverts</span>' : '<span class="chip warn">Choix fermés</span>'}
@@ -516,10 +639,11 @@ function elections() {
   view(head("Élection du maire", tour ? "Un vote par compte et par tour ; tu peux changer ton vote tant que le tour est ouvert. Le vote est secret." : "Les candidats et leur programme.") + `
     <div class="card status-line"><span class="chip ${st === "fermee" ? "muted" : st === "resultats" ? "ok" : "warn"}">${esc(ELECTION[st])}</span></div>
     ${st === "candidatures" && canWrite() && p ? candForm(mine) : ""}
+    ${st === "candidatures" ? loginHint("Pour te présenter,") : tour ? loginHint("Pour voter,") : ""}
     <div class="cards">${shown.map((c) => {
       const voted = tour && D.myVotes[tour] === c.id;
       return `<article class="pcard${voted ? " mine" : ""}"><header>${face(c.mc_name)}
-        <div><b>${esc(c.mc_name)}</b>${c.tour2 ? '<span class="chip ok">2nd tour</span>' : ""}</div></header>
+        <div><b>${plink(c.mc_name)}</b>${c.tour2 ? '<span class="chip ok">2nd tour</span>' : ""}</div></header>
         ${c.affiche_v ? `<a class="affiche" href="${afficheUrl(c)}" target="_blank" rel="noopener" title="Voir l'affiche en grand"><img src="${afficheUrl(c)}" alt="Affiche de ${esc(c.mc_name)}" loading="lazy"></a>` : ""}
         ${para(c.resume)}
         <p class="links">${c.lien ? `<a href="${esc(c.lien)}" target="_blank" rel="noopener noreferrer nofollow">Programme</a>` : ""}
@@ -736,21 +860,30 @@ const short = (v) => (v === null || v === undefined || v === "" ? "∅" : String
 
 /* ---------- entrée ---------- */
 let started = false;
-async function show(s) {
-  if (s && SUBS.some(([k]) => k === s)) sub = s;
-  if (!started) {
-    started = true;
-    render();
-    if (!LIVE) return;
-    // Un seul appel : il dit qui est connecté ET renvoie les données (401 = pas connecté)
-    try { await reload(); }
-    catch (e) { if (ME === null && !/Connecte-toi/.test(e.message)) toast(e.message, true); }
-    finally { checking = false; render(); }
-    return;
+async function start() {
+  if (started) return;
+  started = true;
+  if (!LIVE) { checking = false; render(); return; }
+  try { await reload(); }
+  catch (e) { toast(e.message, true); }
+  finally {
+    checking = false; render();
+    // Retour de la connexion Discord : on revient sur la page de départ
+    let next = null; try { next = sessionStorage.getItem(NEXT_KEY); sessionStorage.removeItem(NEXT_KEY); } catch (e) {}
+    if (next && ME && /^#espace\/?$|^#?$/.test(location.hash) && next !== location.hash) location.replace(next);
   }
-  render();
-  // les autres joueurs ont pu modifier des choses : on relit à chaque changement d'onglet
-  if (ME && !busy) reload().catch((e) => toast(e.message, true));
 }
-window.Espace = { show };
+function show(a, s, x) {
+  area = AREAS[a] ? a : "espace";
+  arg = x || "";
+  const subs = AREAS[area].subs.map(([k]) => k);
+  sub = area === "communaute" && (s === "joueur" || s === "faction") && arg ? s : subs.includes(s) ? s : subs[0];
+  if (!started) { start(); render(); return; }
+  render();
+  // les autres joueurs ont pu modifier des choses : on relit en arrière-plan (au plus toutes les 20 s)
+  if (D && !busy && Date.now() - lastLoad > 20000) reload().catch(() => {});
+}
+window.addEventListener("hashchange", renderAcct);
+start();
+window.Espace = { show, data: () => D };
 })();

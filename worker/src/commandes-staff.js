@@ -1,4 +1,4 @@
-// Commandes réservées au staff (mod Sumenium Economy 2.0.0) : servies seulement aux comptes Discord staff.
+// Commandes réservées au staff (mod Sumenium Economy 2.4.0) : servies seulement aux comptes Discord staff.
 export const COMMANDES_STAFF = {
   intro: "Réservées aux opérateurs. Sans /sumeco bypass, un admin utilise les boutiques comme un joueur.",
   sections: [
@@ -6,7 +6,7 @@ export const COMMANDES_STAFF = {
       ["/fisc rachat <prix unitaire>", "Le coffre devient un point de rachat de l'item en main (ex. /fisc rachat 70 avec un minerai de diamant)"],
       ["/fisc vente <prix> <quantité>", "Le FISC vend l'item en main, stock infini (ex. hopper filtre à 1500)"],
       ["/fisc prix <prix>", "Change le prix d'une boutique du FISC"],
-      ["/fisc cacher", "En regardant le coffre : la boutique (du FISC ou d'un joueur) disparaît de l'annuaire, du site et de la carte, mais reste utilisable par qui la trouve. Ex. shop d'items cheat : /fisc vente <prix> <quantité> puis /fisc cacher. Le panneau affiche toujours « FISC » : le casser en /sumeco bypass, la boutique marche sans"],
+      ["/fisc cacher", "Cache la boutique visée (FISC ou joueur) : elle n'apparaît plus dans l'annuaire, sur le site ni sur la carte BlueMap, mais fonctionne normalement pour qui la trouve. Pratique pour une boutique secrète (ex. shop d'items cheat : /fisc vente puis /fisc cacher ; le panneau affiche toujours « FISC », le casser en /sumeco bypass)"],
       ["/fisc montrer", "Rend de nouveau visible une boutique cachée"],
     ] },
     { titre: "Argent", lignes: [
@@ -28,7 +28,7 @@ export const COMMANDES_STAFF = {
     ] },
     { titre: "Outils", lignes: [
       ["/sumeco bypass", "Mode gestion : ouvrir, casser et gérer toutes les boutiques. Retaper pour l'arrêter (s'arrête aussi au redémarrage)"],
-      ["/sumeco surnom <joueur> <surnom>", "Donne un surnom affiché dans le chat et le tab, le pseudo réel ne change pas (espaces acceptés, 32 caractères max). Ex. /sumeco surnom Bidule42 DeedG (2e compte)"],
+      ["/sumeco surnom <joueur> <surnom>", "Affiche un surnom à la place du pseudo dans le chat et le tab, par exemple pour repérer un second compte. Le survol du nom montre le vrai pseudo ; le nom au-dessus de la tête ne change pas"],
       ["/sumeco surnom <joueur> retirer", "Enlève le surnom"],
       ["/sumeco surnom", "Liste des joueurs qui ont un surnom"],
       ["/sumeco stats", "Argent en circulation, nombre de boutiques et factions"],
@@ -36,7 +36,7 @@ export const COMMANDES_STAFF = {
       ["/sumeco recharger", "Recharge config/sumenium-economy.json"],
       ["/sumeco importer-savs [soldes|boutiques|forcer]", "Reprise des données de Savs (une seule fois, sauf forcer)"],
     ] },
-    { titre: "Hôtel des ventes et annuaire", lignes: [
+    { titre: "Hôtel des ventes, annuaire et marchand de têtes", lignes: [
       ["/hdv pnj", "Place le PNJ de l'hôtel des ventes à ta position (immobile, invulnérable, tourné vers toi)"],
       ["/hdv pnj retirer", "Retire le PNJ le plus proche (6 blocs)"],
       ["/hdv boite", "Le coffre ou tonneau visé devient une boîte aux lettres"],
@@ -44,6 +44,8 @@ export const COMMANDES_STAFF = {
       ["/hdv annuler <n°>", "Avec /sumeco bypass, retire n'importe quelle annonce sans offre"],
       ["/annuaire lutrin", "Le lutrin visé affiche l'annuaire des boutiques"],
       ["/annuaire retirer", "Le lutrin visé n'affiche plus l'annuaire"],
-    ], note: "Le PNJ, la boîte aux lettres et le lutrin ne se cassent qu'avec /sumeco bypass. Pour le site : sumenium-data/export/hdv.json (annonces) et bluemap-markers.json (boutiques, FISC et hôtel des ventes au format BlueMap)." },
+      ["/tetes pnj · /tetes pnj retirer", "Place le marchand de têtes à ta position, ou retire le plus proche (6 blocs)"],
+      ["/tetes · /tetes ouvrir · /tetes maj", "État du catalogue, ouvrir le menu sans PNJ (test), recharger le catalogue tout de suite (sinon une fois par jour)"],
+    ], note: "Les PNJ, la boîte aux lettres et le lutrin ne se cassent qu'avec /sumeco bypass. Pour le site : sumenium-data/export/hdv.json (annonces) et bluemap-markers.json (boutiques, FISC et hôtel des ventes au format BlueMap)." },
   ],
 };

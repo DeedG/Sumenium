@@ -111,7 +111,10 @@ def build(sftp, read, j, log, out_path):
                           "service": s.get("service"), "quantite": s.get("quantite") or 1, "prix": _num(s.get("prix")),
                           "stock": s.get("stock"), "rupture": bool(s.get("rupture")), "ventes": s.get("ventes") or 0,
                           "itemsEchanges": s.get("itemsEchanges") or 0, "chiffreAffaires": _num(s.get("chiffreAffaires")) or 0,
-                          "creeLe": s.get("creeLe"), "details": _details(s.get("details"))})
+                          "creeLe": s.get("creeLe"), "details": _details(s.get("details")),
+                          # Boutique de lot (mod 2.4) : 2 à 9 items différents vendus ensemble
+                          "lot": [{"item": x.get("item"), "nom": x.get("nom"), "quantite": x.get("quantite") or 1, "details": _details(x.get("details"))}
+                                  for x in (s.get("lot") or []) if isinstance(x, dict) and x.get("item")] or None})
         eco["boutiques"] = shops
     else:
         eco["boutiques"] = None
@@ -193,6 +196,8 @@ def items(eco_path):
     out = set()
     for s in eco.get("boutiques") or []:
         out.add(s.get("item"))
+        for x in s.get("lot") or []:
+            out.add(x.get("item"))
     for a in eco.get("hdv") or []:
         out.add(a.get("item"))
     for k in ("rachat", "vente"):

@@ -13,6 +13,10 @@ crons = ["*/5 * * * *"]
 
 [vars]
 GITHUB_REPO = "DeedG/Sumenium"
+# Serveur Minecraft (statut affiché sur le site) : adresse DNS only (pas de proxy Cloudflare) et port du jeu
+MC_HOST = "play.sumenium.com"
+MC_PORT = "22756"
+MC_ADDRESS = "play.sumenium.com"
 PUBLIC_URL = "https://sumenium.com"
 SITE_ORIGIN = "https://deedg.github.io/Sumenium"
 DISCORD_CLIENT_ID = "1558815844879048734"
