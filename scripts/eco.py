@@ -123,7 +123,15 @@ def build(sftp, read, j, log, out_path):
     if fisc and (isinstance(fisc.get("rachat"), list) or isinstance(fisc.get("vente"), list)):
         clean = lambda lst: [{"item": r.get("item"), "nom": r.get("nom"), "prix": _num(r.get("prix")), "quantite": r.get("quantite"),
                               "x": r.get("x"), "y": r.get("y"), "z": r.get("z")} for r in (lst or [])]
-        eco["fisc"] = {"rachat": clean(fisc.get("rachat")), "vente": clean(fisc.get("vente")), "prixDynamiques": fisc.get("prixDynamiques")}
+        eco["fisc"] = {"rachat": clean(fisc.get("rachat")), "vente": clean(fisc.get("vente")), "prixDynamiques": fisc.get("prixDynamiques"),
+                       # Objets rares (mod 2.5+) : rachetés aux PNJ sans être détruits, revendus au double ; prix selon le stock (2.6)
+                       "revente": bool(fisc.get("revente")),
+                       "reprise": [{"item": r.get("item"), "nom": r.get("nom"), "categorie": r.get("categorie"), "rachete": r.get("rachete", True),
+                                    "prixRachat": _num(r.get("prixRachat")), "prixReference": _num(r.get("prixReference")),
+                                    "demiStock": r.get("demiStock"), "baissePct": _num(r.get("baissePct")), "demandes": r.get("demandes") or 0,
+                                    "stock": r.get("stock"), "rupture": bool(r.get("rupture")), "prixRevente": _num(r.get("prixRevente")),
+                                    "details": _details(r.get("details"))}
+                                   for r in (fisc.get("reprise") or []) if isinstance(r, dict) and r.get("item")]}
     else:
         eco["fisc"] = None
 
@@ -200,7 +208,7 @@ def items(eco_path):
             out.add(x.get("item"))
     for a in eco.get("hdv") or []:
         out.add(a.get("item"))
-    for k in ("rachat", "vente"):
+    for k in ("rachat", "vente", "reprise"):
         for r in (eco.get("fisc") or {}).get(k) or []:
             out.add(r.get("item"))
     for r in (eco.get("stats") or {}).get("rachatsFisc7j") or []:

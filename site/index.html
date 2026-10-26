@@ -136,6 +136,11 @@ a.stat:hover{transform:translateY(-2px)}
 .join-grid+.card{margin-top:14px}
 .join-list{margin:0;padding-left:20px;display:grid;gap:6px}
 #join-how{scroll-margin-top:70px}
+[data-sub="guides"] .card+.card{margin-top:14px}
+[data-sub="guides"] a{color:var(--crystal);font-weight:700}
+[data-sub="guides"] .anchors{margin:12px 0 0}
+[data-sub="guides"] .tbl-wrap{margin:8px 0 10px}
+.cat-h{font:700 .95rem var(--display);margin:14px 0 6px}
 .plink{color:inherit;text-decoration:none;border-bottom:1px dotted currentColor}
 .plink:hover{color:var(--crystal)}
 .ip-sub{display:block;margin-top:6px;color:var(--muted);font-weight:600;font-size:.8rem}
@@ -776,7 +781,7 @@ body.busy{cursor:progress}
 
   <section class="panel" id="p-aide" hidden>
     <nav class="subtabs" aria-label="Aide" data-area="aide">
-      <a href="#aide/rejoindre" data-sub="rejoindre">Rejoindre le serveur</a><a href="#aide/commandes" data-sub="commandes">Commandes</a><a href="confidentialite.html">Confidentialité</a>
+      <a href="#aide/rejoindre" data-sub="rejoindre">Rejoindre le serveur</a><a href="#aide/guides" data-sub="guides">Guides</a><a href="#aide/commandes" data-sub="commandes">Commandes</a><a href="confidentialite.html">Confidentialité</a>
     </nav>
     <div class="subpanel" data-sub="rejoindre">
       <section class="card join-hero">
@@ -796,8 +801,8 @@ body.busy{cursor:progress}
           <p>Rien d'obligatoire : on parle de semi-RP, pas de RP complet. Chaque joueur choisit un <b>métier</b> (il peut en changer à tout moment) et s'en sert pour jouer sur le serveur.</p>
           <p><a href="#communaute/joueurs">Voir les métiers des joueurs</a></p></section>
         <section class="card wide"><h3>💰 L'économie</h3>
-          <p>Le serveur a sa propre monnaie, le <b>suménien (Su)</b>, et son propre mod d'économie. Chaque joueur peut ouvrir une <b>boutique</b> sur un coffre au spawn : objets, lots ou services (avec des bons). Les factions ont une <b>banque commune</b>, l'<b>hôtel des ventes</b> organise des enchères de 7 jours, et le <b>FISC</b> rachète certains minerais. Tout se fait en cliquant sur les coffres et avec quelques commandes simples (<code>/boutique</code>, <code>/compte</code>, <code>/faction</code>, <code>/hdv</code>).</p>
-          <p><a href="#marche/boutiques">Voir le marché</a> · <a href="#aide/commandes">Toutes les commandes</a></p></section>
+          <p>Le serveur a sa propre monnaie, le <b>suménien (Su)</b>, et son propre mod d'économie. Chaque joueur peut ouvrir une <b>boutique</b> sur un coffre au spawn : objets, lots ou services (avec des bons). Les factions ont une <b>banque commune</b>, l'<b>hôtel des ventes</b> organise des enchères de 7 jours, le <b>FISC</b> rachète les minerais et les objets rares d'exploration (qu'il revend au lieu de les détruire), et un marchand vend plus de 100 000 <b>têtes décoratives</b>. Tout se fait en cliquant sur les coffres et les PNJ, avec quelques commandes simples (<code>/boutique</code>, <code>/compte</code>, <code>/faction</code>, <code>/hdv</code>).</p>
+          <p><a href="#aide/guides">Les guides pas à pas</a> · <a href="#marche/boutiques">Voir le marché</a> · <a href="#aide/commandes">Toutes les commandes</a></p></section>
         <section class="card"><h3>🎉 Les events</h3>
           <p>Des events originaux sont organisés par le staff ou par les joueurs, presque chaque semaine !</p>
           <p>Le serveur a été choisi solide pour que l'expérience de jeu soit la plus agréable possible, et la survie est accompagnée d'un <b>monde créatif</b> en flatworld.</p></section>
@@ -819,6 +824,126 @@ body.busy{cursor:progress}
       </ol>
       <p class="muted small">On préfère des joueurs de 18 ans et plus, vu les sujets qui peuvent être abordés, mais on n'est pas fermés : quelques joueurs de moins de 18 ans sont déjà là, alors venez !</p></section>
       <section class="card join-end"><p><b>Voilà !</b> Si vous cherchez un serveur organisé, propre, qui est là pour durer et avec des règles innovantes… venez nous trouver !</p><p class="muted small">— Le staff de Suménium</p></section>
+    </div>
+    <div class="subpanel" data-sub="guides">
+      <section class="card join-hero">
+        <h3>Les guides de l'économie</h3>
+        <p>Tout ce qu'on peut faire avec le mod d'économie de Suménium, expliqué pas à pas. La monnaie est le <b>suménien (Su)</b>. Presque tout se fait en <b>cliquant</b> sur les coffres et les PNJ du spawn ; les quelques commandes sont dans l'onglet <a href="#aide/commandes">Commandes</a>.</p>
+        <nav class="anchors" aria-label="Guides">
+          <a href="#aide/guides" data-jump="g-argent">💳 Mon argent</a><a href="#aide/guides" data-jump="g-acheter">🛍️ Acheter</a><a href="#aide/guides" data-jump="g-boutique">🏪 Ouvrir une boutique</a><a href="#aide/guides" data-jump="g-lot">📦 Vendre un lot</a><a href="#aide/guides" data-jump="g-service">🎟️ Vendre un service</a><a href="#aide/guides" data-jump="g-gagner">💰 Gagner de l'argent</a><a href="#aide/guides" data-jump="g-fisc">🏛️ Le FISC</a><a href="#aide/guides" data-jump="g-hdv">🔨 Les enchères</a><a href="#aide/guides" data-jump="g-faction">🏰 La banque de faction</a><a href="#aide/guides" data-jump="g-tetes">🗿 Les têtes</a><a href="#aide/guides" data-jump="g-redstone">⚡ La redstone</a><a href="#aide/guides" data-jump="g-savoir">💡 Bon à savoir</a>
+        </nav>
+      </section>
+
+      <section class="card steps" id="g-argent"><h3>💳 Comprendre mon argent</h3>
+        <p>Chaque joueur a un <b>compte perso</b>, et chaque faction une <b>banque commune</b>.</p>
+        <ol>
+          <li><code>/compte</code> affiche ton solde, celui de ta faction et le compte que tu utilises pour payer.</li>
+          <li><code>/compte perso</code> ou <code>/compte faction</code> choisit avec quoi tu paies tes achats et tes boutiques (la banque de faction : chef et trésoriers seulement).</li>
+          <li><code>/historique</code> liste tes achats, ventes, frais et dépôts des 30 derniers jours. Ton historique est aussi sur le site, dans <a href="#espace/historique">Mon espace</a>.</li>
+          <li><code>/baltop</code> classe les joueurs les plus riches, <code>/baltop factions</code> les banques de faction (aussi dans <a href="#classements/richesse">Classements</a>).</li>
+        </ol>
+        <p class="muted small">Les montants s'écrivent avec un point : <code>3.5</code> pour 3,5 Su.</p></section>
+
+      <section class="card steps" id="g-acheter"><h3>🛍️ Acheter quelque chose</h3>
+        <ol>
+          <li><b>Trouver la boutique</b> : le livre « Annuaire » sur le lutrin à l'entrée de la zone commerciale, l'onglet <a href="#marche/boutiques">Marché</a> du site (avec les coordonnées) ou la <a href="#monde/carte">carte</a>.</li>
+          <li><b>Clic droit sur le coffre ou son panneau</b> : le chat affiche l'objet (passe la souris dessus pour voir ses enchantements), le prix et le stock.</li>
+          <li><b>Tape la quantité dans le chat</b> : un nombre, <code>tout</code> ou <code>annuler</code>. Tu as 30 secondes, et les autres joueurs ne voient pas ce message.</li>
+        </ol>
+        <p>Pour un <b>lot</b>, tu tapes un nombre de lots ; tu ne paies jamais un lot incomplet. Pour un <b>service</b>, tu reçois un bon à remettre au vendeur. Dans la boutique de ta propre faction, passe en <code>/compte perso</code> : l'argent part dans la banque de faction.</p></section>
+
+      <section class="card steps" id="g-boutique"><h3>🏪 Ouvrir ma boutique</h3>
+        <ol>
+          <li><b>Pose un coffre ou un tonneau</b> au spawn, dans la zone commerciale.</li>
+          <li><b>Prends l'objet à vendre en main</b> et regarde le coffre.</li>
+          <li>Tape <code>/boutique creer item &lt;prix&gt; &lt;quantité&gt;</code>. Exemple : <code>/boutique creer item 20 16</code> vend 16 objets pour 20 Su. Les frais sont de <b>150 Su</b>, ou <b>50 Su</b> si tu as déjà une boutique de la même famille (toutes les couleurs de laine, toutes les essences de bois…).</li>
+          <li><b>Un panneau se pose tout seul</b> (ou celui déjà accroché au coffre est repris) : il affiche ton nom, l'objet, le prix et le stock. Il est ciré, personne ne peut le modifier.</li>
+          <li><b>Remplis le coffre</b> en l'ouvrant normalement. Le stock et le panneau se mettent à jour quand tu le refermes.</li>
+        </ol>
+        <p>Ta boutique est protégée : personne d'autre ne peut l'ouvrir ni la casser, et les entonnoirs, golems ou explosions n'y touchent pas. Tu es prévenu de chaque vente (même hors ligne, au retour) et quand le stock est vide.</p>
+        <p class="small"><b>Ensuite</b> : <code>/boutique prix &lt;prix&gt; [quantité]</code> change le prix, <code>/boutique info</code> montre les ventes, <code>/boutique liste</code> toutes tes boutiques, <code>/boutique faction</code> la donne à ta faction, <code>/boutique supprimer</code> la ferme (50 % des frais remboursés). <a href="#aide/commandes/boutiques">Toutes les commandes de boutique</a></p></section>
+
+      <section class="card steps" id="g-lot"><h3>📦 Vendre un lot de plusieurs objets</h3>
+        <ol>
+          <li>Regarde ton coffre et tape <code>/boutique creer lot &lt;prix&gt;</code> (frais : <b>300 Su</b>).</li>
+          <li>Un petit menu s'ouvre : pose <b>un exemplaire de chaque objet</b> du lot avec la bonne quantité, de 2 à 9 objets différents. Exemple : 4 diamants + 16 lingots de fer.</li>
+          <li>Ferme le menu : la boutique est créée et tes objets te sont rendus.</li>
+          <li>Remplis le coffre <b>en vrac</b>. Le stock affiché est le nombre de lots complets ; s'il manque un seul objet, la boutique passe en rupture.</li>
+        </ol></section>
+
+      <section class="card steps" id="g-service"><h3>🎟️ Vendre un service</h3>
+        <p>Un service, c'est tout ce qui n'est pas un objet : une ferme en libre accès, un trajet, une construction… L'acheteur paie et reçoit un <b>bon</b> à son nom.</p>
+        <ol>
+          <li>Regarde un coffre et tape <code>/boutique creer service &lt;prix&gt; &lt;nom du bon&gt;</code>, par exemple <code>/boutique creer service 50 Accès ferme à fer</code> (frais : <b>300 Su</b>, stock infini).</li>
+          <li>Le client clique sur le coffre, tape la quantité et reçoit son bon.</li>
+          <li>Il te remet le bon : <code>/bon verifier</code> dit s'il est authentique et pas encore utilisé, <code>/bon valider</code> le marque comme utilisé.</li>
+        </ol>
+        <p><b>Sans être là</b> : avec <code>/boutique depot &lt;nom du service&gt;</code>, un coffre devient un <b>dépôt</b>. Le client y pose son bon et referme : s'il est valide, il est consommé et le coffre envoie un signal de redstone d'une seconde (porte, piston, usine…). Voir <a href="#aide/guides" data-jump="g-redstone">la redstone</a>.</p></section>
+
+      <section class="card" id="g-gagner"><h3>💰 Gagner de l'argent</h3>
+        <ul class="join-list">
+          <li><b>Miner</b> : le FISC rachète les minerais à ses coffres du spawn (<a href="#marche/fisc">prix du FISC</a>).</li>
+          <li><b>Explorer</b> : le FISC rachète aussi des <b>objets rares</b> à son PNJ (noyau lourd, cœur de la mer, disques, ornements, tessons, armures de cheval…). <a href="#aide/guides" data-jump="g-fisc">Comment ça marche</a></li>
+          <li><b>Ouvrir une boutique</b> et vendre tes farms aux autres joueurs, en objets ou <a href="#aide/guides" data-jump="g-lot">en lots</a>.</li>
+          <li><b>Vendre un service</b> : l'accès à ta ferme, ton aide, tes constructions. <a href="#aide/guides" data-jump="g-service">Guide</a></li>
+          <li><b>Mettre aux enchères</b> un objet précieux à l'hôtel des ventes. <a href="#aide/guides" data-jump="g-hdv">Guide</a></li>
+          <li><b>Travailler pour ta faction</b> : les boutiques de faction remplissent la banque commune.</li>
+        </ul></section>
+
+      <section class="card steps" id="g-fisc"><h3>🏛️ Le FISC : vendre et acheter</h3>
+        <p>Le FISC, c'est le château du spawn. Il a deux façons d'acheter :</p>
+        <ul class="join-list">
+          <li><b>Les coffres du FISC</b> rachètent les <b>minerais</b> à prix fixe (clic droit, puis la quantité ou <code>tout</code>). Ces minerais sont détruits. Certains coffres vendent aussi des objets à l'infini, comme le hopper filtre.</li>
+          <li><b>Le PNJ « FISC — Rachat »</b> rachète les <b>objets rares</b> d'exploration, et ne les détruit pas : il les garde en stock et les revend au <b>PNJ « FISC — Revente »</b>.</li>
+        </ul>
+        <p><b>Vendre un objet rare</b> : clic droit sur le PNJ de rachat, choisis la catégorie puis l'objet, et tape la quantité. Le menu affiche le prix du prochain, les suivants et ce que rapporterait « tout vendre ». L'objet doit être identique au modèle (pas abîmé, mêmes enchantements).</p>
+        <p><b>Le prix suit le stock du FISC</b> : chaque objet qu'il a déjà fait un peu baisser le prix du suivant. Au PNJ de revente, c'est l'inverse : le prix monte quand le stock baisse, et il revend au double. Exemple avec le cœur de la mer :</p>
+        <div class="tbl-wrap"><table class="tbl left"><thead><tr><th>Cœurs en stock chez le FISC</th><th>Il te paie le prochain</th><th>Il revend le prochain</th></tr></thead><tbody>
+          <tr><td>0</td><td>50 Su</td><td>en rupture</td></tr><tr><td>1</td><td>45,85 Su</td><td>100 Su</td></tr><tr><td>3</td><td>38,56 Su</td><td>84,09 Su</td></tr>
+          <tr><td>8</td><td>25 Su</td><td>54,53 Su</td></tr><tr><td>16</td><td>12,50 Su</td><td>27,26 Su</td></tr></tbody></table></div>
+        <p><b>Un objet en rupture ?</b> Clique dessus au PNJ de revente pour le <b>demander</b> : tu seras prévenu dès qu'il revient, et si plusieurs joueurs le cherchent, le FISC augmente son prix de rachat pour attirer des vendeurs. À l'inverse, un objet que personne ne rachète voit son prix baisser de semaine en semaine.</p>
+        <p class="small">Tous les prix en direct : <a href="#marche/fisc">Marché › FISC</a>.</p></section>
+
+      <section class="card steps" id="g-hdv"><h3>🔨 Vendre aux enchères (hôtel des ventes)</h3>
+        <ol>
+          <li>Va près du <b>PNJ de l'hôtel des ventes</b> au spawn, l'objet à vendre en main (tout le stack est mis en vente).</li>
+          <li>Tape <code>/hdv vendre &lt;prix de départ&gt; [achat immédiat]</code>, par exemple <code>/hdv vendre 100 400</code> : enchères à partir de 100 Su, ou achat direct à 400 Su.</li>
+          <li>L'enchère dure <b>7 jours</b>. Tu peux avoir 3 annonces en même temps ; <code>/hdv annonces</code> les suit, <code>/hdv annuler &lt;n°&gt;</code> retire une annonce sans offre.</li>
+          <li>À la fin, tu reçois le prix moins <b>15 %</b> de taxe.</li>
+        </ol>
+        <p><b>Pour acheter</b> : clic droit sur le PNJ, clic sur l'objet, puis ton offre dans le chat ou <code>achat</code> pour l'achat immédiat. Ton offre est bloquée et rendue si quelqu'un surenchérit ; une offre dans les 5 dernières minutes prolonge l'enchère de 5 minutes.</p>
+        <p><b>Objets gagnés et invendus</b> : ils t'attendent dans la <b>boîte aux lettres</b> du spawn (clic droit pour les récupérer). Annonces en cours : <a href="#marche/hdv">Marché › Hôtel des ventes</a>.</p></section>
+
+      <section class="card steps" id="g-faction"><h3>🏰 La banque de ma faction</h3>
+        <ol>
+          <li><code>/faction</code> affiche ta faction, ses membres, leurs rôles et la banque.</li>
+          <li>Tout le monde peut y verser de l'argent : <code>/faction deposer &lt;montant&gt;</code>.</li>
+          <li>Le <b>chef</b> et les <b>trésoriers</b> peuvent la dépenser : <code>/compte faction</code> pour payer avec, <code>/faction retirer &lt;montant&gt;</code> pour se verser de l'argent. Le chef nomme les trésoriers avec <code>/faction role &lt;joueur&gt; tresorier</code>.</li>
+          <li><b>Boutique de faction</b> : <code>/boutique faction</code> donne ta boutique à la faction ; tous les membres peuvent la ravitailler et les ventes vont dans la banque.</li>
+        </ol>
+        <p class="small"><a href="#aide/commandes/factions">Toutes les commandes de faction</a> · <a href="#communaute/factions">Les factions</a></p></section>
+
+      <section class="card steps" id="g-tetes"><h3>🗿 Acheter des têtes décoratives</h3>
+        <ol>
+          <li>Clic droit sur le <b>marchand de têtes</b> au spawn (sa tête change toutes les 2 secondes).</li>
+          <li>Choisis une catégorie, ou clique sur la <b>boussole</b> et tape un mot dans le chat (les noms sont souvent en anglais : <i>cat</i>, <i>pumpkin</i>, <i>book</i>…).</li>
+          <li>Un clic sur une tête l'achète : <b>150 Su</b> la tête, plus de 100 000 au choix.</li>
+        </ol>
+        <p class="muted small">Les têtes des mobs que l'on obtient en jeu (datapack des têtes) ne sont pas vendues ici : elles restent au commerce entre joueurs.</p></section>
+
+      <section class="card" id="g-redstone"><h3>⚡ Automatiser avec la redstone</h3>
+        <ul class="join-list">
+          <li><b>Chaque vente</b> dans une boutique fait émettre au coffre un signal de redstone d'une seconde. Une poudre, un répéteur, un comparateur ou une lampe collés au coffre le captent : sonnette, porte, compteur de ventes…</li>
+          <li><b>Un dépôt de service</b> (<code>/boutique depot &lt;service&gt;</code>) émet le signal quand un client y dépose un bon valide : de quoi ouvrir une porte ou lancer une ferme pour un client, même sans toi.</li>
+        </ul></section>
+
+      <section class="card" id="g-savoir"><h3>💡 Bon à savoir</h3>
+        <ul class="join-list">
+          <li><b>AFK</b> : sans bouger la caméra, marcher ni écrire pendant 2 min 30, tu passes [AFK] dans le tab (un autoclicker ne compte pas). Les joueurs AFK ne bloquent pas la nuit.</li>
+          <li><b>Le chat de quantité est privé</b> : quand tu tapes une quantité ou une offre, personne d'autre ne le voit. Tape <code>annuler</code> pour abandonner.</li>
+          <li><b>Rappel en jeu</b> : <code>/boutique</code> affiche les commandes de boutique, cliquables, et <code>/hdv</code> le fonctionnement de l'hôtel des ventes.</li>
+          <li><b>Les boutiques et le FISC sont sur le site</b>, avec les prix et le stock en direct : <a href="#marche/boutiques">Marché</a>.</li>
+        </ul></section>
     </div>
     <div class="subpanel" data-sub="commandes"><div id="cmdRoot"></div></div>
   </section>
@@ -1156,7 +1281,7 @@ function renderHome(){
       ${card("#monde/succes","🏆","Agrandir la bordure","Les succès qui rapportent des blocs")}
       ${card("#communaute/factions","🏰","Voir les factions","Membres, banque, usines, projets")}
       ${card("#espace/fiche","🪪","Ma fiche","Mon personnage, mon historique")}
-      ${card("#aide/commandes","📖","Les commandes","Boutiques, factions, hôtel des ventes")}
+      ${card("#aide/guides","📖","Les guides","Acheter, ouvrir une boutique, gagner de l'argent")}
     </div>`;
 }
 
@@ -1319,7 +1444,7 @@ async function loadStats(){
 // ---------- Onglets ----------
 // Arborescence : onglet/sous-onglet[/détail]. Les anciens liens (#classement, #economie/boutiques…) renvoient au bon endroit.
 const TABS=["accueil","monde","communaute","marche","classements","espace","aide"];
-const SUBS={monde:["carte","succes"],classements:["tableau","richesse","stats"],aide:["rejoindre","commandes"]};
+const SUBS={monde:["carte","succes"],classements:["tableau","richesse","stats"],aide:["rejoindre","guides","commandes"]};
 const LEGACY={classement:"classements/tableau",succes:"monde/succes",stats:"classements/stats",carte:"monde/carte",
   "economie":"marche","economie/apercu":"marche/economie","economie/boutiques":"marche/boutiques","economie/hdv":"marche/hdv","economie/fisc":"marche/fisc",
   "economie/factions":"communaute/factions","economie/baltop":"classements/richesse","economie/commandes":"aide/commandes",
@@ -1347,9 +1472,10 @@ function route(){
   if(t==="marche"&&window.Economie)window.Economie.show("marche",parts[1]);
   if(t==="classements"&&s==="richesse"&&window.Economie)window.Economie.show("richesse");
   if(t==="aide"&&s==="commandes"&&window.Economie)window.Economie.show("commandes",parts[2]);
+  if(t==="aide"&&s==="guides"&&parts[2])setTimeout(()=>{const g=$("g-"+parts[2]);if(g)g.scrollIntoView({block:"start"})},60);
 }
 let lastTab=null;
-window.addEventListener("hashchange",()=>{const t=location.hash.slice(1).split(/[?]/)[0].split("/").slice(0,3).join("/");route();if(t!==lastTab&&!/^aide\/commandes\/./.test(t))window.scrollTo({top:0});lastTab=t});
+window.addEventListener("hashchange",()=>{const t=location.hash.slice(1).split(/[?]/)[0].split("/").slice(0,3).join("/");route();if(t!==lastTab&&!/^aide\/(commandes|guides)\/./.test(t))window.scrollTo({top:0});lastTab=t});
 
 (async()=>{
   route();

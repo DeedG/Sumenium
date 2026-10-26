@@ -386,10 +386,26 @@ function fisc(view) {
     ${rows.slice().sort((a, b) => itemName(a.item, a.nom).localeCompare(itemName(b.item, b.nom))).map((r) => `<tr><td>${ico(r.item)} ${E_(itemName(r.item, r.nom))}</td><td><b>${su(r.prix)}</b>${sell ? "" : '<span class="muted small"> / unité</span>'}</td>${sell ? `<td>× ${n0(r.quantite || 1)}</td>` : ""}<td>${mapLink(r)}</td></tr>`).join("")}
     </tbody></table></div>` : '<p class="empty">Aucun.</p>';
   view.innerHTML = `<div class="bar"><input type="search" id="fqS" placeholder="Chercher un objet (français ou anglais)…" value="${E_(fqS)}" aria-label="Chercher un objet du FISC"></div>
-    ${F.prixDynamiques && F.prixDynamiques !== "off" ? `<div class="banner info">Prix dynamiques activés (${E_(F.prixDynamiques)}) : les prix évoluent selon les quantités échangées.</div>` : ""}
-    <div class="board"><h3>Ce que le FISC rachète<small>${n0(F.rachat.length)} objets</small></h3>${table(F.rachat, false)}</div>
-    <div class="board" style="margin-top:14px"><h3>Ce que le FISC vend<small>stock illimité</small></h3>${table(F.vente, true)}</div>`;
+    ${F.prixDynamiques && !/^(off|aucun)$/i.test(F.prixDynamiques) ? `<div class="banner info">Prix dynamiques activés (${E_(F.prixDynamiques)}) : les prix évoluent selon les quantités échangées.</div>` : ""}
+    ${rares(F)}
+    <div class="board" style="margin-top:14px"><h3>Minerais : ce que le FISC rachète<small>coffres du FISC, objets détruits</small></h3>${table(F.rachat, false)}</div>
+    <div class="board" style="margin-top:14px"><h3>Ce que le FISC vend<small>coffres du FISC, stock illimité</small></h3>${table(F.vente, true)}</div>`;
   keepSearch("fqS", (v) => (fqS = v));
+}
+
+// Objets rares (PNJ « FISC — Rachat » et « FISC — Revente ») : le prix suit le stock du FISC
+function rares(F) {
+  const R = (F.reprise || []).filter((r) => matches(fqS, itemKeys(r.item, r.nom) + " " + (r.categorie || "")));
+  if (!(F.reprise || []).length) return "";
+  const cats = [...new Set(R.map((r) => r.categorie || "Divers"))];
+  const rows = (c) => R.filter((r) => (r.categorie || "Divers") === c).sort((a, b) => itemName(a.item, a.nom).localeCompare(itemName(b.item, b.nom))).map((r) => `<tr>
+      <td>${ico(r.item)} ${E_(itemName(r.item, r.nom))}${r.demandes ? ` <span class="chip" title="Joueurs qui l'ont demandé cette semaine">🔎 ${n0(r.demandes)}</span>` : ""}</td>
+      <td>${r.rachete === false ? '<span class="muted small">plus racheté</span>' : `<b>${su(r.prixRachat)}</b>`}</td>
+      ${F.revente ? `<td>${r.rupture ? '<span class="muted small">en rupture</span>' : `<b>${su(r.prixRevente)}</b>`}</td><td>${r.stock == null ? "—" : n0(r.stock)}</td>` : ""}
+      <td class="muted small">−${(r.baissePct ?? 0).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %</td></tr>`).join("");
+  return `<div class="board"><h3>Objets rares : rachat et revente<small>PNJ du FISC au spawn</small></h3>
+    <p class="small muted">Ces objets ne sont pas détruits : le FISC les garde et les revend. Son prix suit son stock : chaque objet qu'il a déjà fait baisser un peu le prix du suivant (colonne « par objet »), et il revend au double. Prix affichés pour le prochain objet. <a href="#aide/guides/fisc">Comment ça marche</a></p>
+    ${cats.length ? cats.map((c) => `<h4 class="cat-h">${E_(c)}</h4><div class="tbl-wrap"><table class="tbl left"><thead><tr><th>Objet</th><th>Le FISC paie</th>${F.revente ? "<th>Il revend</th><th>Stock</th>" : ""}<th>Par objet</th></tr></thead><tbody>${rows(c)}</tbody></table></div>`).join("") : '<p class="empty">Aucun.</p>'}</div>`;
 }
 
 /* ---------------- Baltop ---------------- */
@@ -406,11 +422,13 @@ function baltop(view) {
   </div>`;
 }
 
-/* ---------------- Commandes (doc « Commandes Suménium Economy », v2.4.0) ---------------- */
+/* ---------------- Commandes (doc « Commandes Suménium Economy », v2.6.2) ---------------- */
 const SANS_COMMANDE = [
   ["Acheter dans une boutique", "Clic droit sur le coffre ou son panneau. Le chat affiche l'item (survolable), le prix et le stock. Taper ensuite la quantité dans le chat : un nombre, « tout » ou « annuler » (30 s pour répondre, invisible pour les autres)."],
   ["Acheter un lot", "Pareil qu'une boutique normale, mais on tape un nombre de lots. Le chat et le panneau montrent le contenu du lot (chaque item est survolable). Si un seul item du lot manque dans le coffre, la boutique est en rupture : on ne paie jamais un lot incomplet."],
-  ["Vendre au FISC", "Clic droit sur le coffre du FISC, puis taper la quantité à vendre ou « tout »."],
+  ["Vendre des minerais au FISC", "Clic droit sur le coffre du FISC, puis taper la quantité à vendre ou « tout ». Les minerais rachetés sont détruits."],
+  ["Vendre un objet rare au FISC", "Clic droit sur le PNJ « FISC — Rachat » : un menu montre les objets rachetés (cœur de la mer, disques, ornements, tessons…) par catégorie, avec le prix du prochain et combien on en a. Clic sur l'objet puis la quantité dans le chat ou « tout ». L'objet doit être identique (pas abîmé, mêmes enchantements). Il n'est pas détruit : il rejoint le stock du FISC, et chaque objet en stock fait un peu baisser le prix du suivant."],
+  ["Acheter un objet rare au FISC", "Clic droit sur le PNJ « FISC — Revente » : les objets rachetés aux joueurs, au double du prix de rachat ; le prix monte quand le stock baisse. Un objet en rupture se demande d'un clic : on est prévenu à son retour, et le FISC augmente son prix de rachat si plusieurs joueurs le cherchent."],
   ["Ravitailler sa boutique", "Le propriétaire et, pour une boutique de faction, tous les membres ouvrent le coffre normalement. Le stock et le panneau se mettent à jour à la fermeture."],
   ["Acheter dans la boutique de sa faction", "Avec son compte perso (/compte perso), cliquer sur le panneau : l'argent va dans la banque de faction."],
   ["Panneau", "Posé automatiquement à la création de la boutique (ou un panneau déjà accroché au coffre est repris). Il est ciré : personne ne peut le modifier ni le casser à part les membres."],
@@ -490,8 +508,9 @@ function commandes(view) {
   }
   const sans = SANS_COMMANDE.filter((l) => match("en jeu", ...l));
   view.innerHTML = `<div class="bar"><input type="search" id="cq" placeholder="Chercher une commande ou une action (boutique, bon, faction, hdv…)" value="${E_(cq)}" aria-label="Chercher une commande"></div>
-    <p class="small muted">Mod Sumenium Economy 2.4.0. Les montants s'écrivent avec un point (3.5). Entre &lt; &gt; : obligatoire ; entre [ ] : facultatif.</p>
-    ${sans.length ? `<section class="board cmd-sec"><h3>En jeu, sans commande</h3><p class="small muted">Acheter, vendre au FISC et ravitailler se fait en cliquant sur les coffres, pas avec des commandes.</p>
+    <div class="banner info">Tu débutes ? Les <a href="#aide/guides">guides pas à pas</a> expliquent comment acheter, ouvrir une boutique, vendre un service ou gagner de l'argent.</div>
+    <p class="small muted">Mod Sumenium Economy 2.6.2. Les montants s'écrivent avec un point (3.5). Entre &lt; &gt; : obligatoire ; entre [ ] : facultatif.</p>
+    ${sans.length ? `<section class="board cmd-sec"><h3>En jeu, sans commande</h3><p class="small muted">Acheter, vendre au FISC et ravitailler se fait en cliquant sur les coffres et les PNJ, pas avec des commandes.</p>
       <div class="tbl-wrap"><table class="tbl left cmds"><thead><tr><th>Action</th><th>Comment</th></tr></thead><tbody>
       ${sans.map((l) => `<tr><td><b>${E_(l[0])}</b></td><td>${E_(l[1])}</td></tr>`).join("")}</tbody></table></div></section>` : ""}
     <h3 class="sec">Commandes des joueurs <small>accessibles à tous ; certaines sont réservées au chef ou aux trésoriers</small></h3>

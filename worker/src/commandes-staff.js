@@ -1,14 +1,25 @@
-// Commandes réservées au staff (mod Sumenium Economy 2.4.0) : servies seulement aux comptes Discord staff.
+// Commandes réservées au staff (mod Sumenium Economy 2.6.2) : servies seulement aux comptes Discord staff.
 export const COMMANDES_STAFF = {
   intro: "Réservées aux opérateurs. Sans /sumeco bypass, un admin utilise les boutiques comme un joueur.",
   sections: [
-    { titre: "FISC", intro: "Regarder le coffre ou le tonneau du FISC.", lignes: [
-      ["/fisc rachat <prix unitaire>", "Le coffre devient un point de rachat de l'item en main (ex. /fisc rachat 70 avec un minerai de diamant)"],
-      ["/fisc vente <prix> <quantité>", "Le FISC vend l'item en main, stock infini (ex. hopper filtre à 1500)"],
-      ["/fisc prix <prix>", "Change le prix d'une boutique du FISC"],
-      ["/fisc cacher", "Cache la boutique visée (FISC ou joueur) : elle n'apparaît plus dans l'annuaire, sur le site ni sur la carte BlueMap, mais fonctionne normalement pour qui la trouve. Pratique pour une boutique secrète (ex. shop d'items cheat : /fisc vente puis /fisc cacher ; le panneau affiche toujours « FISC », le casser en /sumeco bypass)"],
-      ["/fisc montrer", "Rend de nouveau visible une boutique cachée"],
+    { titre: "FISC : coffres", intro: "En regardant un coffre ou un tonneau du FISC : minerais rachetés et détruits, objets vendus à l'infini.", lignes: [
+      ["/fisc coffre rachat <prix unitaire>", "Le coffre devient un point de rachat de l'item en main (ex. /fisc coffre rachat 70 avec un minerai de diamant)"],
+      ["/fisc coffre vente <prix> <quantité>", "Le FISC vend l'item en main, stock infini (ex. hopper filtre à 1500)"],
+      ["/fisc coffre prix <prix>", "Change le prix d'un coffre du FISC"],
+      ["/fisc coffre cacher", "Cache la boutique visée (FISC ou joueur) : elle n'apparaît plus dans l'annuaire, sur le site ni sur la carte BlueMap, mais fonctionne normalement pour qui la trouve (ex. boutique secrète : /fisc coffre vente puis /fisc coffre cacher ; casser le panneau en /sumeco bypass)"],
+      ["/fisc coffre montrer", "Rend de nouveau visible une boutique cachée"],
     ] },
+    { titre: "FISC : objets rares", intro: "Item en main. Rachetés au PNJ « FISC — Rachat » sans être détruits, revendus au PNJ « FISC — Revente ». Prix de rachat = référence × 2^(−stock/H), revente = 2 × le rachat au stock précédent.", lignes: [
+      ["/fisc rare <prix> [H] [catégorie]", "Ajoute ou modifie l'item en main : prix de référence (payé quand le FISC n'en a aucun), H = le prix est divisé par 2 tous les H en stock (10 par défaut), catégorie existante ou nouvelle. Ex. /fisc rare 400 4 Rares"],
+      ["/fisc rare defaut", "Ajoute les 59 objets rares de départ (noyau lourd, cœur de la mer, disques, ornements, tessons, armures de cheval, éponge, fougère, herbes hautes, tête de dragon…) sans toucher à ceux déjà présents"],
+      ["/fisc rare info", "Item en main : prix de référence et de départ, H, stock, prochain rachat et revente, argent max créé, semaine en cours (entrées, sorties, rupture, demandes)"],
+      ["/fisc rare stock", "Liste par catégorie : prochain rachat, référence, H, prochaine revente, stock, demandes"],
+      ["/fisc rare retirer", "Le FISC ne rachète plus l'item en main (son stock reste vendable)"],
+      ["/fisc rare plafond <max|aucun|general>", "Stock maximum de l'item en main (aucun par défaut)"],
+      ["/fisc rare ajuster", "Lance tout de suite l'ajustement hebdomadaire (+20 % si rupture 3 jours et 2 demandes, −15 % si le stock dort, entre ×0,5 et ×2 du prix de départ)"],
+      ["/fisc pnj rachat · /fisc pnj revente · /fisc pnj retirer", "Place le PNJ de rachat ou de revente à ta position, ou retire le plus proche (6 blocs)"],
+      ["/fisc ouvrir rachat|revente", "Ouvre le menu sans PNJ, pour tester"],
+    ], note: "Config : fiscRevente (activée), fiscReventeMultiplicateur (2), fiscRepriseDemiStock, fiscRepriseSeuilRachat (0,50 Su), fiscRepriseAjustement, fiscRepriseHausse, fiscRepriseBaisse, fiscRepriseJoursRupture, fiscRepriseDemandesMin, fiscRepriseFacteurMax, fiscRepriseFacteurMin, fiscReprisePlafond." },
     { titre: "Argent", lignes: [
       ["/eco voir <joueur>", "Solde d'un joueur et de sa faction"],
       ["/eco donner <joueur> <montant>", "Ajoute de l'argent"],
