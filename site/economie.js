@@ -422,7 +422,7 @@ function baltop(view) {
   </div>`;
 }
 
-/* ---------------- Commandes (doc « Commandes Suménium Economy », v2.6.2) ---------------- */
+/* ---------------- Commandes (doc « Commandes Suménium Economy », v2.6.3) ---------------- */
 const SANS_COMMANDE = [
   ["Acheter dans une boutique", "Clic droit sur le coffre ou son panneau. Le chat affiche l'item (survolable), le prix et le stock. Taper ensuite la quantité dans le chat : un nombre, « tout » ou « annuler » (30 s pour répondre, invisible pour les autres)."],
   ["Acheter un lot", "Pareil qu'une boutique normale, mais on tape un nombre de lots. Le chat et le panneau montrent le contenu du lot (chaque item est survolable). Si un seul item du lot manque dans le coffre, la boutique est en rupture : on ne paie jamais un lot incomplet."],
@@ -509,7 +509,7 @@ function commandes(view) {
   const sans = SANS_COMMANDE.filter((l) => match("en jeu", ...l));
   view.innerHTML = `<div class="bar"><input type="search" id="cq" placeholder="Chercher une commande ou une action (boutique, bon, faction, hdv…)" value="${E_(cq)}" aria-label="Chercher une commande"></div>
     <div class="banner info">Tu débutes ? Les <a href="#aide/guides">guides pas à pas</a> expliquent comment acheter, ouvrir une boutique, vendre un service ou gagner de l'argent.</div>
-    <p class="small muted">Mod Sumenium Economy 2.6.2. Les montants s'écrivent avec un point (3.5). Entre &lt; &gt; : obligatoire ; entre [ ] : facultatif.</p>
+    <p class="small muted">Mod Sumenium Economy 2.6.3. Les montants s'écrivent avec un point (3.5). Entre &lt; &gt; : obligatoire ; entre [ ] : facultatif.</p>
     ${sans.length ? `<section class="board cmd-sec"><h3>En jeu, sans commande</h3><p class="small muted">Acheter, vendre au FISC et ravitailler se fait en cliquant sur les coffres et les PNJ, pas avec des commandes.</p>
       <div class="tbl-wrap"><table class="tbl left cmds"><thead><tr><th>Action</th><th>Comment</th></tr></thead><tbody>
       ${sans.map((l) => `<tr><td><b>${E_(l[0])}</b></td><td>${E_(l[1])}</td></tr>`).join("")}</tbody></table></div></section>` : ""}

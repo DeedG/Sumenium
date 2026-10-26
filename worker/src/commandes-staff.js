@@ -1,4 +1,4 @@
-// Commandes réservées au staff (mod Sumenium Economy 2.6.2) : servies seulement aux comptes Discord staff.
+// Commandes réservées au staff (mod Sumenium Economy 2.6.3) : servies seulement aux comptes Discord staff.
 export const COMMANDES_STAFF = {
   intro: "Réservées aux opérateurs. Sans /sumeco bypass, un admin utilise les boutiques comme un joueur.",
   sections: [
@@ -11,12 +11,12 @@ export const COMMANDES_STAFF = {
     ] },
     { titre: "FISC : objets rares", intro: "Item en main. Rachetés au PNJ « FISC — Rachat » sans être détruits, revendus au PNJ « FISC — Revente ». Prix de rachat = référence × 2^(−stock/H), revente = 2 × le rachat au stock précédent.", lignes: [
       ["/fisc rare <prix> [H] [catégorie]", "Ajoute ou modifie l'item en main : prix de référence (payé quand le FISC n'en a aucun), H = le prix est divisé par 2 tous les H en stock (10 par défaut), catégorie existante ou nouvelle. Ex. /fisc rare 400 4 Rares"],
-      ["/fisc rare defaut", "Ajoute les 59 objets rares de départ (noyau lourd, cœur de la mer, disques, ornements, tessons, armures de cheval, éponge, fougère, herbes hautes, tête de dragon…) sans toucher à ceux déjà présents"],
+      ["/fisc rare defaut [remplacer]", "Ajoute les 57 objets rares de départ arrêtés le 26 octobre (noyau lourd 800 Su, pomme dorée enchantée 400 Su, cœur de la mer 60 Su, disques, ornements 80 Su, tessons 30 Su, armures de cheval, éponge, grande fougère, herbes hautes, tête de dragon…). Sans « remplacer », les objets déjà présents ne bougent pas ; avec, ils reprennent ces valeurs (stock gardé). L'œuf de renifleur n'est plus racheté"],
       ["/fisc rare info", "Item en main : prix de référence et de départ, H, stock, prochain rachat et revente, argent max créé, semaine en cours (entrées, sorties, rupture, demandes)"],
       ["/fisc rare stock", "Liste par catégorie : prochain rachat, référence, H, prochaine revente, stock, demandes"],
       ["/fisc rare retirer", "Le FISC ne rachète plus l'item en main (son stock reste vendable)"],
       ["/fisc rare plafond <max|aucun|general>", "Stock maximum de l'item en main (aucun par défaut)"],
-      ["/fisc rare ajuster", "Lance tout de suite l'ajustement hebdomadaire (+20 % si rupture 3 jours et 2 demandes, −15 % si le stock dort, entre ×0,5 et ×2 du prix de départ)"],
+      ["/fisc rare ajuster", "Lance tout de suite l'ajustement hebdomadaire (+20 % si rupture 3 jours et 2 demandes, −15 % si le stock dort, entre ×0,5 et ×1,5 du prix de départ)"],
       ["/fisc pnj rachat · /fisc pnj revente · /fisc pnj retirer", "Place le PNJ de rachat ou de revente à ta position, ou retire le plus proche (6 blocs)"],
       ["/fisc ouvrir rachat|revente", "Ouvre le menu sans PNJ, pour tester"],
     ], note: "Config : fiscRevente (activée), fiscReventeMultiplicateur (2), fiscRepriseDemiStock, fiscRepriseSeuilRachat (0,50 Su), fiscRepriseAjustement, fiscRepriseHausse, fiscRepriseBaisse, fiscRepriseJoursRupture, fiscRepriseDemandesMin, fiscRepriseFacteurMax, fiscRepriseFacteurMin, fiscReprisePlafond." },
