@@ -117,20 +117,46 @@ function apercu(view) {
     </div>` : unavailable("statistiques");
   view.innerHTML = `${tiles}
     <div class="board chart-board"><h3>Argent en circulation<small>un relevé par heure</small></h3><div id="ecoLine"></div></div>
-    <div class="board chart-board"><h3>Volume des échanges<small>7 derniers jours</small></h3><div id="ecoBars"></div></div>
+    <h3 class="sec">Entre joueurs</h3>
+    <div class="board chart-board"><h3>Échanges entre joueurs<small>7 j</small></h3><div id="ecoBars"></div></div>
     <div class="boards boards-2">
-      <div class="board"><h3>Objets les plus vendus<small>boutiques des joueurs, 7 j</small></h3>${topList(s && s.topVentesJoueurs7j, false)}</div>
-      <div class="board"><h3>Rachats du FISC<small>7 j</small></h3>${topList(s && s.rachatsFisc7j, true)}</div>
+      <div class="board"><h3>Objets les plus vendus<small>boutiques · 7 j</small></h3>${topList(s && s.topVentesJoueurs7j, false)}</div>
+      <div class="board"><h3>Enchères en cours<small>les plus chères</small></h3>${hdvTop()}</div>
+    </div>
+    <h3 class="sec">Le FISC <small>la banque du serveur : c'est lui qui crée et retire l'argent</small></h3>
+    <div class="board chart-board"><h3>Argent versé et repris par le FISC<small>7 j</small></h3>
+      <p class="small muted">Au-dessus : ce que le FISC paie aux joueurs (il crée cet argent). En dessous : ce qu'il leur reprend (achats, taxes, frais). C'est ce qui fait monter ou baisser l'argent en circulation.</p><div id="ecoFisc"></div></div>
+    <div class="boards boards-2">
+      <div class="board"><h3>Minerais rachetés par le FISC<small>7 j</small></h3>${topList(s && s.rachatsFisc7j, true)}</div>
+      ${raresBoard() || '<div class="board"><h3>Objets rares du FISC</h3><p class="empty">Données indisponibles.</p></div>'}
     </div>`;
   lineChart($("ecoLine"), E.masse);
-  barChart($("ecoBars"), s && s.parJour7j);
+  stackChart($("ecoBars"), s && s.parJour7j, S_JOUEURS, [], "Échanges entre joueurs par jour sur 7 jours");
+  stackChart($("ecoFisc"), s && s.parJour7j, S_CREE, S_RETIRE, "Argent versé et repris par le FISC par jour sur 7 jours");
+}
+// Le mod donne le nom en jeu de l'objet vendu (en anglais sur le serveur) : on retrouve l'objet via les boutiques
+function soldName(n) {
+  const b = (E.boutiques || []).find((x) => x.nom === n && x.item) || (E.hdv || []).find((x) => x.nom === n && x.item);
+  if (b) return ico(b.item) + " " + E_(itemName(b.item, n));
+  const sv = (E.boutiques || []).find((x) => x.service === n);
+  return (sv ? '<span class="eco-ico svc" aria-hidden="true">🎫</span> ' : "") + E_(n);
+}
+// Enchères en cours les plus élevées (offre actuelle ou prix de départ)
+function hdvTop() {
+  const A = (E.hdv || []).filter((a) => !a.fin || a.fin > Date.now());
+  if (!E.hdv) return '<p class="empty">Données indisponibles.</p>';
+  if (!A.length) return '<p class="empty">Aucune enchère en cours.</p>';
+  const rows = A.map((a) => ({ a, v: a.offreActuelle || a.prixDepart || 0 })).sort((x, y) => y.v - x.v).slice(0, 9), max = Math.max(...rows.map((r) => r.v), 1);
+  return `<div class="rank-scroll"><ol class="rank">${rows.map(({ a, v }, i) => `<li><span class="pos">${i + 1}</span>
+    <span class="who"><a href="#marche/hdv">${ico(a.item)} ${E_(itemName(a.item, a.nom))}</a><small>${a.quantite > 1 ? `× ${n0(a.quantite)} · ` : ""}${a.offreActuelle ? `${n0(a.nbOffres)} offre${a.nbOffres > 1 ? "s" : ""}` : "aucune offre"}</small></span>
+    <span class="val">${su(v, 0)}</span><span class="bar2"><s style="width:${Math.max(2, Math.round(v / max * 100))}%"></s></span></li>`).join("")}</ol></div>`;
 }
 function topList(rows, isItemId) {
   if (!rows) return '<p class="empty">Données indisponibles.</p>';
   if (!rows.length) return '<p class="empty">Rien sur les 7 derniers jours.</p>';
   const max = Math.max(...rows.map((r) => r.montant || 0), 1);
   return `<div class="rank-scroll"><ol class="rank">${rows.map((r, i) => `<li><span class="pos">${i + 1}</span>
-    <span class="who">${isItemId ? ico(r.item) + " " + E_(itemName(r.item)) : E_(r.item)}<small>× ${n0(r.quantite)}</small></span>
+    <span class="who">${isItemId ? ico(r.item) + " " + E_(itemName(r.item)) : soldName(r.item)}<small>× ${n0(r.quantite)}</small></span>
     <span class="val">${su(r.montant, 0)}</span><span class="bar2"><s style="width:${Math.max(2, Math.round((r.montant || 0) / max * 100))}%"></s></span></li>`).join("")}</ol></div>`;
 }
 
@@ -250,45 +276,84 @@ function lineChart(el, all) {
 }
 
 // Barres empilées par jour : 4 séries (couleurs validées clair/sombre), légende + tableau
-const SERIES = [["ventesJoueurs", "Ventes en boutique"], ["rachatsFisc", "Rachats du FISC"], ["ventesHdv", "Ventes à l'HDV"], ["achatsFisc", "Achats au FISC"]];
-function barChart(el, days) {
+// Séries des graphiques par jour (parJour7j du mod) : [clé, libellé, classe de couleur]
+const S_JOUEURS = [["ventesJoueurs", "Ventes en boutique", "s0"], ["ventesHdv", "Ventes à l'hôtel des ventes", "s2"]];
+const S_CREE = [["rachatsFisc", "Rachats de minerais", "s1"], ["reprisesFisc", "Reprises d'objets rares", "s4"]];
+const S_RETIRE = [["achatsFisc", "Achats au FISC", "s3"], ["reventesFisc", "Reventes d'objets rares", "s5"], ["taxesFrais", "Taxes et frais de boutique", "s6"]];
+// Barres empilées par jour ; « neg » : séries tracées sous l'axe (argent retiré)
+function stackChart(el, days, pos, neg = [], label = "") {
   if (!days) { el.innerHTML = '<p class="empty">Données indisponibles.</p>'; return; }
-  if (!days.length) { el.innerHTML = '<p class="empty">Aucun échange sur les 7 derniers jours.</p>'; return; }
-  const W = Math.max(300, el.clientWidth || 600), H = 220, P = { l: 64, r: 8, t: 10, b: 26 };
-  const tot = days.map((d) => SERIES.reduce((a, [k]) => a + (d[k] || 0), 0));
-  const max = Math.max(...tot, 1);
-  const ticks = [0, 1, 2, 3].map((i) => max * i / 3);
+  days = days.map((d) => ({ ...d, taxesFrais: (d.taxes || 0) + (d.fraisBoutiques || 0), taxesFraisNb: (d.fraisBoutiquesNb || 0) }));
+  const sum = (d, ser) => ser.reduce((a, [k]) => a + (d[k] || 0), 0);
+  if (!days.some((d) => sum(d, pos) + sum(d, neg))) { el.innerHTML = '<p class="empty">Rien sur les 7 derniers jours.</p>'; return; }
+  const W = Math.max(300, el.clientWidth || 600), H = neg.length ? 260 : 220, P = { l: 64, r: 8, t: 10, b: 26 };
+  const up = Math.max(...days.map((d) => sum(d, pos)), 1), down = neg.length ? Math.max(...days.map((d) => sum(d, neg)), 1) : 0;
+  const span = up + down, inner = H - P.t - P.b, zero = P.t + inner * up / span;
+  const Y = (v) => zero - v / span * inner;  // v > 0 au-dessus, v < 0 en dessous
+  const ticks = neg.length ? [up, up / 2, 0, -down / 2, -down] : [0, 1, 2, 3].map((i) => up * i / 3);
   const slot = (W - P.l - P.r) / days.length, bw = Math.min(46, slot * 0.6);
-  const Y = (v) => H - P.b - v / max * (H - P.t - P.b);
-  const lab = (d) => new Date(d.jour + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" });
+  // Libellés des jours : « mer. 21 », ou « M 21 » quand la place manque (téléphone)
+  const lab = (d) => new Date(d.jour + "T12:00:00").toLocaleDateString("fr-FR", { weekday: slot < 64 ? "narrow" : "short", day: "numeric" });
+  const labL = (d) => new Date(d.jour + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "short" });
   let bars = "";
   days.forEach((d, i) => {
-    let acc = 0; const x = P.l + i * slot + (slot - bw) / 2;
-    SERIES.forEach(([k], si) => {
-      const v = d[k] || 0; if (!v) return;
-      const y = Y(acc + v), h = Y(acc) - y; acc += v;
-      bars += `<rect class="s${si}" x="${x.toFixed(1)}" y="${(y + 1).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, h - 2).toFixed(1)}" rx="3"/>`;
+    const x = P.l + i * slot + (slot - bw) / 2;
+    [[pos, 1], [neg, -1]].forEach(([ser, sign]) => {
+      let acc = 0;
+      ser.forEach(([k, , c]) => {
+        const v = d[k] || 0; if (!v) return;
+        const y1 = Y(sign * acc), y2 = Y(sign * (acc + v)); acc += v;
+        const top = Math.min(y1, y2), h = Math.abs(y2 - y1);
+        bars += `<rect class="${c}" x="${x.toFixed(1)}" y="${(top + 1).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, h - 2).toFixed(1)}" rx="3"/>`;
+      });
     });
-    bars += `<rect class="hitbar" data-i="${i}" x="${P.l + i * slot}" y="${P.t}" width="${slot}" height="${H - P.t - P.b}" fill="transparent"/>`;
+    bars += `<rect class="hitbar" data-i="${i}" x="${P.l + i * slot}" y="${P.t}" width="${slot}" height="${inner}" fill="transparent"/>`;
     bars += `<text class="axis" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${E_(lab(d))}</text>`;
   });
-  el.innerHTML = `<div class="legend">${SERIES.map(([, l], si) => `<span><i class="sw s${si}"></i>${l}</span>`).join("")}</div>
-    <svg class="chart" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Volume des échanges par jour sur 7 jours">
-    ${ticks.map((v) => `<line class="grid" x1="${P.l}" x2="${W - P.r}" y1="${Y(v)}" y2="${Y(v)}"/><text class="axis" x="${P.l - 8}" y="${Y(v) + 4}" text-anchor="end">${E_(suShort(v))}</text>`).join("")}
-    ${bars}</svg><div class="ctip" id="ecoTipB" hidden></div>
-    <details class="tblview"><summary>Voir le tableau</summary><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Jour</th><th></th>${SERIES.map(([, l]) => `<th>${l}</th>`).join("")}<th>Taxes</th></tr></thead><tbody>
-    ${days.map((d) => `<tr><td>${E_(lab(d))}</td><td></td>${SERIES.map(([k]) => `<td>${su(d[k] || 0, 0)}<small class="muted"> · ${n0(d[k + "Nb"])}</small></td>`).join("")}<td>${su(d.taxes || 0, 0)}</td></tr>`).join("")}
+  const all = [...pos, ...neg], tid = "tip" + Math.random().toString(36).slice(2, 8);
+  const net = (d) => sum(d, pos) - sum(d, neg);
+  el.innerHTML = `<div class="legend">${pos.map(([, l, c]) => `<span><i class="sw ${c}"></i>${l}</span>`).join("")}${neg.length ? '<span class="legend-sep" aria-hidden="true">·</span>' : ""}${neg.map(([, l, c]) => `<span><i class="sw ${c}"></i>${l}</span>`).join("")}</div>
+    <svg class="chart" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${E_(label)}">
+    ${ticks.map((v) => `<line class="grid${v === 0 && neg.length ? " zero" : ""}" x1="${P.l}" x2="${W - P.r}" y1="${Y(v)}" y2="${Y(v)}"/><text class="axis" x="${P.l - 8}" y="${Y(v) + 4}" text-anchor="end">${v < 0 ? "−" : v > 0 && neg.length ? "+" : ""}${E_(suShort(Math.abs(v)))}</text>`).join("")}
+    ${neg.length ? `<text class="axis" x="${W - P.r}" y="${P.t + 10}" text-anchor="end">versé aux joueurs ↑</text><text class="axis" x="${W - P.r}" y="${H - P.b - 4}" text-anchor="end">repris aux joueurs ↓</text>` : ""}
+    ${bars}</svg><div class="ctip" id="${tid}" hidden></div>
+    <details class="tblview"><summary>Voir le tableau</summary><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Jour</th>${all.map(([, l]) => `<th>${l}</th>`).join("")}${neg.length ? "<th>Solde</th>" : ""}</tr></thead><tbody>
+    ${days.map((d) => `<tr><td>${E_(labL(d))}</td>${all.map(([k]) => `<td>${su(d[k] || 0, 0)}${d[k + "Nb"] ? `<small class="muted"> · ${n0(d[k + "Nb"])}</small>` : ""}</td>`).join("")}${neg.length ? `<td><b>${net(d) >= 0 ? "+" : "−"}${su(Math.abs(net(d)), 0)}</b></td>` : ""}</tr>`).join("")}
     </tbody></table></div></details>`;
-  const tip = $("ecoTipB");
+  const tip = $(tid);
   el.querySelectorAll(".hitbar").forEach((r) => {
     const show = () => {
       const d = days[+r.dataset.i];
-      tip.innerHTML = `<b>${E_(lab(d))}</b>${SERIES.map(([k, l], si) => `<span><i class="sw s${si}"></i>${l} : ${su(d[k] || 0, 0)} (${n0(d[k + "Nb"])})</span>`).join("")}`;
-      tip.hidden = false; tip.style.left = Math.min(Math.max(+r.getAttribute("x") - 40, 0), W - 230) + "px";
+      tip.innerHTML = `<b>${E_(labL(d))}</b>${all.filter(([k]) => d[k]).map(([k, l, c]) => `<span><i class="sw ${c}"></i>${l} : ${su(d[k], 0)}${d[k + "Nb"] ? ` (${n0(d[k + "Nb"])})` : ""}</span>`).join("") || "<span>Rien ce jour-là</span>"}
+        ${neg.length ? `<span><b>${net(d) >= 0 ? `+${su(net(d), 0)} versés` : `−${su(-net(d), 0)} repris`}</b></span>` : ""}`;
+      tip.hidden = false; tip.style.left = Math.min(Math.max(+r.getAttribute("x") - 40, 0), W - 250) + "px";
     };
     r.addEventListener("pointerenter", show); r.addEventListener("pointerdown", show);
     r.addEventListener("pointerleave", () => (tip.hidden = true));
   });
+}
+
+// Objets rares du FISC : les plus recherchés (en rupture) et ce qu'il a en stock
+function raresBoard() {
+  const R = (E.fisc && E.fisc.reprise) || [];
+  if (!R.length) return "";
+  const s = E.stats || {}, days = s.parJour7j || [], tot = (k) => days.reduce((a, d) => a + (d[k] || 0), 0);
+  const enStock = R.filter((r) => r.stock > 0), valeur = enStock.reduce((a, r) => a + r.stock * (r.prixRevente || 0), 0);
+  const cherches = R.filter((r) => r.rachete !== false && (r.rupture || !r.stock)).sort((a, b) => (b.demandes || 0) - (a.demandes || 0) || (b.prixRachat || 0) - (a.prixRachat || 0)).slice(0, 5);
+  const stock = enStock.slice().sort((a, b) => b.stock * (b.prixRevente || 0) - a.stock * (a.prixRevente || 0)).slice(0, 5);
+  const li = (r, right) => `<li><span class="who">${ico(r.item)} ${E_(itemName(r.item, r.nom))}${r.demandes ? ` <span class="chip" title="Joueurs qui l'ont demandé">🔎 ${n0(r.demandes)}</span>` : ""}</span><span class="val">${right}</span></li>`;
+  return `<div class="board rares-board"><h3>Objets rares du FISC<small>PNJ du spawn</small></h3>
+    <div class="stats mini">
+      <div class="stat"><b>${n0(enStock.length)}</b><span>objets en stock</span></div>
+      <div class="stat"><b>${suShort(valeur)}</b><span>valeur à la revente</span></div>
+      <div class="stat"><b>${su(tot("reprisesFisc"), 0)}</b><span>versés aux joueurs · 7 j</span></div>
+      <div class="stat"><b>${su(tot("reventesFisc"), 0)}</b><span>payés par les joueurs · 7 j</span></div>
+    </div>
+    <h4 class="cat-h">Les plus recherchés <small class="muted">en rupture : le FISC paie</small></h4>
+    ${cherches.length ? `<ol class="rank plain">${cherches.map((r) => li(r, su(r.prixRachat))).join("")}</ol>` : '<p class="empty">Tout est en stock.</p>'}
+    <h4 class="cat-h">En stock <small class="muted">prix de revente</small></h4>
+    ${stock.length ? `<ol class="rank plain">${stock.map((r) => li(r, `${su(r.prixRevente)} <small class="muted">× ${n0(r.stock)}</small>`)).join("")}</ol>` : '<p class="empty">Rien en stock.</p>'}
+    <p class="small"><a href="#marche/fisc">Tous les objets rares et leurs prix</a> · <a href="#aide/guides/fisc">Comment marche le prix</a></p></div>`;
 }
 
 /* ---------------- Boutiques ---------------- */
@@ -544,7 +609,8 @@ function show(m, s) {
 }
 let rz = null;
 window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (mode === "marche" && sub === "economie" && !$("p-marche").hidden && E) render(); }, 200); });
-window.Economie = { show, data: () => E };
+// refresh : redessine l'onglet affiché (les noms français des objets arrivent parfois après les données)
+window.Economie = { show, data: () => E, refresh: () => { if (loaded && visible()) render(); } };
 // Chargé tout de suite : l'accueil et les fiches joueur / faction s'en servent aussi
 if (location.hostname !== "deedg.github.io") load();
 })();

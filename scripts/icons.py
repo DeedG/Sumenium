@@ -10,6 +10,9 @@ SITE = os.path.join(HERE, "..", "site")
 OUT = os.path.join(SITE, "icons")
 CACHE = os.path.join(HERE, "..", "work")
 WANTED_VERSION = os.environ.get("MC_VERSION", "26.3")
+NAMES_V = 2  # format de names_fr.json (2 : noms précisés pour les objets homonymes) ; changer force la régénération
+# Objets sans texture simple : on prend celle d'un objet qui leur ressemble
+ALIAS = {"enchanted_golden_apple": "golden_apple", "debug_stick": "stick"}
 
 
 def get(url):
@@ -44,20 +47,37 @@ def client_jar():
 def french_names(items):
     """Noms français officiels des objets (fichier de langue fr_fr du jeu) → site/icons/names_fr.json."""
     path = os.path.join(OUT, "names_fr.json")
-    if os.path.exists(path) and set(items) <= set(json.load(open(path, encoding="utf-8"))):
-        return
+    if os.path.exists(path):
+        old = json.load(open(path, encoding="utf-8"))
+        if old.get("_v") == NAMES_V and set(items) <= set(old):
+            return
     index = json.loads(get(version_meta()["assetIndex"]["url"]))
     h = index["objects"]["minecraft/lang/fr_fr.json"]["hash"]
     lang = json.loads(get(f"https://resources.download.minecraft.net/{h[:2]}/{h}"))
-    names = {}
+    names, keys = {}, {}
     for it in items:
         for key in (f"item.minecraft.{it}", f"block.minecraft.{it}"):
             if key in lang:
-                names[it] = lang[key]
+                names[it], keys[it] = lang[key], key
                 break
+    # Objets qui portent le même nom en jeu (« Disque », « Modèle de forge », « Motif de bannière ») : on précise lequel
+    count = {}
+    for n in names.values():
+        count[n] = count.get(n, 0) + 1
+    for it, n in list(names.items()):
+        if count[n] < 2:
+            continue
+        extra = lang.get(keys[it] + ".desc")
+        if it.endswith("_armor_trim_smithing_template"):
+            extra = lang.get("trim_pattern.minecraft." + it[: -len("_armor_trim_smithing_template")]) or extra
+        elif it.endswith("_upgrade_smithing_template"):
+            extra = lang.get("upgrade.minecraft." + it[: -len("_smithing_template")]) or extra
+        if extra:
+            names[it] = f"{n} : {extra}"
+    names["_v"] = NAMES_V
     with open(path, "w", encoding="utf-8") as f:
         json.dump(names, f, ensure_ascii=False, separators=(",", ":"))
-    print(f"Noms français : {len(names)}/{len(items)} objets")
+    print(f"Noms français : {len(names) - 1}/{len(items)} objets")
 
 
 def main():
@@ -81,8 +101,9 @@ def main():
     base = "assets/minecraft/textures/"
     found = 0
     for it in missing:
+        al = ALIAS.get(it, it)
         for cand in (f"item/{it}.png", f"block/{it}.png", f"block/{it}_front.png", f"block/{it}_side.png",
-                     f"block/{it}_top.png", f"item/{it}_00.png"):
+                     f"block/{it}_top.png", f"item/{it}_00.png", f"item/{al}.png", f"block/{al}.png"):
             if base + cand in names:
                 with open(os.path.join(OUT, it + ".png"), "wb") as f:
                     f.write(z.read(base + cand))

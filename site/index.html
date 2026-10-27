@@ -293,6 +293,7 @@ footer{margin-top:32px;color:var(--muted);font-size:.86rem;max-width:75ch}
 .rank li:nth-child(1) .pos{color:var(--sun-ink)}
 .rank .who{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
 .rank .who small{font-weight:600;color:var(--muted);margin-left:6px}
+@media (max-width:560px){.rank .who{white-space:normal;line-height:1.25;overflow-wrap:anywhere}}
 .rank .val{font:600 1rem var(--display);font-variant-numeric:tabular-nums}
 .rank .bar2{grid-column:2/4;height:4px;border-radius:2px;background:var(--crystal-soft);overflow:hidden;margin-top:-2px}
 .rank .bar2 s{display:block;height:100%;background:var(--crystal)}
@@ -484,8 +485,8 @@ p.cmd{margin:4px 0;overflow-x:auto;white-space:nowrap}
 .metier.muted{font-weight:400;font-style:italic}
 body.busy{cursor:progress}
 /* Économie */
-:root{--c0:#1f7fc9;--c1:#d99a0b;--c2:#7a3fb0;--c3:#3d7f2c}
-@media (prefers-color-scheme:dark){:root{--c0:#3f93d6;--c1:#b38414;--c2:#a874e0;--c3:#4fa83a}}
+:root{--c0:#1f7fc9;--c1:#d99a0b;--c2:#7a3fb0;--c3:#3d7f2c;--c4:#c2417a;--c5:#e58db3;--c6:#8a948a}
+@media (prefers-color-scheme:dark){:root{--c0:#3f93d6;--c1:#b38414;--c2:#a874e0;--c3:#4fa83a;--c4:#d9568f;--c5:#f2a6c6;--c6:#7d877d}}
 .eco-when{margin:-6px 0 12px}
 .eco-ico{width:28px;height:28px;image-rendering:pixelated;vertical-align:middle;flex:none}
 .rank .eco-ico{width:20px;height:20px;margin-right:4px}
@@ -538,6 +539,14 @@ body.busy{cursor:progress}
 .chart .dot{fill:var(--c0);stroke:var(--surface);stroke-width:2}
 .chart .s0,.sw.s0{fill:var(--c0);background:var(--c0)} .chart .s1,.sw.s1{fill:var(--c1);background:var(--c1)}
 .chart .s2,.sw.s2{fill:var(--c2);background:var(--c2)} .chart .s3,.sw.s3{fill:var(--c3);background:var(--c3)}
+.chart .s4,.sw.s4{fill:var(--c4);background:var(--c4)} .chart .s5,.sw.s5{fill:var(--c5);background:var(--c5)} .chart .s6,.sw.s6{fill:var(--c6);background:var(--c6)}
+.chart .grid.zero{stroke:var(--muted);stroke-width:1.5}
+.legend-sep{color:var(--muted)}
+.stats.mini{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:6px 0 8px}
+.stats.mini .stat{padding:10px 12px}.stats.mini .stat b{font-size:1.15rem}
+.rank.plain li{grid-template-columns:1fr auto;background:none}
+.rank.plain li:nth-child(odd){background:var(--bg)}
+.rares-board h4.cat-h{margin-top:4px}
 .chart .hitbar{cursor:default}
 .idet{display:grid;gap:4px;margin:-2px 0 2px}
 .idet .ench{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px}
@@ -1480,6 +1489,7 @@ window.addEventListener("hashchange",()=>{const t=location.hash.slice(1).split(/
 (async()=>{
   route();
   try{const r=await fetch("icons/names_fr.json");if(r.ok)NAMES=await r.json()}catch(e){}
+  if(window.Economie&&window.Economie.refresh)window.Economie.refresh();
   CAT=await (await fetch("catalog.json")).json();
   [...new Set(CAT.map(e=>e.tab))].sort().forEach(t=>$("tab").add(new Option(t,t)));
   Object.entries(TIERS).forEach(([k,v])=>{if(CAT.some(e=>e.tier===k))$("tier").add(new Option(v,k))});
