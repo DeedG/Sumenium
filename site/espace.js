@@ -368,7 +368,8 @@ function tailleTxt(sc, applied) {
 const TX = { ACHAT: "Achat en boutique", ACHAT_SERVICE: "Achat de service", RACHAT_FISC: "Vente au FISC", ACHAT_FISC: "Achat au FISC",
   FRAIS_BOUTIQUE: "Frais de boutique", REMBOURSEMENT_BOUTIQUE: "Remboursement de boutique", SUPPRESSION_BOUTIQUE: "Suppression de boutique",
   DEPOT_FACTION: "Dépôt à la faction", RETRAIT_FACTION: "Retrait de la faction", ADMIN: "Opération du staff", IMPORT: "Reprise de Savs",
-  BON_UTILISE: "Bon de service utilisé", HDV_OFFRE: "Offre à l'HDV", HDV_REMBOURSEMENT: "Offre HDV rendue", HDV_VENTE: "Vente à l'HDV" };
+  BON_UTILISE: "Bon de service utilisé", HDV_OFFRE: "Offre à l'HDV", HDV_REMBOURSEMENT: "Offre HDV rendue", HDV_VENTE: "Vente à l'HDV",
+  ACHAT_TETE: "Achat d'une tête", REPRISE_FISC: "Objet rare vendu au FISC", REVENTE_FISC: "Objet rare acheté au FISC", DEMANDE_REPRISE: "Objet rare demandé au FISC" };
 const su = (cents) => (cents / 100).toLocaleString("fr-FR", { minimumFractionDigits: cents % 100 ? 2 : 0, maximumFractionDigits: 2 }) + "\u00a0Su";
 const itemLabel = (t) => { const id = String(t.item || "").replace(/^minecraft:/, ""); return (typeof NAMES !== "undefined" && NAMES[id]) || t.itemName || id.replace(/_/g, " "); };
 function txRow(t, uuid) {
@@ -378,11 +379,13 @@ function txRow(t, uuid) {
   if (from === me && to !== me) { sign = -1; who = t.toName || (t.to === "fisc" ? "FISC" : ""); }
   else if (to === me && from !== me) { sign = 1; value = amount - (t.type === "RACHAT_FISC" ? 0 : tax); who = t.fromName || (t.from === "fisc" ? "FISC" : ""); }
   else if (from.startsWith("faction:") || to.startsWith("faction:")) who = from.startsWith("faction:") ? `banque ${from.slice(8)}` : `banque ${to.slice(8)}`;
-  const what = t.item ? `${t.qty ? t.qty + " × " : ""}${itemLabel(t)}` : (t.note || "");
+  const units = t.unitFirst != null && t.qty > 1 ? ` (de ${su(t.unitFirst)} à ${su(t.unitLast)} l'unité)` : "";
+  const what = t.item ? `${t.qty ? t.qty + " × " : ""}${itemLabel(t)}${units}` : (t.note || "");
+  const taxShown = t.type === "REVENTE_FISC" ? 0 : tax;  // la revente du FISC n'est pas une taxe
   return `<tr><td class="nowrap">${new Date(t.t).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</td>
     <td>${esc(TX[t.type] || t.type)}</td><td>${esc(what)}${who ? `<span class="muted small"> · ${sign < 0 ? "à" : sign > 0 ? "de" : ""} ${esc(who)}</span>` : ""}</td>
     <td class="num ${sign < 0 ? "amt-neg" : sign > 0 ? "amt-pos" : ""}">${sign < 0 ? "−" : sign > 0 ? "+" : ""}${su(value)}${!sign && (from || to) && !from.startsWith("joueur:") ? '<span class="muted small"> (faction)</span>' : ""}</td>
-    <td class="num muted">${tax ? su(tax) : ""}</td></tr>`;
+    <td class="num muted">${taxShown ? su(taxShown) : ""}</td></tr>`;
 }
 let hType = "", hRows = [], hMore = false, hUuid = null;
 async function loadHistory(path, el, append) {
