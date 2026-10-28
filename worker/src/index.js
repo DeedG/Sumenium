@@ -236,7 +236,7 @@ const TABLES = {
   projets: ["nom", "description", "tailles", "unique_srv", "illimite", "ordre", "deleted"],
   projet_faction: ["projet_id", "faction_id", "usine_id", "note", "ts", "deleted"],
   faction_demandes: ["name", "theme", "couleur", "membres", "player_id", "statut", "reponse", "faction_id", "ts", "updated", "traite_par"],
-  projet_demandes: ["projet_id", "faction_id", "player_id", "note", "statut", "reponse", "ts", "updated", "traite_par"],
+  projet_demandes: ["projet_id", "faction_id", "player_id", "note", "statut", "reponse", "ts", "updated", "traite_par", "usine_id", "usine_validee"],
 };
 
 async function row(env, table, id) {
@@ -529,7 +529,8 @@ async function api(req, env, url, ctx) {
     if (await env.DB.prepare("SELECT 1 FROM projet_demandes WHERE projet_id = ? AND faction_id = ? AND statut IN ('attente','a_completer')").bind(pr.id, me.faction_id).first()) fail(400, "Une demande est déjà en cours pour ce projet.");
     const note = str(body.note, 1000).trim();
     if (note.length < 5) fail(400, "Décris en quelques mots ce qui a été fait (et où : coordonnées).");
-    return json({ id: await insert(env, s, "projet_demandes", { projet_id: pr.id, faction_id: me.faction_id, player_id: me.id, note, statut: "attente", ts: now(), updated: now() }) });
+    const usine_id = await usineDemandee(env, pr, me.faction_id, body.usine_id);
+    return json({ id: await insert(env, s, "projet_demandes", { projet_id: pr.id, faction_id: me.faction_id, player_id: me.id, note, usine_id, statut: "attente", ts: now(), updated: now() }) });
   }
   if ((mm = p.match(/^\/api\/projets\/demandes\/(\d+)$/)) && m === "PUT") {
     const s = await need(req, env, "sumenien");
@@ -547,7 +548,9 @@ async function api(req, env, url, ctx) {
       if (!mine) fail(403, "Seule la faction concernée peut compléter sa demande.");
       const note = str(body.note, 1000).trim();
       if (note.length < 5) fail(400, "Décris en quelques mots ce qui a été fait (et où : coordonnées).");
-      await update(env, s, "projet_demandes", d.id, { note, statut: "attente", updated: now() });
+      const pr = await row(env, "projets", d.projet_id);
+      const usine_id = await usineDemandee(env, pr, d.faction_id, body.usine_id);
+      await update(env, s, "projet_demandes", d.id, { note, usine_id, statut: "attente", updated: now() });
       return json({ ok: true });
     }
     if (s.level !== "staff") fail(403, "Réservé au staff.");
@@ -560,8 +563,9 @@ async function api(req, env, url, ctx) {
     }
     if (action === "refuser") { await update(env, s, "projet_demandes", d.id, { traite_par: s.name || "", statut: "refusee", reponse: str(body.reponse, 500), updated: now() }); return json({ ok: true }); }
     if (action !== "accepter") fail(400, "Action inconnue.");
-    await addProjet(env, s, { projet_id: d.projet_id, faction_id: d.faction_id, usine_id: body.usine_id, note: str(body.note, 500) || d.note });
-    await update(env, s, "projet_demandes", d.id, { traite_par: s.name || "", statut: "acceptee", reponse: str(body.reponse, 500), updated: now() });
+    const uid = "usine_id" in body ? int(body.usine_id) : d.usine_id;  // par défaut : l'usine demandée par la faction
+    await addProjet(env, s, { projet_id: d.projet_id, faction_id: d.faction_id, usine_id: uid, note: str(body.note, 500) || d.note });
+    await update(env, s, "projet_demandes", d.id, { traite_par: s.name || "", statut: "acceptee", usine_validee: uid || null, reponse: str(body.reponse, 500), updated: now() });
     return json({ ok: true });
   }
 
@@ -862,6 +866,18 @@ function imageFrom(dataUrl) {
   if (bytes[0] !== magic[0] || bytes[1] !== magic[1]) fail(400, "Le contenu ne correspond pas à une image.");
   return { mime: mt[1], bytes };
 }
+// Usine demandée avec une demande de projet : de la bonne taille, pas déjà à la faction, et encore de la place
+async function usineDemandee(env, pr, fid, uid) {
+  uid = int(uid);
+  if (!uid) fail(400, "Choisis l'usine que ce projet doit débloquer.");
+  const u = await env.DB.prepare("SELECT * FROM usines WHERE id = ?").bind(uid).first();
+  if (!u) fail(400, "Usine introuvable.");
+  if (!pr.tailles.split(",").includes(u.taille)) fail(400, `Ce projet débloque une usine ${pr.tailles.replace(",", " ou ")}, pas une ${u.taille}.`);
+  if (await env.DB.prepare("SELECT 1 FROM usine_choix WHERE faction_id = ? AND usine_id = ?").bind(fid, uid).first()) fail(400, `Ta faction a déjà « ${u.nom} ».`);
+  const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM usine_choix WHERE usine_id = ?").bind(uid).first();
+  if (n.n >= USINE_MAX[u.taille]) fail(400, `« ${u.nom} » est complète (${USINE_MAX[u.taille]} maximum) : choisis-en une autre.`);
+  return uid;
+}
 async function sameFaction(env, s, fid) {
   const me = await env.DB.prepare("SELECT faction_id FROM players WHERE discord_id = ? AND deleted = 0").bind(s.id).first();
   return !!(me && me.faction_id === fid);
@@ -921,6 +937,8 @@ async function addProjet(env, s, b) {
     if (!pr.tailles.split(",").includes(u.taille)) fail(400, `Ce projet débloque une usine ${pr.tailles.replace(",", " ou ")}, pas une ${u.taille}.`);
     const has = await env.DB.prepare("SELECT 1 FROM usine_choix WHERE faction_id = ? AND usine_id = ?").bind(fac.id, u.id).first();
     if (has) fail(400, `${fac.name} a déjà « ${u.nom} ».`);
+    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM usine_choix WHERE usine_id = ?").bind(u.id).first();
+    if (n.n >= USINE_MAX[u.taille]) fail(400, `« ${u.nom} » est complète (${USINE_MAX[u.taille]} maximum sur le serveur) : choisis-en une autre ou renvoie la demande.`);
     usineId = u.id;
   }
   const id = await insert(env, s, "projet_faction", { projet_id: pr.id, faction_id: fac.id, usine_id: usineId, note: str(b.note, 500), ts: now(), deleted: 0 });
