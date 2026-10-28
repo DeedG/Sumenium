@@ -235,8 +235,8 @@ const TABLES = {
   prix: ["minerai", "roche", "prix", "ordre", "deleted"],
   projets: ["nom", "description", "tailles", "unique_srv", "illimite", "ordre", "deleted"],
   projet_faction: ["projet_id", "faction_id", "usine_id", "note", "ts", "deleted"],
-  faction_demandes: ["name", "theme", "couleur", "membres", "player_id", "statut", "reponse", "faction_id", "ts", "updated"],
-  projet_demandes: ["projet_id", "faction_id", "player_id", "note", "statut", "reponse", "ts", "updated"],
+  faction_demandes: ["name", "theme", "couleur", "membres", "player_id", "statut", "reponse", "faction_id", "ts", "updated", "traite_par"],
+  projet_demandes: ["projet_id", "faction_id", "player_id", "note", "statut", "reponse", "ts", "updated", "traite_par"],
 };
 
 async function row(env, table, id) {
@@ -502,7 +502,7 @@ async function api(req, env, url, ctx) {
       return json({ ok: true });
     }
     if (s.level !== "staff") fail(403, "Réservé au staff.");
-    if (action === "refuser") { await update(env, s, "faction_demandes", d.id, { statut: "refusee", reponse: str(body.reponse, 500), updated: now() }); return json({ ok: true }); }
+    if (action === "refuser") { await update(env, s, "faction_demandes", d.id, { traite_par: s.name || "", statut: "refusee", reponse: str(body.reponse, 500), updated: now() }); return json({ ok: true }); }
     if (action !== "accepter") fail(400, "Action inconnue.");
     if (await env.DB.prepare("SELECT 1 FROM factions WHERE name = ? AND deleted = 0").bind(d.name).first()) fail(400, "Une faction porte déjà ce nom.");
     const fid = await insert(env, s, "factions", { name: d.name, theme: d.theme });
@@ -513,7 +513,7 @@ async function api(req, env, url, ctx) {
     }
     // contact recrutement par défaut : l'auteur de la demande (futur chef)
     await update(env, s, "factions", fid, { recrutement: membres[0] || "" });
-    await update(env, s, "faction_demandes", d.id, { statut: "acceptee", reponse: str(body.reponse, 500), faction_id: fid, updated: now() });
+    await update(env, s, "faction_demandes", d.id, { traite_par: s.name || "", statut: "acceptee", reponse: str(body.reponse, 500), faction_id: fid, updated: now() });
     return json({ ok: true, faction_id: fid });
   }
 
@@ -555,13 +555,13 @@ async function api(req, env, url, ctx) {
     if (action === "renvoyer") {
       const why = str(body.reponse, 500).trim();
       if (!why) fail(400, "Dis à la faction ce qu'il manque.");
-      await update(env, s, "projet_demandes", d.id, { statut: "a_completer", reponse: why, updated: now() });
+      await update(env, s, "projet_demandes", d.id, { traite_par: s.name || "", statut: "a_completer", reponse: why, updated: now() });
       return json({ ok: true });
     }
-    if (action === "refuser") { await update(env, s, "projet_demandes", d.id, { statut: "refusee", reponse: str(body.reponse, 500), updated: now() }); return json({ ok: true }); }
+    if (action === "refuser") { await update(env, s, "projet_demandes", d.id, { traite_par: s.name || "", statut: "refusee", reponse: str(body.reponse, 500), updated: now() }); return json({ ok: true }); }
     if (action !== "accepter") fail(400, "Action inconnue.");
     await addProjet(env, s, { projet_id: d.projet_id, faction_id: d.faction_id, usine_id: body.usine_id, note: str(body.note, 500) || d.note });
-    await update(env, s, "projet_demandes", d.id, { statut: "acceptee", reponse: str(body.reponse, 500), updated: now() });
+    await update(env, s, "projet_demandes", d.id, { traite_par: s.name || "", statut: "acceptee", reponse: str(body.reponse, 500), updated: now() });
     return json({ ok: true });
   }
 
@@ -1220,7 +1220,8 @@ async function allData(env, s) {
     Q("SELECT w.mc_name FROM whitelist w WHERE NOT EXISTS (SELECT 1 FROM players p WHERE p.mc_name = w.mc_name AND p.deleted = 0) ORDER BY w.mc_name"),
     Q("SELECT faction_id, tour FROM usine_fini"),
     Q("SELECT d.*, p.mc_name AS auteur FROM faction_demandes d JOIN players p ON p.id = d.player_id WHERE d.statut = 'attente' OR d.updated > ? ORDER BY d.id DESC", now() - 30 * 86400),
-    staff ? Q("SELECT d.*, p.mc_name AS auteur FROM projet_demandes d JOIN players p ON p.id = d.player_id WHERE d.statut IN ('attente','a_completer') OR d.updated > ? ORDER BY d.id DESC", now() - 30 * 86400)
+    // staff : tout l'historique des demandes (hors annulées) ; faction : les siennes des 30 derniers jours
+    staff ? Q("SELECT d.*, p.mc_name AS auteur FROM projet_demandes d JOIN players p ON p.id = d.player_id WHERE d.statut != 'annulee' OR d.updated > ? ORDER BY d.id DESC", now() - 30 * 86400)
       : Q(`SELECT d.*, p.mc_name AS auteur FROM projet_demandes d JOIN players p ON p.id = d.player_id WHERE d.faction_id = ${myFaction} AND (d.statut IN ('attente','a_completer') OR d.updated > ?) ORDER BY d.id DESC`, s.id, now() - 30 * 86400),
     staff ? Q("SELECT id, demande_id FROM projet_images ORDER BY id")
       : Q(`SELECT i.id, i.demande_id FROM projet_images i JOIN projet_demandes d ON d.id = i.demande_id WHERE d.faction_id = ${myFaction} ORDER BY i.id`, s.id),

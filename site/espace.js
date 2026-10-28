@@ -660,7 +660,7 @@ function projDemCard() {
   if (!pend.length && !done.length && !form) return "";
   return `${form}<section class="card" id="projDem"><h3>${isStaff() ? "Demandes de validation" : "Demandes de ta faction"}</h3>
     ${pend.length ? `<ul class="dem-list">${pend.map(projDemItem).join("")}</ul>` : '<p class="muted small">Aucune demande en cours.</p>'}
-    ${done.length ? `<details><summary>Réponses récentes (${done.length})</summary><ul class="dem-list">${done.map((d) => `<li class="dem small">${d.statut === "acceptee" ? "✅" : "❌"} <b>${esc((projet(d.projet_id) || {}).nom || "?")}</b> · ${esc(facName(d.faction_id))}${d.reponse ? ` : ${esc(d.reponse)}` : ""}</li>`).join("")}</ul></details>` : ""}</section>`;
+    ${done.length ? `<details><summary>${isStaff() ? "Demandes traitées" : "Réponses récentes"} (${done.length})</summary><ul class="dem-list">${done.map(projDemDone).join("")}</ul></details>` : ""}</section>`;
 }
 // Formulaire de la faction : description + jusqu'à 3 images (captures d'écran du projet)
 function projDemForm() {
@@ -675,6 +675,18 @@ function projDemForm() {
       <div class="pd-imgs" id="pdPrev"></div></div>
     <div class="wide actions"><button class="btn small">${d ? "Renvoyer au staff" : "Envoyer la demande"}</button><button type="button" class="btn small ghost" id="pdClose">Fermer</button></div></form>`;
 }
+const dateFr = (t) => (t ? new Date(t * 1000).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
+// Demande traitée : une ligne résumée, et tout le détail en l'ouvrant (texte, photos, qui a demandé, qui a traité)
+function projDemDone(d) {
+  const ok = d.statut === "acceptee";
+  return `<li><details class="dem done"><summary><span>${ok ? "✅" : "❌"} <b>${esc((projet(d.projet_id) || {}).nom || "?")}</b> · ${esc(facName(d.faction_id))}</span>
+      <span class="muted small">${ok ? "validé" : "refusé"}${d.traite_par ? ` par ${esc(d.traite_par)}` : ""} · ${dateFr(d.updated)}</span></summary>
+    <p class="small muted">Demandé par ${plink(d.auteur)} le ${dateFr(d.ts)}${(d.images || []).length ? ` · ${d.images.length} image${d.images.length > 1 ? "s" : ""}` : ""}</p>
+    <p class="small">${esc(d.note)}</p>
+    ${d.reponse ? `<p class="small"><b>Réponse du staff :</b> ${esc(d.reponse)}</p>` : ""}
+    ${(d.images || []).length ? `<div class="pd-imgs">${d.images.map((id) => `<a class="pd-img" href="${pdImg(d, id)}" target="_blank" rel="noopener" title="Voir en grand"><img src="${pdImg(d, id)}" alt="Image jointe" loading="lazy"></a>`).join("")}</div>` : ""}
+  </details></li>`;
+}
 function projDemItem(d) {
   const pr = projet(d.projet_id) || { nom: "?", tailles: "" }, ok = pr.tailles.split(",");
   const mineF = me() && me().faction_id === d.faction_id;
@@ -682,7 +694,7 @@ function projDemItem(d) {
       ${d.statut === "a_completer" ? '<span class="chip warn">À compléter</span>' : '<span class="chip">En attente du staff</span>'}
       <span class="muted small">demandé par ${plink(d.auteur)} · ${new Date(d.ts * 1000).toLocaleDateString("fr-FR")}</span></div>
     <p class="small">${esc(d.note)}</p>
-    ${d.reponse && d.statut === "a_completer" ? `<p class="small"><b>Le staff demande :</b> ${esc(d.reponse)}</p>` : d.reponse ? `<p class="small muted">Message précédent du staff : ${esc(d.reponse)}</p>` : ""}
+    ${d.reponse && d.statut === "a_completer" ? `<p class="small"><b>Le staff demande${d.traite_par ? ` (${esc(d.traite_par)}, ${dateFr(d.updated)})` : ""} :</b> ${esc(d.reponse)}</p>` : d.reponse ? `<p class="small muted">Message précédent du staff : ${esc(d.reponse)}</p>` : ""}
     ${(d.images || []).length ? `<div class="pd-imgs">${d.images.map((id) => `<a class="pd-img" href="${pdImg(d, id)}" target="_blank" rel="noopener" title="Voir en grand"><img src="${pdImg(d, id)}" alt="Image jointe" loading="lazy"></a>`).join("")}</div>` : ""}
     ${isStaff() ? `<div class="actions inline">${d.statut === "attente" ? `<select data-pd-usine aria-label="Usine débloquée"><option value="">Aucune usine pour l'instant</option>${D.usines.filter((u) => ok.includes(u.taille)
         && !D.choix.some((c) => c.faction_id === d.faction_id && c.usine_id === u.id)).map((u) => { const n = D.choix.filter((c) => c.usine_id === u.id).length;
