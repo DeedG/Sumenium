@@ -120,6 +120,9 @@ def build(sftp, read, j, log, out_path):
         eco["boutiques"] = None
 
     fisc = _load(sftp, read, j, "prix-fisc.json", log)
+    if fisc is not None:  # diagnostic visible dans le récapitulatif de la mise à jour
+        print(f"::notice title=FISC::prix-fisc.json du {fisc.get('genereLe')} : {len(fisc.get('rachat') or [])} minerais, "
+              f"{len(fisc.get('vente') or [])} ventes, {len(fisc.get('reprise') or [])} objets rares, revente {fisc.get('revente')}, clés {sorted(fisc)}")
     if fisc and (isinstance(fisc.get("rachat"), list) or isinstance(fisc.get("vente"), list)):
         clean = lambda lst: [{"item": r.get("item"), "nom": r.get("nom"), "prix": _num(r.get("prix")), "quantite": r.get("quantite"),
                               "x": r.get("x"), "y": r.get("y"), "z": r.get("z")} for r in (lst or [])]
