@@ -1,4 +1,4 @@
-// Commandes réservées au staff (mod Sumenium Economy 2.6.3) : servies seulement aux comptes Discord staff.
+// Commandes réservées au staff (mod Sumenium Economy 2.7.0) : servies seulement aux comptes Discord staff.
 export const COMMANDES_STAFF = {
   intro: "Réservées aux opérateurs. Sans /sumeco bypass, un admin utilise les boutiques comme un joueur.",
   sections: [
@@ -19,6 +19,8 @@ export const COMMANDES_STAFF = {
       ["/fisc rare ajuster", "Lance tout de suite l'ajustement hebdomadaire (+20 % si rupture 3 jours et 2 demandes, −15 % si le stock dort, entre ×0,5 et ×1,5 du prix de départ)"],
       ["/fisc pnj rachat · /fisc pnj revente · /fisc pnj retirer", "Place le PNJ de rachat ou de revente à ta position, ou retire le plus proche (6 blocs)"],
       ["/fisc ouvrir rachat|revente", "Ouvre le menu sans PNJ, pour tester"],
+      ["/fisc journal [page]", "Inspecte toutes les transactions récentes (30 jours), la plus récente d'abord ; survoler [+] pour le détail (note, stock, taxe, position)"],
+      ["/fisc journal joueur <nom> · type <TYPE> · objet <mot>", "Même chose filtré par joueur, par type d'opération (ACHAT, REPRISE_FISC, CONFIG_BOUTIQUE…) ou par objet"],
     ], note: "Config : fiscRevente (activée), fiscReventeMultiplicateur (2), fiscRepriseDemiStock, fiscRepriseSeuilRachat (0,50 Su), fiscRepriseAjustement, fiscRepriseHausse, fiscRepriseBaisse, fiscRepriseJoursRupture, fiscRepriseDemandesMin, fiscRepriseFacteurMax, fiscRepriseFacteurMin, fiscReprisePlafond." },
     { titre: "Argent", lignes: [
       ["/eco voir <joueur>", "Solde d'un joueur et de sa faction"],

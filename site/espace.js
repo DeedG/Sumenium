@@ -369,7 +369,7 @@ const TX = { ACHAT: "Achat en boutique", ACHAT_SERVICE: "Achat de service", RACH
   FRAIS_BOUTIQUE: "Frais de boutique", REMBOURSEMENT_BOUTIQUE: "Remboursement de boutique", SUPPRESSION_BOUTIQUE: "Suppression de boutique",
   DEPOT_FACTION: "Dépôt à la faction", RETRAIT_FACTION: "Retrait de la faction", ADMIN: "Opération du staff", IMPORT: "Reprise de Savs",
   BON_UTILISE: "Bon de service utilisé", HDV_OFFRE: "Offre à l'HDV", HDV_REMBOURSEMENT: "Offre HDV rendue", HDV_VENTE: "Vente à l'HDV",
-  ACHAT_TETE: "Achat d'une tête", REPRISE_FISC: "Objet rare vendu au FISC", REVENTE_FISC: "Objet rare acheté au FISC", DEMANDE_REPRISE: "Objet rare demandé au FISC" };
+  ACHAT_TETE: "Achat d'une tête", REPRISE_FISC: "Objet rare vendu au FISC", REVENTE_FISC: "Objet rare acheté au FISC", DEMANDE_REPRISE: "Objet rare demandé au FISC", MARCHE_NOIR: "Marché noir" };
 const su = (cents) => (cents / 100).toLocaleString("fr-FR", { minimumFractionDigits: cents % 100 ? 2 : 0, maximumFractionDigits: 2 }) + "\u00a0Su";
 const itemLabel = (t) => { const id = String(t.item || "").replace(/^minecraft:/, ""); return (typeof NAMES !== "undefined" && NAMES[id]) || t.itemName || id.replace(/_/g, " "); };
 function txRow(t, uuid) {
