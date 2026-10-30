@@ -569,6 +569,11 @@ body.busy{cursor:progress}
 .chart-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-bottom:8px}
 .chart-tools .seg button{padding:6px 11px;font-size:.86rem}
 .chart-help{margin:4px 0 0}
+.se-pages{margin-top:4px}.se-bar{margin-bottom:14px;align-items:center}.se-bar input[type=date]{padding:5px 8px}
+.stat .se-d{display:block;margin-top:4px;font-size:.78rem;font-weight:700;color:var(--muted)}.stat .se-d.up{color:var(--leaf-ink)}.stat .se-d.down{color:var(--warn)}
+.se-tiles{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}.se-mini{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-top:12px}
+.se-tbl{margin:8px 0 4px}button.link.small{background:none;border:0;padding:0;margin-top:6px;cursor:pointer;font:inherit;font-size:.85rem;font-weight:700;color:var(--crystal)}.se-matrix td,.se-matrix th{padding:7px 9px;font-size:.86rem}
+.se-usines{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.85rem;color:var(--fg);margin-bottom:6px}
 .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:0}
 .ctip{position:absolute;top:4px;z-index:5;background:var(--fg);color:var(--bg);border-radius:10px;padding:8px 10px;font-size:.84rem;display:grid;gap:2px;pointer-events:none;box-shadow:0 8px 20px rgba(0,0,0,.25);min-width:130px}
@@ -966,6 +971,7 @@ body.busy{cursor:progress}
 <div class="toast" id="toast" role="status" hidden></div>
 <script src="espace.js?v=__BUILD__"></script>
 <script src="economie.js?v=__BUILD__"></script>
+<script src="staff-eco.js?v=__BUILD__"></script>
 <script>
 const TIERS={task:"Tâche",goal:"Objectif",challenge:"Défi",super_challenge:"Super défi",milestone:"Palier",hidden:"Caché",root:"Racine",custom:"Fin de partie"};
 const $=id=>document.getElementById(id);

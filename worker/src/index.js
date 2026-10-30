@@ -335,6 +335,27 @@ async function api(req, env, url, ctx) {
     await need(req, env, "staff");
     return json(COMMANDES_STAFF);
   }
+  /* ---- tableau de bord Économie (staff) : journal du mod (centimes) + réglages ---- */
+  if (p === "/api/staff/eco" && m === "GET") {
+    await need(req, env, "staff");
+    return json(await staffEco(env, url));
+  }
+  if (p === "/api/staff/eco/config" && m === "PUT") {
+    const s = await need(req, env, "staff");
+    const usines = {};
+    for (const [k, v] of Object.entries(body.usines && typeof body.usines === "object" ? body.usines : {})) {
+      if (!Array.isArray(v)) continue;
+      usines[str(k, 80)] = v.map((x) => str(x, 60).toLowerCase().replace(/[^a-z0-9_:*]/g, "")).filter(Boolean).slice(0, 80);
+    }
+    const num = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
+    const cfg = { usines, seuilPct: num(body.seuilPct, 0, 100, 10), seuilVentes: num(body.seuilVentes, 0, 1000, 5) };
+    const val = JSON.stringify(cfg);
+    if (val.length > 30000) fail(400, "Réglages trop longs.");
+    const before = await setting(env, "eco_staff");
+    await env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('eco_staff', ?)").bind(val).run();
+    await audit(env, s, "settings", "eco_staff", "update", before ? JSON.parse(before) : null, cfg);
+    return json({ ok: true, config: cfg });
+  }
   if (p === "/api/admin/historique" && m === "GET") {
     await need(req, env, "staff");
     const n = str(url.searchParams.get("joueur"), 16);
@@ -990,6 +1011,30 @@ async function history(env, mcName, url) {
     `SELECT data FROM tx WHERE (actor = ? OR from_acc = ? OR to_acc = ?) AND t < ?${type ? " AND type = ?" : ""} ORDER BY t DESC LIMIT ?`
   ).bind(uuid, account, account, before, ...(type ? [type] : []), LIMIT + 1).all()).results;
   return { uuid, name: wl.mc_name, rows: rows.slice(0, LIMIT).map((r) => JSON.parse(r.data)), more: rows.length > LIMIT };
+}
+
+/** Tableau de bord Économie (staff) : lignes du journal avec de l'argent, en tableaux compacts (le navigateur fait les calculs).
+ *  Les opérations hors circuit sont exclues des lignes et seulement comptées à part. */
+const ECO_HORS = ["MARCHE_NOIR", "CONFIG_MARCHE_NOIR"];
+const ECO_SANS = ["IMPORT", ...ECO_HORS];
+async function staffEco(env, url) {
+  const since = Math.max(int(url.searchParams.get("depuis")) || 0, Date.parse(SAISON_DEBUT) - 86400000);
+  const ph = (a) => a.map(() => "?").join(",");
+  const [rows, hors, wl, cfg] = await Promise.all([
+    env.DB.prepare(`SELECT t, type, from_acc, to_acc, actor, item, json_extract(data,'$.amount'), json_extract(data,'$.tax'), json_extract(data,'$.qty'),
+        json_extract(data,'$.shop'), json_extract(data,'$.actorName'), json_extract(data,'$.fromName'), json_extract(data,'$.toName')
+      FROM tx WHERE t >= ? AND type NOT IN (${ph(ECO_SANS)}) AND COALESCE(json_extract(data,'$.amount'),0) + COALESCE(json_extract(data,'$.tax'),0) > 0
+      ORDER BY t LIMIT 60000`).bind(since, ...ECO_SANS).raw(),
+    env.DB.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(json_extract(data,'$.amount')),0) AS m FROM tx WHERE t >= ? AND type = ?`).bind(since, ECO_HORS[0]).first(),
+    env.DB.prepare("SELECT mc_name, uuid FROM whitelist WHERE uuid IS NOT NULL").all(),
+    setting(env, "eco_staff"),
+  ]);
+  return {
+    cols: ["t", "type", "from", "to", "actor", "item", "amount", "tax", "qty", "shop", "actorName", "fromName", "toName"],
+    rows, horsCircuit: { n: (hors && hors.n) || 0, montant: (hors && hors.m) || 0 },
+    noms: Object.fromEntries(wl.results.map((w) => [String(w.uuid).toLowerCase(), w.mc_name])),
+    config: cfg ? JSON.parse(cfg) : null, saisonDebut: SAISON_DEBUT,
+  };
 }
 
 async function claim(env, s, name) {

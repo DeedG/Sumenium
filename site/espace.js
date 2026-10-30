@@ -18,7 +18,7 @@ const TAILLE_USINE = { grosse: ["Grosses usines", 3], moyenne: ["Moyennes usines
 const TAILLE_MOT = { grosse: "grosse", moyenne: "moyenne", petite: "petite" };
 // Zones rendues par ce fichier : chacune a sa racine dans la page et ses sous-onglets
 const AREAS = {
-  espace: { root: "espaceRoot", subs: [["fiche", "Ma fiche"], ["historique", "Mon historique"], ["staff", "Outils staff"]] },
+  espace: { root: "espaceRoot", subs: [["fiche", "Ma fiche"], ["historique", "Mon historique"], ["staff", "Outils staff"], ["eco", "Économie"]] },
   communaute: { root: "comRoot", subs: [["joueurs", "Joueurs"], ["factions", "Factions"], ["usines", "Usines"], ["projets", "Projets"], ["elections", "Élections"]] },
 };
 // Échelle RP : 1,87 m IRL = taille normale (1), comme dans l'ancien tableau
@@ -271,14 +271,14 @@ function render() {
         <p class="muted small">Tu passes par la page officielle <b>discord.com</b> : vérifie l'adresse, et ne donne jamais ton mot de passe ailleurs. Le site reçoit seulement ton pseudo Discord et tes rôles sur le serveur Suménium, rien n'est publié sur Discord. <a href="confidentialite.html">Ce qu'on enregistre</a></p></div>`;
       return;
     }
-    if (sub === "staff" && !isStaff()) sub = "fiche";
+    if ((sub === "staff" || sub === "eco") && !isStaff()) sub = "fiche";
     const badge = { staff: isStaff() ? D.players.filter((p) => D.wlSynced && !p.whitelisted && ficheOk(p)).length : 0 };
     root.innerHTML = `<div class="who-bar">
         <div class="who-me">${ME.avatar ? `<img src="${esc(ME.avatar)}" alt="" width="36" height="36">` : ""}
           <div><b>${esc(ME.name)}</b><span class="chip lvl-${esc(ME.level)}">${esc(LEVEL[ME.level])}</span></div></div>
         <a class="link" href="/api/auth/logout">Se déconnecter</a></div>
       ${ME.level === "attente" ? '<div class="banner info">Ton compte est en attente de vérification : tu peux tout consulter, et tu pourras remplir ta fiche une fois le vocal passé avec le staff.</div>' : ""}
-      <nav class="subtabs" aria-label="Mon espace">${A.subs.filter(([k]) => k !== "staff" || isStaff()).map(([k, l]) =>
+      <nav class="subtabs" aria-label="Mon espace">${A.subs.filter(([k]) => !STAFF_SUBS.includes(k) || isStaff()).map(([k, l]) =>
         `<a href="#espace/${k}" aria-current="${k === sub ? "page" : "false"}">${l}${badge[k] ? ` <span class="badge">${badge[k]}</span>` : ""}</a>`).join("")}</nav>
       <div id="espView"></div>`;
   } else if (area === "communaute") {
@@ -287,9 +287,15 @@ function render() {
         `<a href="#communaute/${k}" aria-current="${k === cur ? "page" : "false"}">${l}</a>`).join("")}</nav>
       <div id="espView"></div>`;
   } else root.innerHTML = '<div id="espView"></div>';
-  ({ fiche, historique, staff, joueurs, factions, usines, elections, projets, joueur: joueurPage, faction: factionPage })[sub]();
+  ({ fiche, historique, staff, eco, joueurs, factions, usines, elections, projets, joueur: joueurPage, faction: factionPage })[sub]();
 }
 const view = (h) => ($("espView").innerHTML = h);
+const STAFF_SUBS = ["staff", "eco"];
+// Tableau de bord Économie (staff) : staff-eco.js
+function eco() {
+  if (!window.StaffEco) return view('<div class="card center"><p>Module indisponible, recharge la page.</p></div>');
+  window.StaffEco.render($("espView"), { D, ECO, call, toast, facOfEco: ecoToFac });
+}
 
 /* ---------- Ma fiche ---------- */
 function fiche() {

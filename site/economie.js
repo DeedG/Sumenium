@@ -610,7 +610,7 @@ function show(m, s) {
 let rz = null;
 window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (mode === "marche" && sub === "economie" && !$("p-marche").hidden && E) render(); }, 200); });
 // refresh : redessine l'onglet affiché (les noms français des objets arrivent parfois après les données)
-window.Economie = { show, data: () => E, refresh: () => { if (loaded && visible()) render(); } };
+window.Economie = { show, data: () => E, refresh: () => { if (loaded && visible()) render(); }, charts: { stackChart } };
 // Chargé tout de suite : l'accueil et les fiches joueur / faction s'en servent aussi
 if (location.hostname !== "deedg.github.io") load();
 })();
