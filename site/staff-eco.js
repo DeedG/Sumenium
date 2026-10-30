@@ -279,11 +279,11 @@ function lineSvg(points, label, W = 640) {
   let y0 = Math.min(...ys), y1 = Math.max(...ys); if (y0 === y1) { y0 -= 1; y1 += 1; } const pad = (y1 - y0) * 0.1; y0 = Math.max(0, y0 - pad); y1 += pad;
   const Xp = (t) => P.l + (t - t0) / (t1 - t0 || 1) * (W - P.l - P.r), Y = (v) => Hh - P.b - (v - y0) / (y1 - y0) * (Hh - P.t - P.b);
   const ticks = [0, 1, 2].map((i) => y0 + (y1 - y0) * i / 2);
-  const step = Math.max(1, Math.round((t1 - t0) / DAY / 6)) * DAY, days = [];
-  for (let t = midnight(dayOf(t0 + DAY)); t < t1; t += step) days.push(t);
+  const step = Math.max(1, Math.round((t1 - t0) / DAY / 6)), days = [];
+  for (let d = dayOf(t0 + DAY); midnight(d) < t1; d = addDays(d, step)) days.push(midnight(d));
   return `<svg class="chart" viewBox="0 0 ${W} ${Hh}" width="${W}" height="${Hh}" role="img" aria-label="${esc(label)}">
     ${ticks.map((v) => `<line class="grid" x1="${P.l}" x2="${W - P.r}" y1="${Y(v)}" y2="${Y(v)}"/><text class="axis" x="${P.l - 6}" y="${Y(v) + 4}" text-anchor="end">${esc(Number(v).toLocaleString("fr-FR", { notation: "compact", maximumFractionDigits: 1 }))}</text>`).join("")}
-    ${days.map((t) => `<text class="axis" x="${Xp(t)}" y="${Hh - 6}" text-anchor="middle">${esc(new Date(t).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }))}</text>`).join("")}
+    ${days.map((t) => `<text class="axis" x="${Xp(t)}" y="${Hh - 6}" text-anchor="middle">${esc(dayLabel(dayOf(t + 3600000)))}</text>`).join("")}
     <path class="line" d="${points.map((p, i) => `${i ? "L" : "M"}${Xp(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join("")}"/></svg>`;
 }
 function gini(vals) {
@@ -400,20 +400,21 @@ function boutiques(el, P) {
   const unit = (s) => (s.prix || 0) / Math.max(1, s.quantite || 1);
   // Concurrence par item (boutiques d'items, hors lots) : vendeurs, écart de prix, part de marché du premier, HHI
   const items = new Map();
-  for (const s of shops) { if (s.type !== "item" || s.lot || !s.item) continue; const k = idOf(s.item); const it = items.get(k) || { nom: s.nom || k, shops: [] }; it.shops.push(s); items.set(k, it); }
+  for (const s of shops) { if (s.type !== "item" || s.lot || !s.item) continue; const [k, v] = variant(s); const it = items.get(k) || { nom: (s.nom || idOf(s.item)) + (v ? " — " + v : ""), id: idOf(s.item), shops: [] }; it.shops.push(s); items.set(k, it); }
   const conc = [...items].map(([k, it]) => {
     const ca = new Map(); let tot = 0;
     for (const s of it.shops) { const v = (byShop.get(s.id) || {}).ext || 0; if (v) { ca.set(shopKey(s), (ca.get(shopKey(s)) || 0) + v); tot += v; } }
     const prices = it.shops.filter((s) => !s.rupture || (byShop.get(s.id) || {}).n).map(unit).filter((x) => x > 0);
     const hhi = tot ? [...ca.values()].reduce((a, v) => a + (v / tot) ** 2, 0) : null;
     const lead = [...ca].sort((a, b) => b[1] - a[1])[0];
-    return { k, nom: it.nom, vendeurs: ca.size, boutiques: it.shops.length, tot, ecart: prices.length > 1 ? (Math.max(...prices) - Math.min(...prices)) / Math.min(...prices) : null, min: prices.length ? Math.min(...prices) : null, hhi, lead };
+    const facs = new Set(it.shops.map(shopKey)).size;
+    return { k: it.id, facs, nom: it.nom, vendeurs: ca.size, boutiques: it.shops.length, tot, ecart: prices.length > 1 ? (Math.max(...prices) - Math.min(...prices)) / Math.min(...prices) : null, min: prices.length ? Math.min(...prices) : null, hhi, lead };
   }).filter((c) => c.tot || c.boutiques > 1).sort((a, b) => b.tot - a.tot);
   el.innerHTML = `<section class="card"><h3>Concurrence par item</h3>
       <p class="muted small">Items vendus par plusieurs boutiques ou avec des ventes externes sur la période. Écart de prix = (max − min) ÷ min, prix à l'unité des boutiques en stock ; sous 1 %, les prix sont alignés. HHI = somme des parts de marché au carré : au-dessus de 0,5, quasi-monopole.</p>
       ${table("concurrence", ["Item", "Boutiques", "Vendeurs actifs", "CA ext.", "Prix min. / u", "Écart", "HHI", "Premier vendeur"],
         conc.map((c) => [H(`${esc(c.nom)} <small class="muted">${esc(c.k)}</small>`, c.k), c.boutiques, c.vendeurs, S(c.tot), c.min === null ? "—" : S2(c.min), PC(c.ecart, 1),
-          H(c.hhi === null ? "—" : `<span class="${c.hhi > 0.8 ? "chip warn" : ""}">${c.hhi.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</span>`, c.hhi === null ? "" : Math.round(c.hhi * 100) / 100),
+          H(c.hhi === null ? "—" : `<span class="${c.hhi > 0.8 && c.facs > 1 ? "chip warn" : ""}">${c.hhi.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</span>`, c.hhi === null ? "" : Math.round(c.hhi * 100) / 100),
           c.lead ? H(`${facHtml(c.lead[0])} <small class="muted">${pct(c.lead[1] / c.tot)}</small>`, facName(c.lead[0])) : "—"]))}</section>
     <section class="card"><h3>Toutes les boutiques</h3>
       <div class="bar"><input type="search" id="seQ" placeholder="Item, propriétaire…" value="${esc(st.q)}" aria-label="Chercher une boutique">
@@ -425,6 +426,13 @@ function boutiques(el, P) {
   const qEl = $("seQ");
   if (qEl) { qEl.oninput = (e) => { st.q = e.target.value; const pos = e.target.selectionStart; boutiques(el, P); bindCsv(el); const n = $("seQ"); n.focus(); n.setSelectionRange(pos, pos); }; }
   if ($("seFac")) $("seFac").onchange = (e) => { st.fac = e.target.value; boutiques(el, P); bindCsv(el); };
+}
+// Variante d'un item : potion, enchantements (deux livres différents ne se font pas concurrence)
+function variant(s) {
+  const d = s.details || {}, N = (window.Economie && window.Economie.names) || {};
+  const ench = (d.enchantements || []).map((e) => ({ ...e, id: idOf(e.id) })).sort((a, b) => a.id.localeCompare(b.id));
+  const parts = [d.potion ? (N.potName ? N.potName(d.potion) : idOf(d.potion)) : null, ...ench.map((e) => (N.enchName ? N.enchName(e) : e.id + " " + (e.niveau || 1)))].filter(Boolean);
+  return [[idOf(s.item), idOf(d.potion || ""), ...ench.map((e) => e.id + (e.niveau || 1))].join("|"), parts.join(", ")];
 }
 const bindCsv = (el) => el.querySelectorAll("[data-csv]").forEach((b) => (b.onclick = () => downloadCsv(CSV[+b.dataset.csv])));
 
