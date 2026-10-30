@@ -336,9 +336,19 @@ async function api(req, env, url, ctx) {
     return json(COMMANDES_STAFF);
   }
   /* ---- tableau de bord Économie (staff) : journal du mod (centimes) + réglages ---- */
-  if (p === "/api/staff/eco" && m === "GET") {
-    await need(req, env, "staff");
-    return json(await staffEco(env, url));
+  // Marché › Détail de l'économie : complet pour le staff ; pour les autres, comptes anonymisés (faction seulement), en cache 5 min
+  if ((p === "/api/eco/detail" || p === "/api/staff/eco") && m === "GET") {
+    const s = await session(req, env);
+    if (s && s.level === "staff") return json({ ...(await staffEco(env, url)), staff: true });
+    const cache = caches.default, key = new Request(new URL("/api/eco/detail?public", url).toString());
+    // Le navigateur ne garde rien (la réponse change si on se connecte en staff) ; seul le cache du Worker sert 5 min
+    const out = (b) => new Response(b, { headers: securityHeaders(new Headers({ "content-type": "application/json; charset=utf-8", "cache-control": "no-store" })) });
+    const hit = await cache.match(key);
+    if (hit) return out(await hit.text());
+    const body = JSON.stringify(await publicEco(env, url, await staffEco(env, url)));
+    const put = cache.put(key, new Response(body, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=300" } }));
+    if (ctx && ctx.waitUntil) ctx.waitUntil(put);
+    return out(body);
   }
   if (p === "/api/staff/eco/config" && m === "PUT") {
     const s = await need(req, env, "staff");
@@ -1035,6 +1045,31 @@ async function staffEco(env, url) {
     noms: Object.fromEntries(wl.results.map((w) => [String(w.uuid).toLowerCase(), w.mc_name])),
     config: cfg ? JSON.parse(cfg) : null, saisonDebut: SAISON_DEBUT,
   };
+}
+
+/** Version publique : chaque compte de joueur devient sa faction (ou « solo:n », anonyme) ; pas de joueur, pas de nom, rien hors circuit. */
+async function publicEco(env, url, full) {
+  const eco = await ecoData(env);
+  const facOf = new Map(((eco && eco.joueurs) || []).map((j) => [String(j.nom).toLowerCase(), j.faction ? String(j.faction).toLowerCase() : null]));
+  const names = { ...full.noms };
+  const C = Object.fromEntries(full.cols.map((c, i) => [c, i]));
+  for (const r of full.rows) if (r[C.actor] && r[C.actorName]) names[r[C.actor]] = r[C.actorName];
+  const solo = new Map();
+  const anon = (a) => {
+    if (!a || !a.startsWith("joueur:")) return a;
+    const u = a.slice(7), n = names[u], f = n && facOf.get(String(n).toLowerCase());
+    if (f) return "faction:" + f;
+    if (!solo.has(u)) solo.set(u, "solo:" + (solo.size + 1));
+    return solo.get(u);
+  };
+  const rows = full.rows.map((r) => {
+    const o = r.slice();
+    o[C.from] = r[C.type] === "HDV_VENTE" && r[C.actor] ? anon("joueur:" + r[C.actor]) : anon(r[C.from]);
+    o[C.to] = anon(r[C.to]);
+    o[C.actor] = o[C.actorName] = o[C.fromName] = o[C.toName] = null;
+    return o;
+  });
+  return { cols: full.cols, rows, noms: {}, config: full.config, saisonDebut: full.saisonDebut, staff: false };
 }
 
 async function claim(env, s, name) {

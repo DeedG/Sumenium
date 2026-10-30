@@ -1,9 +1,10 @@
-/* Mon espace › Économie (staff) : tableau de bord d'après le journal du mod (via /api/staff/eco) et eco.json.
-   Phase 1 de la spec « Tableau de bord staff — usines & économie » : aucune donnée en plus du mod.
+/* Marché › Détail de l'économie : tableau de bord d'après le journal du mod (via /api/eco/detail) et eco.json.
+   Visible par tous : les comptes des joueurs y sont remplacés par leur faction (anonyme pour les joueurs seuls).
+   Le staff connecté voit en plus les noms (rachats par joueur) et les réglages.
    Définitions (figées, voir la spec) :
    - création : le FISC (ou le staff) paie un compte ; destruction : un compte paie le FISC, plus les taxes de vente ;
    - commerce : achat en boutique ou à l'hôtel des ventes ; interne si l'acheteur et le vendeur sont de la même faction ;
-   - faction d'un joueur : sa faction actuelle dans le mod (phase 1, pas encore d'historique des membres) ;
+   - faction d'un joueur : sa faction actuelle dans le mod ;
    - jours coupés à minuit, heure de Paris. */
 (() => {
 const $ = (id) => document.getElementById(id);
@@ -14,7 +15,8 @@ const pct = (v, d = 0) => (v === null || !isFinite(v) ? "—" : (v * 100).toLoca
 const idOf = (i) => String(i || "").replace(/^minecraft:/, "");
 const DAY = 86400000;
 
-const PAGES = [["vue", "Vue d'ensemble"], ["flux", "Flux entre factions"], ["usines", "Usines"], ["boutiques", "Boutiques et prix"], ["fisc", "FISC et reprise"], ["reglages", "Réglages"]];
+const PAGES = [["vue", "Vue d'ensemble"], ["flux", "Flux entre factions"], ["usines", "Usines"], ["boutiques", "Boutiques et prix"], ["fisc", "FISC et reprise"], ["reglages", "Réglages (staff)"]];
+const STAFF = () => !!(RAW && RAW.staff);
 const PERIODES = [[7, "7 j"], [14, "14 j"], [30, "30 j"], [0, "Saison"]];
 // Libellés des sources de création / destruction (type du journal)
 const SRC = { RACHAT_FISC: "Rachats de minerais", REPRISE_FISC: "Reprises d'objets rares", REMBOURSEMENT_BOUTIQUE: "Remboursements de boutique", ADMIN: "Staff",
@@ -56,7 +58,14 @@ const DEFAUT_USINES = {
   "Usine à fleur": ["dandelion", "poppy", "blue_orchid", "allium", "azure_bluet", "*_tulip", "oxeye_daisy", "cornflower", "lily_of_the_valley", "sunflower", "lilac", "rose_bush", "peony", "*_dye"],
 };
 
-let X = null;            // contexte donné par espace.js : { D, ECO, call, toast, facOfEco }
+let X = null;            // { ECO (eco.json), D (données de l'Espace : factions, usines), facOfEco }
+async function call(method, path, body) {
+  const r = await fetch(path, { method, credentials: "same-origin", headers: { "content-type": "application/json", "x-requested-with": "sumenium" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `Erreur ${r.status}`);
+  return j;
+}
+const toast = (msg, bad) => (window.Espace && window.Espace.toast ? window.Espace.toast(msg, bad) : bad && alert(msg));
 let RAW = null, rawAt = 0, loadErr = null, loadingP = null;
 const st = { page: "vue", per: 14, du: "", au: "", fac: "", q: "" };
 const CSV = [];          // tableaux exportables de la page affichée
@@ -73,14 +82,14 @@ const dayLabel = (day, o = { day: "numeric", month: "short" }) => new Date(day +
 /* ---------- données ---------- */
 async function load(force) {
   if (RAW && !force && Date.now() - rawAt < 120000) return RAW;
-  if (!loadingP) loadingP = X.call("GET", "/api/staff/eco").then((r) => { RAW = r; rawAt = Date.now(); loadErr = null; prep(); return r; })
+  if (!loadingP) loadingP = call("GET", "/api/eco/detail").then((r) => { RAW = r; rawAt = Date.now(); loadErr = null; prep(); return r; })
     .catch((e) => { loadErr = e.message; throw e; }).finally(() => { loadingP = null; });
   return loadingP;
 }
 
 // Lignes du journal → événements classés : { t, day, type, kind, m (Su), tax, buyer/seller ou to/from (clés de faction), item, qty, shop, actor }
 let EV = [], NAMES = {}, FAC = new Map(), PLAYER_FAC = new Map();
-const isAcc = (v) => v && (v.startsWith("joueur:") || v.startsWith("faction:"));
+const isAcc = (v) => v && (v.startsWith("joueur:") || v.startsWith("faction:") || v.startsWith("solo:"));
 function prep() {
   const ECO = X.ECO || {};
   NAMES = { ...(RAW.noms || {}) };
@@ -101,8 +110,8 @@ function prep() {
     const commerce = r.type === "ACHAT" || r.type === "ACHAT_SERVICE" || r.type === "HDV_VENTE";
     if (r.type === "HDV_OFFRE" || r.type === "HDV_REMBOURSEMENT") continue;       // argent bloqué puis rendu : neutre
     if (commerce && (isAcc(r.from) || r.type === "HDV_VENTE") && isAcc(r.to)) {
-      e.kind = "commerce"; e.buyer = keyOf(r.type === "HDV_VENTE" ? "joueur:" + r.actor : r.from); e.seller = keyOf(r.to); e.tax = tax;
-      e.internal = e.buyer === e.seller; e.buyerName = nameOf(r.type === "HDV_VENTE" ? "joueur:" + r.actor : r.from);
+      const buyer = r.type === "HDV_VENTE" && r.actor ? "joueur:" + r.actor : r.from;
+      e.kind = "commerce"; e.buyer = keyOf(buyer); e.seller = keyOf(r.to); e.tax = tax; e.internal = e.buyer === e.seller;
     } else if ((r.from === "fisc" || !r.from) && isAcc(r.to)) { e.kind = "creation"; e.to = keyOf(r.to); e.toName = nameOf(r.to); }
     else if (isAcc(r.from) && (r.to === "fisc" || !r.to)) { e.kind = "destruction"; e.from = keyOf(r.from); }
     else if (isAcc(r.from) && isAcc(r.to)) { e.kind = "transfert"; e.tax = tax; }
@@ -115,18 +124,20 @@ const nameOf = (acc) => acc && acc.startsWith("joueur:") ? NAMES[acc.slice(7)] |
 function keyOf(acc) {
   if (!acc) return null;
   if (acc.startsWith("faction:")) return "f:" + acc.slice(8);
+  if (acc.startsWith("solo:")) return "s:#" + acc.slice(5);     // joueur seul anonyme (version publique)
   const n = nameOf(acc), f = n && PLAYER_FAC.get(n.toLowerCase());
   return f ? "f:" + f : "s:" + (n || acc.slice(7, 15)).toLowerCase();
 }
 function facInfo(key) {
   if (!key) return { label: "?", members: 1 };
   if (key.startsWith("site:")) { const site = X.D.factions.find((f) => "site:" + f.id === key); return { label: site ? site.name + " (pas dans le mod)" : key, site, members: 1 }; }
+  if (key.startsWith("s:#")) return { label: "Joueur solo", solo: true, anon: true, members: 1 };
   if (key.startsWith("s:")) { const n = key.slice(2); const j = ((X.ECO && X.ECO.joueurs) || []).find((x) => x.nom.toLowerCase() === n); return { label: (j ? j.nom : n), solo: true, members: 1 }; }
   const f = FAC.get(key.slice(2)), site = f && X.facOfEco && X.facOfEco(f.id);
   return { label: site ? site.name : f ? f.tag || f.id : key.slice(2), site, eco: f, members: f ? Math.max(1, (f.membres || []).length) : 1 };
 }
 const facName = (key) => facInfo(key).label;
-const facHtml = (key) => { const i = facInfo(key); return i.site ? `<a href="#communaute/faction/${i.site.id}">${esc(i.label)}</a>` : i.solo ? `${esc(i.label)} <span class="chip">solo</span>` : esc(i.label); };
+const facHtml = (key) => { const i = facInfo(key); return i.site ? `<a href="#communaute/faction/${i.site.id}">${esc(i.label)}</a>` : i.anon ? '<span class="muted">Joueurs solo</span>' : i.solo ? `${esc(i.label)} <span class="chip">solo</span>` : esc(i.label); };
 // Clé de faction d'une faction du site
 const keyOfSite = (fid) => { const f = X.D.factions.find((x) => x.id === fid); for (const [k, e] of FAC) { const s = X.facOfEco && X.facOfEco(e.id); if (s && s.id === fid) return "f:" + k; } return f ? "site:" + f.id : null; };
 // Faction d'une boutique d'eco.json
@@ -210,7 +221,15 @@ function usinesData() {
 
 /* ---------- rendu ---------- */
 function render(el, ctx) {
-  X = ctx;
+  const Es = window.Espace || {};
+  X = { ECO: ctx.ECO, D: (Es.data && Es.data()) || { factions: [], usines: [], choix: [] }, facOfEco: Es.facOfEco };
+  if (!["sumenium.com", "localhost", "127.0.0.1"].includes(location.hostname)) {
+    el.innerHTML = `<div class="card center"><h3>Cette partie est sur sumenium.com</h3><a class="btn" href="https://sumenium.com/${esc(location.hash)}">Ouvrir sur sumenium.com</a></div>`; return;
+  }
+  // Connexion ou déconnexion du staff depuis le dernier chargement : on relit
+  const me = X.D.user, staffNow = !!(me && me.level === "staff");
+  if (RAW && RAW.staff !== staffNow) RAW = null;
+  if (st.page === "reglages" && RAW && !RAW.staff) st.page = "vue";
   if (RAW && X.ECO) prep();
   if (!RAW) {
     el.innerHTML = loadErr ? `<div class="card center"><p>${esc(loadErr)}</p><button class="btn small" id="seRetry">Réessayer</button></div>`
@@ -222,8 +241,9 @@ function render(el, ctx) {
   CSV.length = 0;
   const P = period();
   const per = (v, l) => `<button type="button" data-per="${v}" aria-pressed="${!st.du && !st.au && st.per === v}">${l}</button>`;
-  el.innerHTML = `<div class="sec-head"><h3>Économie (staff)</h3><p class="sub2">D'où vient l'argent, qui commerce avec qui, à quoi servent les usines. D'après le journal du mod (mis à jour toutes les 5 min) et l'export du serveur.</p></div>
-    <nav class="subtabs se-pages" aria-label="Pages du tableau de bord">${PAGES.map(([k, l]) => `<a href="#" data-sep="${k}" aria-current="${k === st.page ? "page" : "false"}">${l}</a>`).join("")}</nav>
+  el.classList.add("se-root");
+  el.innerHTML = `<div class="sec-head"><h3>Détail de l'économie</h3><p class="sub2">D'où vient l'argent, qui commerce avec qui, à quoi servent les usines. D'après toutes les transactions du serveur (toutes les 5 min), regroupées par faction.</p></div>
+    <nav class="subtabs se-pages" aria-label="Pages du détail de l'économie">${PAGES.filter(([k]) => k !== "reglages" || STAFF()).map(([k, l]) => `<a href="#" data-sep="${k}" aria-current="${k === st.page ? "page" : "false"}">${l}</a>`).join("")}</nav>
     ${st.page !== "reglages" && st.page !== "usines" ? `<div class="bar se-bar"><div class="seg" role="group" aria-label="Période">${PERIODES.map(([v, l]) => per(v, l)).join("")}</div>
       <label class="chk">du <input type="date" id="seDu" value="${esc(st.du)}"></label><label class="chk">au <input type="date" id="seAu" value="${esc(st.au)}"></label>
       <span class="muted small">${esc(dayLabel(P.a, { day: "numeric", month: "long" }))} → ${esc(dayLabel(P.b, { day: "numeric", month: "long" }))} (${P.n} j)</span>
@@ -314,7 +334,7 @@ function vue(el, P) {
       ${tile(su(M), "Masse monétaire", "", "Soldes des joueurs + banques de faction (dernier export)")}
       ${tile((o.net >= 0 ? "+" : "−") + su(Math.abs(o.net)), "Création nette", delta(o.net, p.net, su, -1), "Création − destruction sur la période (IMPORT exclu)")}
       ${tile(su(o.ext), "Commerce externe", delta(o.ext, p.ext), "Achats en boutique et à l'hôtel des ventes entre factions différentes")}
-      ${tile(n0(seen), "Joueurs vus", "", "Joueurs dont la dernière connexion tombe dans la période (phase 1 : pas encore de sessions)")}
+      ${tile(n0(seen), "Joueurs vus", "", "Joueurs connectés au moins une fois depuis le début de la période")}
       ${tile(`${nCom}/${U.list.length}`, "Usines commerciales", `<small class="se-d">${pct(U.list.length ? nCom / U.list.length : null)} · sur 14 j</small>`, "Voir la page Usines pour la règle")}
       ${tile(pct(o.partFisc), "Part FISC des revenus", delta(o.partFisc ?? 0, p.partFisc, (v) => (v * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " pts", -1, true), "Création reçue ÷ (création reçue + commerce externe reçu). Au-dessus de 50 %, le minage rapporte plus que le commerce.")}
     </div>
@@ -351,7 +371,15 @@ function flux(el, P) {
   const heat = (v) => v ? ` style="background:color-mix(in srgb, var(--c0) ${Math.round(12 + 70 * Math.sqrt(v / max))}%, transparent)"` : "";
   const csvRows = cols.map((b) => [lab(b), ...cols.map((s) => Math.round(M.get(b + "|" + s) || 0))]);
   const ci = CSV.push({ name: "matrice-flux", head: ["Acheteur \\ Vendeur", ...cols.map(lab)], rows: csvRows }) - 1;
-  const rows = keys.map((k) => { const f = o.perFac.get(k), i = facInfo(k); return [H(facHtml(k), i.label), S(f.achExt), S(f.venExt), S(f.achExt / i.members), i.members, f.fourn.size, f.clients.size, PC(f.achExt + f.achInt ? f.achInt / (f.achExt + f.achInt) : null), S(f.crea), PC(f.crea + f.venExt ? f.crea / (f.crea + f.venExt) : null)]; })
+  // Joueurs solo anonymes (version publique) : une seule ligne
+  const anon = keys.filter((k) => k.startsWith("s:#"));
+  if (anon.length) {
+    const g = { achExt: 0, venExt: 0, achInt: 0, crea: 0, fourn: new Set(), clients: new Set() };
+    for (const k of anon) { const f = o.perFac.get(k); g.achExt += f.achExt; g.venExt += f.venExt; g.achInt += f.achInt; g.crea += f.crea; f.fourn.forEach((x) => g.fourn.add(grp(x))); f.clients.forEach((x) => g.clients.add(grp(x))); }
+    o.perFac.set("s:#", g); keys.splice(0, keys.length, ...keys.filter((k) => !k.startsWith("s:#")), "s:#");
+  }
+  const membersOf = (k) => (k === "s:#" ? anon.length : facInfo(k).members);
+  const rows = keys.map((k) => { const f = o.perFac.get(k), i = { ...facInfo(k), members: membersOf(k) }; return [H(facHtml(k), i.label), S(f.achExt), S(f.venExt), S(f.achExt / i.members), i.members, f.fourn.size, f.clients.size, PC(f.achExt + f.achInt ? f.achInt / (f.achExt + f.achInt) : null), S(f.crea), PC(f.crea + f.venExt ? f.crea / (f.crea + f.venExt) : null)]; })
     .sort((a, b) => b[1].v + b[2].v - a[1].v - a[2].v);
   el.innerHTML = `<section class="card"><h3>Qui achète à qui</h3>
       <p class="muted small">Commerce externe sur la période, en Su. Ligne = faction acheteuse, colonne = faction vendeuse. Les joueurs sans faction sont regroupés.</p>
@@ -360,8 +388,8 @@ function flux(el, P) {
         <tr><td><b>Total</b></td>${cols.map((s) => `<td><b>${n0(cols.reduce((a, b) => a + (M.get(b + "|" + s) || 0), 0))}</b></td>`).join("")}<td><b>${n0(o.ext)}</b></td></tr>
         </tbody></table></div><button type="button" class="link small" data-csv="${ci}">Exporter en CSV</button>` : '<p class="empty">Rien sur la période.</p>'}</section>
     <section class="card"><h3>Par faction</h3>
-      ${table("factions", ["Faction", "Achats ext.", "Ventes ext.", ["Achats / membre", "Achats externes ÷ membres de la faction (membres actuels)"], "Membres", ["Fournisseurs", "Factions distinctes chez qui elle achète"], ["Clients", "Factions distinctes qui lui achètent"], ["Part interne", "Commerce interne ÷ (interne + externe), côté acheteur"], ["FISC reçu", "Argent créé reçu : rachats, reprises, staff"], ["Part FISC", "FISC reçu ÷ (FISC reçu + ventes externes)"]], rows)}
-      <p class="muted small">Faction d'un joueur : sa faction actuelle dans le mod (l'historique des membres arrivera avec la phase 2).</p></section>`;
+      ${table("factions", ["Faction", "Achats ext.", "Ventes ext.", ["Par membre", "Achats externes ÷ membres de la faction"], "Membres", ["Fourn.", "Fournisseurs : factions distinctes chez qui elle achète"], ["Clients", "Factions distinctes qui lui achètent"], ["Interne", "Commerce interne ÷ (interne + externe), côté acheteur"], ["FISC reçu", "Argent créé reçu : rachats, reprises, staff"], ["Part FISC", "FISC reçu ÷ (FISC reçu + ventes externes)"]], rows)}
+      <p class="muted small">Un joueur compte pour sa faction actuelle.</p></section>`;
 }
 
 /* ---------- 3. Usines ---------- */
@@ -370,9 +398,9 @@ function usines(el) {
   const byFac = new Map();
   for (const x of U.list) { const f = byFac.get(x.k) || { n: 0, com: 0, ca: 0 }; f.n++; if (x.commerciale) f.com++; f.ca += x.ca; byFac.set(x.k, f); }
   el.innerHTML = `<div class="banner info">Fenêtre fixe : les 14 derniers jours (${esc(dayLabel(U.W.a))} → ${esc(dayLabel(U.W.b))}). Une usine est <b>commerciale</b> si les boutiques de sa faction ont vendu ses items à d'autres factions pour au moins
-      <b>${U.C.seuilPct} %</b> du CA externe moyen par usine (${su(U.moyenne)} → seuil ${su(U.seuil)}), <b>ou</b> en au moins <b>${U.C.seuilVentes} ventes</b> (les items bon marché comptent aussi). Réglable dans Réglages.</div>
+      <b>${U.C.seuilPct} %</b> du CA externe moyen par usine (${su(U.moyenne)} → seuil ${su(U.seuil)}), <b>ou</b> en au moins <b>${U.C.seuilVentes} ventes</b> (les items bon marché comptent aussi). ${STAFF() ? "Réglable dans Réglages." : ""}</div>
     <section class="card"><h3>Toutes les usines attribuées</h3>
-      ${table("usines", ["Usine", "Faction", "Taille", "Origine", "Commerciale", "CA ext. 14 j", "Ventes", "Clients", ["Ruptures", "Boutiques de la faction en rupture sur ses items"]],
+      ${table("usines", ["Usine", "Faction", "Taille", "Origine", "Commerciale", "CA 14 j", "Ventes", "Clients", ["Rupt.", "Boutiques de la faction en rupture sur ses items"]],
         U.list.sort((a, b) => b.ca - a.ca || a.u.nom.localeCompare(b.u.nom)).map((x) => [x.u.nom, H(facHtml(x.k), facName(x.k)), x.u.taille, x.origine,
           H(x.sansItems ? '<span class="chip warn">items à définir</span>' : x.commerciale ? '<span class="chip ok">oui</span>' : '<span class="chip">non</span>', x.sansItems ? "?" : x.commerciale ? "oui" : "non"),
           S(x.ca), x.n, x.clients, x.rupt]), { empty: "Aucune usine attribuée." })}</section>
@@ -385,8 +413,7 @@ function usines(el) {
         U.types.filter((t) => t.holders.size || t.ca).sort((a, b) => b.expose - a.expose || b.ca - a.ca).map((t) => [t.u.nom, t.u.taille,
           H([...t.holders].map(facHtml).join(", ") || '<span class="muted">libre</span>', [...t.holders].map(facName).join(", ")),
           H([...t.vendeurs].sort((a, b) => b[1].ca - a[1].ca).map(([k, v]) => `${facHtml(k)} <small class="muted">${n0(v.ca)}</small>`).join(", ") || "—", [...t.vendeurs].map(([k, v]) => `${facName(k)} ${Math.round(v.ca)}`).join(", ")),
-          S(t.ca), S(t.expose), t.acheteurs.size]))}
-      <p class="muted small">Autosuffisance et effet d'une nouvelle usine : phase 3 (stats vanilla).</p></section>`;
+          S(t.ca), S(t.expose), t.acheteurs.size]))}</section>`;
 }
 
 /* ---------- 4. Boutiques et prix ---------- */
@@ -412,17 +439,17 @@ function boutiques(el, P) {
   }).filter((c) => c.tot || c.boutiques > 1).sort((a, b) => b.tot - a.tot);
   el.innerHTML = `<section class="card"><h3>Concurrence par item</h3>
       <p class="muted small">Items vendus par plusieurs boutiques ou avec des ventes externes sur la période. Écart de prix = (max − min) ÷ min, prix à l'unité des boutiques en stock ; sous 1 %, les prix sont alignés. HHI = somme des parts de marché au carré : au-dessus de 0,5, quasi-monopole.</p>
-      ${table("concurrence", ["Item", "Boutiques", "Vendeurs actifs", "CA ext.", "Prix min. / u", "Écart", "HHI", "Premier vendeur"],
+      ${table("concurrence", ["Item", ["Bout.", "Boutiques qui vendent cet item"], ["Vendeurs", "Factions qui en ont vendu à d'autres sur la période"], "CA ext.", ["Prix min.", "Prix à l'unité le plus bas"], "Écart", "HHI", "1er vendeur"],
         conc.map((c) => [H(`${esc(c.nom)} <small class="muted">${esc(c.k)}</small>`, c.k), c.boutiques, c.vendeurs, S(c.tot), c.min === null ? "—" : S2(c.min), PC(c.ecart, 1),
           H(c.hhi === null ? "—" : `<span class="${c.hhi > 0.8 && c.facs > 1 ? "chip warn" : ""}">${c.hhi.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</span>`, c.hhi === null ? "" : Math.round(c.hhi * 100) / 100),
           c.lead ? H(`${facHtml(c.lead[0])} <small class="muted">${pct(c.lead[1] / c.tot)}</small>`, facName(c.lead[0])) : "—"]))}</section>
     <section class="card"><h3>Toutes les boutiques</h3>
       <div class="bar"><input type="search" id="seQ" placeholder="Item, propriétaire…" value="${esc(st.q)}" aria-label="Chercher une boutique">
         <select id="seFac" aria-label="Faction"><option value="">Toutes les factions</option>${keys.map((k) => `<option value="${esc(k)}"${k === st.fac ? " selected" : ""}>${esc(facName(k))}</option>`).join("")}</select></div>
-      ${table("boutiques", ["Boutique", "Faction", "Propriétaire", "Prix / u", "Stock", "Rupture", "Ventes (pér.)", "CA (pér.)", ["dont externe", "Ventes à d'autres factions"], "CA total"],
-        list.map((s) => { const b = byShop.get(s.id) || { ca: 0, ext: 0, n: 0 }; return [s.lot ? `Lot : ${s.lot.map((x) => x.nom || idOf(x.item)).join(" + ")}` : s.service || s.nom || idOf(s.item), H(shopKey(s) ? facHtml(shopKey(s)) : "—", shopKey(s) ? facName(shopKey(s)) : ""), s.proprietaire || "", S2(unit(s)), s.stock ?? "—",
-          H(s.rupture ? '<span class="chip warn">rupture</span>' : "", s.rupture ? "oui" : ""), b.n, S(b.ca), S(b.ext), S(s.chiffreAffaires || 0)]; }).sort((a, b) => b[7].v - a[7].v || b[9].v - a[9].v), { max: 400 })}
-      <p class="muted small">Historique des prix : phase 2 (événement MODIF_PRIX).</p></section>`;
+      ${table("boutiques", ["Boutique", "Faction", "Prix / u", "Stock", "Ventes", "CA", ["dont ext.", "Ventes à d'autres factions"], ["CA total", "Depuis la création de la boutique"]],
+        list.map((s) => { const b = byShop.get(s.id) || { ca: 0, ext: 0, n: 0 }, nom = s.lot ? `Lot : ${s.lot.map((x) => x.nom || idOf(x.item)).join(" + ")}` : s.service || s.nom || idOf(s.item);
+          return [H(`${esc(nom)}${s.proprietaire ? ` <small class="muted">· ${esc(s.proprietaire)}</small>` : ""}`, nom + (s.proprietaire ? " · " + s.proprietaire : "")), H(shopKey(s) ? facHtml(shopKey(s)) : "—", shopKey(s) ? facName(shopKey(s)) : ""), S2(unit(s)),
+            H(s.rupture ? '<span class="chip warn">rupture</span>' : n0(s.stock ?? 0), s.rupture ? "rupture" : s.stock ?? ""), b.n, S(b.ca), S(b.ext), S(s.chiffreAffaires || 0)]; }).sort((a, b) => b[5].v - a[5].v || b[7].v - a[7].v), { max: 400 })}</section>`;
   const qEl = $("seQ");
   if (qEl) { qEl.oninput = (e) => { st.q = e.target.value; const pos = e.target.selectionStart; boutiques(el, P); bindCsv(el); const n = $("seQ"); n.focus(); n.setSelectionRange(pos, pos); }; }
   if ($("seFac")) $("seFac").onchange = (e) => { st.fac = e.target.value; boutiques(el, P); bindCsv(el); };
@@ -440,10 +467,11 @@ const bindCsv = (el) => el.querySelectorAll("[data-csv]").forEach((b) => (b.oncl
 function fisc(el, P) {
   const o = agg(P), ev = o.ev, E = X.ECO || {};
   const rachats = ev.filter((e) => e.type === "RACHAT_FISC");
-  const byItem = new Map(), byPlayer = new Map();
+  const byItem = new Map(), byPlayer = new Map(), byFac = new Map();
   for (const e of rachats) {
     const i = byItem.get(e.item) || { m: 0, q: 0 }; i.m += e.m; i.q += e.qty; byItem.set(e.item, i);
-    const n = NAMES[e.actor] || e.toName || "?"; byPlayer.set(n, (byPlayer.get(n) || 0) + e.m);
+    if (STAFF()) { const n = NAMES[e.actor] || e.toName || "?"; byPlayer.set(n, (byPlayer.get(n) || 0) + e.m); }
+    byFac.set(e.to, (byFac.get(e.to) || 0) + e.m);
   }
   const tot = rachats.reduce((a, e) => a + e.m, 0);
   const players = [...byPlayer].sort((a, b) => b[1] - a[1]);
@@ -457,15 +485,19 @@ function fisc(el, P) {
   for (const e of ev) if (e.type === "REPRISE_FISC" || e.type === "REVENTE_FISC") { const r = rep.get(e.item) || { verse: 0, qv: 0, encaisse: 0, qe: 0 }; if (e.type === "REPRISE_FISC") { r.verse += e.m; r.qv += e.qty; } else { r.encaisse += e.m; r.qe += e.qty; } rep.set(e.item, r); }
   const R = ((E.fisc && E.fisc.reprise) || []).map((x) => ({ ...x, mv: rep.get(idOf(x.item)) || { verse: 0, qv: 0, encaisse: 0, qe: 0 } }));
   el.innerHTML = `<div class="stats">
-      ${tile(su(tot), "Rachats de minerais")}${tile(n0(players.length), "Vendeurs au FISC")}
-      ${tile(pct(tot ? top5 / tot : null), "Part des 5 premiers", "", "Revenus du FISC captés par les 5 plus gros vendeurs")}
+      ${tile(su(tot), "Rachats de minerais")}
+      ${STAFF() ? tile(n0(players.length), "Vendeurs au FISC") + tile(pct(tot ? top5 / tot : null), "Part des 5 premiers", "", "Revenus du FISC captés par les 5 plus gros vendeurs") : ""}
       ${tile(su(R.reduce((a, x) => a + x.mv.verse, 0)), "Versé (reprise)")}${tile(su(R.reduce((a, x) => a + x.mv.encaisse, 0)), "Encaissé (revente)")}</div>
     <section class="card"><h3>Rachats par jour</h3>${chart("seFiscD")}</section>
     <section class="card"><h3>Rachats par item</h3>
       ${table("rachats-items", ["Item", "Quantité", "Su", "Part"], [...byItem].sort((a, b) => b[1].m - a[1].m).map(([k, v]) => [H(`${esc(nomItem(k))} <small class="muted">${esc(k)}</small>`, k), v.q, S(v.m), PC(tot ? v.m / tot : null)]))}</section>
-    <section class="card"><h3>Rachats par joueur</h3>
-      <p class="muted small">Rendement par heure jouée : phase 2 (sessions). En attendant, un joueur très au-dessus des autres est à vérifier dans Ledger.</p>
-      ${table("rachats-joueurs", ["Joueur", "Su", "Part", "Part cumulée"], players.map(([n, v]) => { cum += v; return [n, S(v), PC(tot ? v / tot : null), PC(tot ? cum / tot : null)]; }))}</section>
+    <section class="card"><h3>Rachats par faction</h3>
+      ${(() => { let c = 0; const solo = [...byFac].filter(([k]) => k && k.startsWith("s:")).reduce((a, [, v]) => a + v, 0);
+        const rows = [...byFac].filter(([k]) => !k || !k.startsWith("s:")).concat(solo ? [["s:#", solo]] : []).sort((a, b) => b[1] - a[1]);
+        return table("rachats-factions", ["Faction", "Su", "Part", "Part cumulée"], rows.map(([k, v]) => { c += v; return [H(facHtml(k), facName(k)), S(v), PC(tot ? v / tot : null), PC(tot ? c / tot : null)]; })); })()}</section>
+    ${STAFF() ? `<section class="card"><h3>Rachats par joueur <span class="chip lvl-staff">staff</span></h3>
+      <p class="muted small">Un joueur très au-dessus des autres est à vérifier dans Ledger.</p>
+      ${table("rachats-joueurs", ["Joueur", "Su", "Part", "Part cumulée"], players.map(([n, v]) => { cum += v; return [n, S(v), PC(tot ? v / tot : null), PC(tot ? cum / tot : null)]; }))}</section>` : ""}
     <section class="card"><h3>Reprise d'objets rares</h3>
       ${table("reprise", ["Objet", "Stock", "Rachat", "Revente", ["Demi-stock H", "Le prix de rachat est divisé par 2 tous les H en stock"], "Demandes", ["Versé (pér.)", "Payé aux joueurs sur la période"], ["Encaissé (pér.)", "Reçu des joueurs sur la période"]],
         R.sort((a, b) => b.mv.verse + b.mv.encaisse - a.mv.verse - a.mv.encaisse || (b.stock || 0) - (a.stock || 0)).map((x) => [H(`${esc(x.nom || nomItem(x.item))}${x.rupture ? ' <span class="chip warn">rupture</span>' : ""}`, x.nom || x.item), x.stock ?? 0,
@@ -487,8 +519,8 @@ function reglages(el, P, root) {
       <p class="muted small wide">Un item par virgule, avec son id Minecraft (<code>iron_ingot</code>) ; <code>*</code> remplace n'importe quelle suite (<code>*_log</code>, <code>cooked_*</code>). Un item peut appartenir à plusieurs usines. Les services (niveaux, réparation) ne sont pas encore reliés : ils n'ont pas d'item.</p>
       <div class="wide se-usines">${X.D.usines.map((u) => `<label>${esc(u.nom)} <small class="muted">${esc(u.taille)}</small><input type="text" data-us="${esc(u.nom)}" value="${esc((C.usines[u.nom] || []).join(", "))}"></label>`).join("")}</div>
       <div class="wide actions"><button class="btn small" id="seSave">Enregistrer</button><button type="button" class="btn small ghost" id="seDef">Remettre les valeurs de la spec</button></div></section>`;
-  const save = (usines) => X.call("PUT", "/api/staff/eco/config", { seuilPct: +$("seP").value, seuilVentes: +$("seV").value, usines })
-    .then((r) => { RAW.config = r.config; reCache.clear(); X.toast("Réglages enregistrés"); render(root, X); }).catch((e) => X.toast(e.message, true));
+  const save = (usines) => call("PUT", "/api/staff/eco/config", { seuilPct: +$("seP").value, seuilVentes: +$("seV").value, usines })
+    .then((r) => { RAW.config = r.config; reCache.clear(); toast("Réglages enregistrés"); render(root, { ECO: X.ECO }); }).catch((e) => toast(e.message, true));
   $("seSave").onclick = () => { const u = {}; el.querySelectorAll("[data-us]").forEach((i) => (u[i.dataset.us] = i.value.split(",").map((s) => s.trim()).filter(Boolean))); save(u); };
   $("seDef").onclick = () => { if (confirm("Remettre la table usine → items de la spec ?")) save({}); };
 }

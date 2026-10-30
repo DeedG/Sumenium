@@ -5,7 +5,7 @@ const $ = (id) => document.getElementById(id);
 const E_ = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 let E = null, loaded = false, mode = "marche", sub = "boutiques", timer = null, tick = null;
 // Marché : ses sous-onglets. Richesse et Commandes sont affichés ailleurs (Classements, Aide), sans sous-onglets.
-const SUBS = [["boutiques", "Acheter / vendre"], ["hdv", "Hôtel des ventes"], ["fisc", "FISC"], ["economie", "Économie du serveur"]];
+const SUBS = [["boutiques", "Acheter / vendre"], ["hdv", "Hôtel des ventes"], ["fisc", "FISC"], ["economie", "Économie du serveur"], ["detail", "Détail de l'économie"]];
 const ROOTS = { marche: "ecoRoot", richesse: "richRoot", commandes: "cmdRoot" };
 const f = { q: "", owner: "", fac: "", type: "", stock: false, sort: "recent" };  // type : "" | "item" | "service"
 
@@ -102,7 +102,7 @@ function render() {
     ${stamp}<div id="ecoView"></div>`;
   const view = $("ecoView");
   if (!E) { view.innerHTML = unavailable(); return; }
-  ({ economie: apercu, boutiques, hdv, fisc })[sub](view);
+  ({ economie: apercu, boutiques, hdv, fisc, detail: (v) => (window.StaffEco ? window.StaffEco.render(v, { ECO: E }) : (v.innerHTML = unavailable())) })[sub](view);
   view.querySelectorAll("[data-map]").forEach((b) => (b.onclick = () => { const [x, y, z] = b.dataset.map.split(",").map(Number); showOnMap(x, y, z); }));
 }
 
@@ -601,7 +601,7 @@ function show(m, s) {
   if (mode === "commandes" && s) cmdAnchor = { k: s, until: Date.now() + 2000 };
   if (mode === "marche") sub = SUBS.some(([k]) => k === s) ? s : "boutiques";
   if (!loaded) load(); else render();
-  if (!timer) timer = setInterval(() => { if (visible()) load(); }, 120000);
+  if (!timer) timer = setInterval(() => { if (visible() && !(mode === "marche" && sub === "detail")) load(); }, 120000);
   if (!tick) tick = setInterval(() => {
     if (mode !== "marche" || $("p-marche").hidden || sub !== "hdv") return;
     document.querySelectorAll(".countdown[data-fin]").forEach((el) => { if (el.dataset.fin) el.innerHTML = remain(+el.dataset.fin); });

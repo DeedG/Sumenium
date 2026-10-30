@@ -18,7 +18,7 @@ const TAILLE_USINE = { grosse: ["Grosses usines", 3], moyenne: ["Moyennes usines
 const TAILLE_MOT = { grosse: "grosse", moyenne: "moyenne", petite: "petite" };
 // Zones rendues par ce fichier : chacune a sa racine dans la page et ses sous-onglets
 const AREAS = {
-  espace: { root: "espaceRoot", subs: [["fiche", "Ma fiche"], ["historique", "Mon historique"], ["staff", "Outils staff"], ["eco", "Économie"]] },
+  espace: { root: "espaceRoot", subs: [["fiche", "Ma fiche"], ["historique", "Mon historique"], ["staff", "Outils staff"]] },
   communaute: { root: "comRoot", subs: [["joueurs", "Joueurs"], ["factions", "Factions"], ["usines", "Usines"], ["projets", "Projets"], ["elections", "Élections"]] },
 };
 // Échelle RP : 1,87 m IRL = taille normale (1), comme dans l'ancien tableau
@@ -271,7 +271,7 @@ function render() {
         <p class="muted small">Tu passes par la page officielle <b>discord.com</b> : vérifie l'adresse, et ne donne jamais ton mot de passe ailleurs. Le site reçoit seulement ton pseudo Discord et tes rôles sur le serveur Suménium, rien n'est publié sur Discord. <a href="confidentialite.html">Ce qu'on enregistre</a></p></div>`;
       return;
     }
-    if ((sub === "staff" || sub === "eco") && !isStaff()) sub = "fiche";
+    if (sub === "staff" && !isStaff()) sub = "fiche";
     const badge = { staff: isStaff() ? D.players.filter((p) => D.wlSynced && !p.whitelisted && ficheOk(p)).length : 0 };
     root.innerHTML = `<div class="who-bar">
         <div class="who-me">${ME.avatar ? `<img src="${esc(ME.avatar)}" alt="" width="36" height="36">` : ""}
@@ -287,15 +287,10 @@ function render() {
         `<a href="#communaute/${k}" aria-current="${k === cur ? "page" : "false"}">${l}</a>`).join("")}</nav>
       <div id="espView"></div>`;
   } else root.innerHTML = '<div id="espView"></div>';
-  ({ fiche, historique, staff, eco, joueurs, factions, usines, elections, projets, joueur: joueurPage, faction: factionPage })[sub]();
+  ({ fiche, historique, staff, joueurs, factions, usines, elections, projets, joueur: joueurPage, faction: factionPage })[sub]();
 }
 const view = (h) => ($("espView").innerHTML = h);
-const STAFF_SUBS = ["staff", "eco"];
-// Tableau de bord Économie (staff) : staff-eco.js
-function eco() {
-  if (!window.StaffEco) return view('<div class="card center"><p>Module indisponible, recharge la page.</p></div>');
-  window.StaffEco.render($("espView"), { D, ECO, call, toast, facOfEco: ecoToFac });
-}
+const STAFF_SUBS = ["staff"];
 
 /* ---------- Ma fiche ---------- */
 function fiche() {
@@ -1319,5 +1314,5 @@ window.addEventListener("hashchange", renderAcct);
 start();
 // Pour les autres onglets : retrouver la faction de l'Espace depuis le mod (id) ou un nom d'équipe
 const facByName = (n) => (D && n ? D.factions.find((f) => { const e = ecoFac(f); return [f.name, e && e.tag, e && e.id].map(norm).includes(norm(n)); }) || null : null);
-window.Espace = { show, data: () => D, facOfEco: (id) => ecoToFac(id), facByName };
+window.Espace = { show, data: () => D, facOfEco: (id) => ecoToFac(id), facByName, toast };
 })();

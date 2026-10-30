@@ -573,6 +573,8 @@ body.busy{cursor:progress}
 .stat .se-d{display:block;margin-top:4px;font-size:.78rem;font-weight:700;color:var(--muted)}.stat .se-d.up{color:var(--leaf-ink)}.stat .se-d.down{color:var(--warn)}
 .se-tiles{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}.se-mini{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-top:12px}
 .se-tbl{margin:8px 0 4px}button.link.small{background:none;border:0;padding:0;margin-top:6px;cursor:pointer;font:inherit;font-size:.85rem;font-weight:700;color:var(--crystal)}.se-matrix td,.se-matrix th{padding:7px 9px;font-size:.86rem}
+.se-root .tbl th,.se-root .tbl td{padding:8px 10px;font-size:.9rem}.se-root .tbl th{white-space:normal;vertical-align:bottom;font-size:.72rem;letter-spacing:.04em}
+.se-root .tbl td:first-child{white-space:normal;min-width:120px}.se-root .tbl td small{white-space:nowrap}.se-root .se-matrix td{min-width:0}
 .se-usines{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.85rem;color:var(--fg);margin-bottom:6px}
 .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:0}
@@ -1469,7 +1471,7 @@ const LEGACY={classement:"classements/tableau",succes:"monde/succes",stats:"clas
   "economie":"marche","economie/apercu":"marche/economie","economie/boutiques":"marche/boutiques","economie/hdv":"marche/hdv","economie/fisc":"marche/fisc",
   "economie/factions":"communaute/factions","economie/baltop":"classements/richesse","economie/commandes":"aide/commandes",
   "espace/factions":"communaute/factions","espace/joueurs":"communaute/joueurs","espace/usines":"communaute/usines","espace/elections":"communaute/elections",
-  "espace/projets":"communaute/projets","monde/projets":"communaute/projets","espace/prix":"marche/fisc"};
+  "espace/projets":"communaute/projets","monde/projets":"communaute/projets","espace/prix":"marche/fisc","espace/eco":"marche/detail"};
 function route(){
   const raw=location.hash.slice(1),q=raw.includes("?")?raw.slice(raw.indexOf("?")):"",path=raw.split("?")[0];
   const parts=path.split("/");
