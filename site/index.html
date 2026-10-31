@@ -507,6 +507,12 @@ body.busy{cursor:progress}
 .live-now{font-size:1.15rem;margin:8px 0}
 .tirage tr.turn td{background:color-mix(in srgb,var(--sun,#e6a700) 14%,transparent)}
 .shops-mini .shop-name{display:flex;align-items:center;gap:8px}
+/* Icônes de boutique : service = ticket, lot = premier objet en pile (une copie décalée derrière) */
+.eco-ico.svc{display:inline-flex;align-items:center;justify-content:center;font-size:20px;line-height:1;image-rendering:auto}
+.rank .eco-ico.svc{font-size:16px}
+.ico-stack{position:relative;display:inline-flex;flex:none;padding:4px 4px 0 0;vertical-align:middle;line-height:0}
+.ico-stack>:first-child{position:absolute;left:4px;top:0;opacity:.4;margin:0}
+.ico-stack>:last-child{position:relative}
 .shops-mini .eco-ico{width:24px;height:24px}
 .rules-list{margin:8px 0 0;padding-left:20px}
 .rules-list li{margin:4px 0;color:var(--muted)}

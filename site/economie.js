@@ -21,6 +21,10 @@ const itemName = (item, nom) => {
 };
 const ico = (item) => { const id = idOf(item); const label = itemName(item).slice(0, 10);
   return `<img class="eco-ico" src="icons/${E_(id)}.png" alt="" loading="lazy" data-ph="${E_(label)}" onerror="iconFail(this)">`; };
+// Icône d'une boutique : ticket pour un service, pile (premier objet répété en ombre) pour un lot, sinon l'objet
+const icoSvc = () => '<span class="eco-ico svc" aria-hidden="true" title="Service">🎫</span>';
+const icoLot = (item) => `<span class="ico-stack" title="Lot de plusieurs objets">${ico(item)}${ico(item)}</span>`;
+const shopIco = (s) => s.type === "service" ? icoSvc() : s.type === "lot" || s.lot ? icoLot(((s.lot || [])[0] || {}).item) : ico(s.item);
 // Détails d'un item (mod v2.2) : enchantements, potion, nom perso, lore, durabilité
 const ENCH = { protection: "Protection", fire_protection: "Protection contre le feu", feather_falling: "Chute amortie", blast_protection: "Protection contre les explosions",
   projectile_protection: "Protection contre les projectiles", respiration: "Apnée", aqua_affinity: "Affinité aquatique", thorns: "Épines", depth_strider: "Agilité aquatique",
@@ -136,10 +140,14 @@ function apercu(view) {
 }
 // Le mod donne le nom en jeu de l'objet vendu (en anglais sur le serveur) : on retrouve l'objet via les boutiques
 function soldName(n) {
-  const b = (E.boutiques || []).find((x) => x.nom === n && x.item) || (E.hdv || []).find((x) => x.nom === n && x.item);
+  const B = E.boutiques || [];
+  const sv = B.find((x) => x.type === "service" && (x.service === n || x.nom === n));
+  if (sv) return icoSvc() + " " + E_(sv.service || n) + ' <span class="chip">service</span>';
+  const lt = B.find((x) => x.type === "lot" && x.nom === n);
+  if (lt || /^Lot : /.test(n)) return icoLot(lt && ((lt.lot || [])[0] || {}).item) + " " + E_(lt ? (lt.lot || []).map((x) => `${n0(x.quantite)} ${itemName(x.item, x.nom)}`).join(" + ") : n.replace(/^Lot : /, "")) + ' <span class="chip">lot</span>';
+  const b = B.find((x) => x.nom === n && x.item && x.type === "item") || (E.hdv || []).find((x) => x.nom === n && x.item);
   if (b) return ico(b.item) + " " + E_(itemName(b.item, n));
-  const sv = (E.boutiques || []).find((x) => x.service === n);
-  return (sv ? '<span class="eco-ico svc" aria-hidden="true">🎫</span> ' : "") + E_(n);
+  return E_(n);
 }
 // Enchères en cours les plus élevées (offre actuelle ou prix de départ)
 function hdvTop() {
@@ -400,7 +408,7 @@ function shopCard(s) {
     : s.stock === null || s.stock === undefined ? "" : `<span class="chip">${n0(s.stock)} en stock</span>`;
   const label = fiscS ? (s.type === "fisc_rachat" ? "Le FISC rachète" : "Le FISC vend") : "";
   return `<article class="shop${s.rupture ? " out" : ""}">
-    <header>${ico(lot ? ((s.lot || [])[0] || {}).item : s.item)}<div><b>${E_(name)}</b>${!lot && s.quantite > 1 ? `<span class="muted small"> × ${n0(s.quantite)}</span>` : ""}
+    <header>${shopIco(s)}<div><b>${E_(name)}</b>${!lot && s.quantite > 1 ? `<span class="muted small"> × ${n0(s.quantite)}</span>` : ""}
       ${svc || lot ? "" : nomPerso(s)}</div></header>
     ${lot ? lotHtml(s) : svc ? "" : det(s.details)}
     <p class="price">${label ? `<span class="muted small">${label} </span>` : ""}${su(s.prix)}${lot ? '<span class="muted small"> le lot</span>' : s.quantite > 1 ? `<span class="muted small"> · ${su(unit(s))} l'unité</span>` : ""}</p>
@@ -611,7 +619,7 @@ function show(m, s) {
 let rz = null;
 window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (mode === "marche" && sub === "economie" && !$("p-marche").hidden && E) render(); }, 200); });
 // refresh : redessine l'onglet affiché (les noms français des objets arrivent parfois après les données)
-window.Economie = { show, data: () => E, refresh: () => { if (loaded && visible()) render(); }, charts: { stackChart }, names: { enchName, potName } };
+window.Economie = { shopIco, icoSvc, icoLot, show, data: () => E, refresh: () => { if (loaded && visible()) render(); }, charts: { stackChart }, names: { enchName, potName } };
 // Chargé tout de suite : l'accueil et les fiches joueur / faction s'en servent aussi
 if (location.hostname !== "deedg.github.io") load();
 })();

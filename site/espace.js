@@ -404,7 +404,8 @@ function txRow(t, uuid) {
   else if (to === me && from !== me) { sign = 1; value = amount - (t.type === "RACHAT_FISC" ? 0 : tax); who = t.fromName || (t.from === "fisc" ? "FISC" : ""); }
   else if (from.startsWith("faction:") || to.startsWith("faction:")) who = from.startsWith("faction:") ? `banque ${from.slice(8)}` : `banque ${to.slice(8)}`;
   const units = t.unitFirst != null && t.qty > 1 ? ` (de ${su(t.unitFirst)} à ${su(t.unitLast)} l'unité)` : "";
-  const what = t.item ? `${t.qty ? t.qty + " × " : ""}${itemLabel(t)}${units}` : (t.note || "");
+  const what = t.type === "ACHAT_SERVICE" ? `🎫 ${t.qty > 1 ? t.qty + " × " : ""}${t.itemName || "Service"}`
+    : t.item ? `${t.qty ? t.qty + " × " : ""}${itemLabel(t)}${units}` : (t.note || "");
   const taxShown = t.type === "REVENTE_FISC" ? 0 : tax;  // la revente du FISC n'est pas une taxe
   return `<tr><td class="nowrap">${new Date(t.t).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</td>
     <td>${esc(TX[t.type] || t.type)}</td><td>${esc(what)}${who ? `<span class="muted small"> · ${sign < 0 ? "à" : sign > 0 ? "de" : ""} ${esc(who)}</span>` : ""}</td>
@@ -992,7 +993,7 @@ function shopRows(list, withOwner) {
     const name = b.type === "service" ? (b.service || "Service") : lot ? `Lot : ${(b.lot || []).map((x) => `${fmt(x.quantite)} ${itemFr(x.item, x.nom)}`).join(", ")}` : itemFr(b.item, b.nom);
     const ench = b.details && b.details.enchantements ? b.details.enchantements.map((e) => esc((e.nom || String(e.id).replace(/^minecraft:/, "")) + (e.niveau > 1 ? " " + e.niveau : ""))).join(", ") : "";
     const owner = b.proprietaireType === "faction" ? (ecoToFac(b.faction) ? flink(ecoToFac(b.faction)) : esc(b.proprietaire)) : plink(b.proprietaire);
-    return `<tr><td><span class="shop-name">${b.type === "service" ? "🎫" : icoE(first)}<span><b>${esc(name)}</b>${!lot && b.quantite > 1 ? ` <span class="muted small">× ${fmt(b.quantite)}</span>` : ""}${ench ? `<small class="muted"> · ${ench}</small>` : ""}</span></span></td><td>${suE(b.prix)}</td>
+    return `<tr><td><span class="shop-name">${b.type === "service" ? '<span class="eco-ico svc" aria-hidden="true" title="Service">🎫</span>' : lot ? `<span class="ico-stack" title="Lot de plusieurs objets">${icoE(first)}${icoE(first)}</span>` : icoE(first)}<span><b>${esc(name)}</b>${!lot && b.quantite > 1 ? ` <span class="muted small">× ${fmt(b.quantite)}</span>` : ""}${ench ? `<small class="muted"> · ${ench}</small>` : ""}</span></span></td><td>${suE(b.prix)}</td>
       <td>${b.type === "service" ? '<span class="chip ok">illimité</span>' : b.rupture ? '<span class="chip warn">Rupture</span>'
         : b.stock != null ? `${fmt(b.stock)}${stockPct(b) != null ? ` <small class="muted">(${stockPct(b)} %)</small>` : ""}${lowStock(b) ? ' <span class="chip warn">faible</span>' : ""}` : ""}</td>${withOwner ? `<td>${owner}</td>` : ""}<td>${mapBtn(b)}</td>${hist ? `<td>${canSeeShop(b) ? histBtn(b) : ""}</td>` : ""}</tr>`;
   }).join("")}</tbody></table></div>`;
