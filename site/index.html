@@ -11,7 +11,7 @@ if(location.hostname==="deedg.github.io")location.replace("https://sumenium.com/
 <meta name="description" content="Suménium, serveur Minecraft Java 26.3 semi-RP en UHC : factions PvE, zone commerciale au spawn, métiers, events chaque semaine, bordure qui grandit avec les succès. Carte, classements et comment nous rejoindre.">
 <link rel="icon" type="image/png" href="favicon.png" id="favicon">
 <script>
-/* Saison du site (icône, fond de l'en-tête, couleurs) selon la date à Paris : Halloween et Noël 2 semaines avant à 1 semaine après,
+/* Saison du site (icône, fond de l'en-tête, couleurs) selon la date à Paris : Halloween 2 semaines avant à 1 semaine après, Noël du 11 décembre au 6 janvier,
    Pâques de J-14 au lundi de Pâques + 6 j, été du 21 juin au 21 septembre, le reste du temps le thème de base.
    Aperçu : ajouter ?saison=halloween|noel|paques|ete|base à l'adresse. */
 (function(){
@@ -22,7 +22,7 @@ if(location.hostname==="deedg.github.io")location.replace("https://sumenium.com/
   var near=function(c){return t>=c-14*D&&t<=c+7*D};
   var s="base";
   if(near(at(y,10,31)))s="halloween";
-  else if(near(at(y,12,25))||near(at(y-1,12,25)))s="noel";
+  else if(t>=at(y,12,11)||t<=at(y,1,6))s="noel";  // Noël : du 11 décembre au 6 janvier (fêtes de fin d'année)
   else if(near(paques(y)))s="paques";
   else if(t>=at(y,6,21)&&t<=at(y,9,21))s="ete";
   try{var q=new URLSearchParams(location.search).get("saison");if(/^(base|halloween|noel|paques|ete)$/.test(q||""))s=q}catch(e){}

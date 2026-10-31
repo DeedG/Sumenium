@@ -55,7 +55,7 @@ Le même passage écrit `site/stats.json` (script `scripts/stats.py`) :
 
 ## Saisons du site
 
-L'icône, le fond de l'en-tête, la bande du bas et la couleur d'accent changent selon la date (heure de Paris) : Halloween du 17 octobre au 7 novembre, Noël du 11 décembre au 1er janvier, Pâques de 14 jours avant à 7 jours après le dimanche de Pâques, été du 21 juin au 21 septembre, le thème de base le reste du temps. Images dans `site/themes/` (`<saison>-logo.webp`, `-favicon.png`, `-fond.webp`). Aperçu d'une saison : `https://sumenium.com/?saison=noel`.
+L'icône, le fond de l'en-tête, la bande du bas et la couleur d'accent changent selon la date (heure de Paris) : Halloween du 17 octobre au 7 novembre, Noël du 11 décembre au 6 janvier, Pâques de 14 jours avant à 7 jours après le dimanche de Pâques, été du 21 juin au 21 septembre, le thème de base le reste du temps. Images dans `site/themes/` (`<saison>-logo.webp`, `-favicon.png`, `-fond.webp`). Aperçu d'une saison : `https://sumenium.com/?saison=noel`.
 
 ## Carte du monde
 
