@@ -408,7 +408,7 @@ function shopCard(s) {
     <p class="owner">${fiscS ? "<b>FISC</b>" : s.proprietaireType === "faction"
       ? `${facIco(s.faction)}${facTag(s.faction) || `<b>${E_(s.proprietaire)}</b>`} <span class="muted small">boutique de faction</span>`
       : `${headE(s.proprietaire)}<b>${plinkE(s.proprietaire)}</b> ${facTag(s.faction)}`}</p>
-    <p class="pos">${mapLink(s)}</p>
+    <p class="pos">${mapLink(s)}${window.Espace && window.Espace.canSeeShop && window.Espace.canSeeShop(s) ? " " + window.Espace.histBtn(s) : ""}</p>
   </article>`;
 }
 

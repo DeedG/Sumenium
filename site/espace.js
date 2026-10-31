@@ -19,7 +19,7 @@ const TAILLE_MOT = { grosse: "grosse", moyenne: "moyenne", petite: "petite" };
 // Zones rendues par ce fichier : chacune a sa racine dans la page et ses sous-onglets
 const AREAS = {
   espace: { root: "espaceRoot", subs: [["fiche", "Ma fiche"], ["historique", "Mon historique"], ["staff", "Outils staff"]] },
-  communaute: { root: "comRoot", subs: [["joueurs", "Joueurs"], ["factions", "Factions"], ["usines", "Usines"], ["projets", "Projets"], ["elections", "Élections"]] },
+  communaute: { root: "comRoot", subs: [["joueurs", "Joueurs"], ["factions", "Factions"], ["usines", "Usines"], ["projets", "Projets"], ["elections", "Élections"], ["mairie", "Mairie"]] },
 };
 // Échelle RP : 1,87 m IRL = taille normale (1), comme dans l'ancien tableau
 const scaleOf = (cm) => (cm ? Math.round((cm / 187) * 10000) / 10000 : null);
@@ -287,7 +287,7 @@ function render() {
         `<a href="#communaute/${k}" aria-current="${k === cur ? "page" : "false"}">${l}</a>`).join("")}</nav>
       <div id="espView"></div>`;
   } else root.innerHTML = '<div id="espView"></div>';
-  ({ fiche, historique, staff, joueurs, factions, usines, elections, projets, joueur: joueurPage, faction: factionPage })[sub]();
+  ({ fiche, historique, staff, mairie, joueurs, factions, usines, elections, projets, joueur: joueurPage, faction: factionPage })[sub]();
 }
 const view = (h) => ($("espView").innerHTML = h);
 const STAFF_SUBS = ["staff"];
@@ -344,7 +344,13 @@ function fiche() {
         <p class="muted small wide">Visible seulement par toi et le staff. Le staff applique la taille en jeu.</p>
       </fieldset>
       <div class="wide actions save-bar"><button class="btn" id="ficheSave" disabled>Enregistré ✓</button><span class="muted small" id="ficheDirty"></span></div>
-    </form></div>`);
+    </form></div>
+    ${(() => { const all = (ECO && ECO.boutiques) || [], mine = all.filter((x) => x.proprietaireType === "joueur" && norm(x.proprietaire) === norm(p.mc_name)),
+        fid = myEcoFacId(), facS = fid ? all.filter((x) => x.proprietaireType === "faction" && x.faction === fid) : [];
+      return mine.length || facS.length ? `<section class="card my-shops"><h3>Mes boutiques <small class="muted">${fmt(mine.length)}</small></h3>${shopRows(mine)}
+        ${facS.length ? `<h3>Boutiques de ma faction <small class="muted">${fmt(facS.length)}</small></h3>${shopRows(facS)}` : ""}
+        <p class="muted small">« Historique » : chaque vente, changement de prix et la création de la boutique. En jeu : <code>/historique boutique</code>.</p></section>` : ""; })()}`);
+  bindMap();
   const form = $("ficheForm"), save = $("ficheSave");
   const initial = JSON.stringify(formData(form));
   form.addEventListener("input", () => {
@@ -416,6 +422,142 @@ function historique() {
     `<div class="bar">${typeSelect("hType")}</div><div id="hList"><p class="empty">Chargement…</p></div>`);
   $("hType").onchange = (e) => { hType = e.target.value; loadHistory("/api/me/historique", $("hList"), false); };
   loadHistory("/api/me/historique", $("hList"), false);
+}
+
+/* ---------- Mairie : tâches municipales ----------
+   Le maire (ou le staff) écrit les tâches ici ; le site les met en page comme un livre Minecraft (14 lignes, 114 px de large),
+   le serveur lit ce livre (/api/mairie/livre) et le pose sur les lutrins de la mairie. */
+const MC_W = 110;  // largeur utile d'une ligne en pixels (114 dans le jeu, marge comprise), comme l'annuaire du mod
+const MC_LINES = 14;
+const mcChar = (c, bold) => { const w = "i!.,:;|'".includes(c) ? 2 : "l`".includes(c) ? 3 : "It[]   ".includes(c) ? 4 : 'fk<>"(){}*'.includes(c) ? 5 : "@~".includes(c) ? 7 : 6; return bold ? w + 1 : w; };
+const mcWidth = (s, bold) => [...s].reduce((a, c) => a + mcChar(c, bold), 0);
+const mcFit = (s, bold) => { if (mcWidth(s, bold) <= MC_W) return s; let o = "", w = 0; const max = MC_W - mcWidth("..", bold);
+  for (const c of s) { const cw = mcChar(c, bold); if (w + cw > max) break; o += c; w += cw; } return o.trimEnd() + ".."; };
+// Coupe un texte en lignes qui tiennent dans la page (mots entiers, sauf mot plus long qu'une ligne)
+function mcWrap(text, bold) {
+  const out = [];
+  for (const para of String(text).replace(/\r/g, "").split("\n")) {
+    if (!para.trim()) { out.push(""); continue; }
+    let line = "";
+    for (let word of para.trim().split(/ +/)) {
+      while (mcWidth(word, bold) > MC_W) {  // mot trop long : coupé
+        let part = ""; for (const c of word) { if (mcWidth((line ? line + " " : "") + part + c, bold) > MC_W) break; part += c; }
+        if (!part) { out.push(line); line = ""; continue; }
+        out.push((line ? line + " " : "") + part); line = ""; word = word.slice(part.length);
+      }
+      const cand = line ? line + " " + word : word;
+      if (mcWidth(cand, bold) <= MC_W) line = cand; else { out.push(line); line = word; }
+    }
+    out.push(line);
+  }
+  return out;
+}
+const SEP = "-".repeat(18);
+// Une tâche : titre (2 lignes au plus), trait, description, prime à la fin ; 1 page, ou 2 si la description est longue
+function layoutTask(t) {
+  const err = [];
+  const T = mcWrap(t.titre || "Sans titre", true).filter((x) => x).map((x) => ({ k: "titre", s: x }));
+  if (T.length > 3) err.push(`titre trop long (${T.length} lignes, 3 au plus)`);
+  const desc = (t.description || "").trim();
+  const Dsc = desc ? mcWrap(desc, false).map((x) => (x ? { k: "texte", s: x } : { k: "vide", s: "" })) : [];
+  const P = (t.prime || "").trim() ? mcWrap("Prime : " + t.prime.trim(), true).map((x) => ({ k: "prime", s: x })) : [];
+  if (P.length > 2) err.push("prime trop longue (2 lignes au plus)");
+  const head = [...T.slice(0, 3), { k: "sep", s: SEP }], tail = P.length ? [{ k: "vide", s: "" }, ...P.slice(0, 2)] : [];
+  let pages;
+  if (head.length + Dsc.length + tail.length <= MC_LINES) pages = [[...head, ...Dsc, ...tail]];
+  else {
+    const n1 = MC_LINES - head.length, rest = Dsc.slice(n1);
+    while (rest.length && rest[0].k === "vide") rest.shift();
+    const p2 = [{ k: "petit", s: mcFit("Suite : " + (t.titre || ""), false) }, ...rest, ...tail];
+    if (p2.length > MC_LINES) err.push(`description trop longue : ${p2.length - MC_LINES} ligne${p2.length - MC_LINES > 1 ? "s" : ""} en trop sur la 2e page`);
+    pages = [[...head, ...Dsc.slice(0, n1)], p2.slice(0, MC_LINES)];
+  }
+  return { pages, err, lines: head.length + Dsc.length + tail.length };
+}
+// Le livre : sommaire cliquable (chaque titre sur 2 lignes au plus), puis les tâches
+function layoutBook(taches, when) {
+  const entry = (t) => { const L = mcWrap("» " + (t.titre || "Sans titre"), false).filter((x) => x); return L.length > 2 ? [L[0], mcFit(L[1] + " " + L.slice(2).join(" "), false)] : L; };
+  const first = [...mcWrap("TÂCHES MUNICIPALES", true).map((x) => ({ k: "entete", s: x })), { k: "petit", s: "Mis à jour le " + when }, { k: "vide", s: "" }];
+  // pages du sommaire (le numéro des pages des tâches dépend de leur nombre : on le calcule d'abord)
+  const groups = [[]]; let used = first.length;
+  for (const t of taches) { const n = entry(t).length; if (used + n > MC_LINES) { groups.push([]); used = 2; } groups[groups.length - 1].push(t); used += n; }
+  let next = groups.length + 1;
+  const tasks = taches.map((t) => { const L = layoutTask(t); const start = next; next += L.pages.length; return { ...L, start }; });
+  let k = 0;
+  const som = groups.map((g, i) => {
+    const page = i === 0 ? [...first] : [{ k: "petit", s: "Tâches (suite)" }, { k: "vide", s: "" }];
+    for (const t of g) { const p = tasks[k++].start; entry(t).forEach((x) => page.push({ k: "lien", s: x, p })); }
+    if (!taches.length) page.push({ k: "texte", s: "Aucune tâche pour" }, { k: "texte", s: "le moment." });
+    return page;
+  });
+  return { pages: [...som, ...tasks.flatMap((x) => x.pages)], tasks };
+}
+const bookPage = (lines, n, total) => `<div class="mcpage"><div class="mcpage-n">Page ${n} sur ${total}</div>${lines.map((l) =>
+  `<div class="mcl k-${l.k}"${l.p ? ` data-goto="${l.p}" role="link" tabindex="0" title="Aller à la page ${l.p}"` : ""}>${esc(l.s) || "&nbsp;"}</div>`).join("")}</div>`;
+let mBook = null, mPage = 0, mDraft = null;
+function bookViewer(el, pages) {
+  mBook = pages; mPage = Math.min(mPage, pages.length - 1);
+  const pair = (i) => bookPage(pages[i], i + 1, pages.length);
+  el.innerHTML = `<div class="mcbook">${pair(mPage)}</div>
+    <div class="mcnav"><button type="button" class="btn small ghost" data-bp="-1" aria-label="Page précédente"${mPage ? "" : " disabled"}>‹</button>
+      <span class="muted small">${mPage + 1} / ${pages.length}</span><button type="button" class="btn small ghost" data-bp="1" aria-label="Page suivante"${mPage < pages.length - 1 ? "" : " disabled"}>›</button></div>`;
+  el.querySelectorAll("[data-bp]").forEach((b) => (b.onclick = () => { mPage += +b.dataset.bp; bookViewer(el, pages); }));
+  el.querySelectorAll("[data-goto]").forEach((b) => (b.onclick = () => { mPage = +b.dataset.goto - 1; bookViewer(el, pages); }));
+}
+const maireOf = () => { const id = Number(D.settings && D.settings.maire_id) || 0; return id ? D.players.find((p) => p.id === id) || null : null; };
+const canEditMairie = () => isStaff() || (canWrite() && maireOf() && me() && me().id === maireOf().id);
+const todayFr = () => new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+function mairie() {
+  const M = D.mairie || { taches: [], maj: 0, par: "" }, maire = maireOf(), edit = canEditMairie();
+  if (!mDraft || !edit) mDraft = JSON.parse(JSON.stringify(M.taches || []));
+  const pub = M.taches || [];
+  const when = M.maj ? new Date(M.maj).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) : todayFr();
+  view(head("Mairie", "Les tâches municipales : le maire propose des travaux pour le serveur. Une fois la tâche faite, la municipalité inspecte et verse la prime.") + `
+    <div class="mairie-grid">
+      <div>
+        <p class="small">${maire ? `Maire : ${plink(maire.mc_name)}` : '<span class="muted">Pas encore de maire désigné.</span>'}${M.maj ? ` <span class="muted">· mis à jour le ${esc(new Date(M.maj).toLocaleDateString("fr-FR", { day: "numeric", month: "long" }))}${M.par ? " par " + esc(M.par) : ""}</span>` : ""}</p>
+        ${pub.length ? `<div class="taches">${pub.map((t) => `<article class="card tache"><h4>${esc(t.titre)}</h4>${para(t.description)}${t.prime ? `<p class="prime">Prime : <b>${esc(t.prime)}</b></p>` : ""}</article>`).join("")}</div>`
+          : '<div class="card"><p class="empty">Aucune tâche pour le moment.</p></div>'}
+      </div>
+      <aside class="card"><h3>Le livre en jeu</h3><p class="muted small">Sur le lutrin de la mairie. Clique une tâche du sommaire pour y aller.</p><div id="mBookPub"></div></aside>
+    </div>
+    ${edit ? `<section class="card mairie-edit"><h3>Écrire les tâches <span class="chip lvl-staff">${isStaff() && !(maire && me() && me().id === maire.id) ? "staff" : "maire"}</span></h3>
+      <p class="muted small">Le site met le texte en page comme dans le jeu : une tâche tient sur 1 page (2 si la description est longue). Le compteur te prévient si ça déborde.
+        Pas de taille de police dans un livre Minecraft : le titre est en gras bleu, la prime en gras vert. Une ligne vide dans la description = un saut de ligne.</p>
+      <div id="mEdit"></div>
+      <div class="actions"><button type="button" class="btn small ghost" id="mAdd">+ Ajouter une tâche</button><button type="button" class="btn small" id="mPub">Publier</button>
+        <span class="muted small" id="mState"></span></div>
+      <h4>Aperçu du livre</h4><div id="mBookDraft"></div></section>` : ""}`);
+  bookViewer($("mBookPub"), layoutBook(pub, when).pages);
+  if (!edit) return;
+  const draw = () => {
+    $("mEdit").innerHTML = mDraft.map((t, i) => { const L = layoutTask(t);
+      return `<div class="tache-ed" data-i="${i}"><div class="tache-ed-h"><b>Tâche ${i + 1}</b>
+          <span class="chip ${L.err.length ? "warn" : "ok"}" data-cnt="${i}"></span>
+          <span class="tache-ed-btns"><button type="button" class="x" data-mv="-1" aria-label="Monter"${i ? "" : " disabled"}>↑</button><button type="button" class="x" data-mv="1" aria-label="Descendre"${i < mDraft.length - 1 ? "" : " disabled"}>↓</button><button type="button" class="x" data-del aria-label="Supprimer">✕</button></span></div>
+        <label>Titre<input data-f="titre" maxlength="80" value="${esc(t.titre)}" placeholder="Ex. : Paver la route du spawn"></label>
+        <label>Description<textarea data-f="description" rows="5" maxlength="1500" placeholder="Ce qu'il faut faire, où, avec quels matériaux…">${esc(t.description)}</textarea></label>
+        <label>Prime<input data-f="prime" maxlength="60" value="${esc(t.prime)}" placeholder="Ex. : 500 Su"></label></div>`; }).join("") || '<p class="empty">Aucune tâche : ajoute la première.</p>';
+    counters();
+  };
+  const counters = () => {
+    let bad = 0;
+    mDraft.forEach((t, i) => { const L = layoutTask(t), c = document.querySelector(`[data-cnt="${i}"]`); if (L.err.length) bad++;
+      if (c) { c.className = "chip " + (L.err.length ? "warn" : "ok"); c.textContent = L.err.length ? L.err.join(" · ") : `${L.pages.length} page${L.pages.length > 1 ? "s" : ""} · ${L.lines} lignes`; } });
+    const changed = JSON.stringify(mDraft) !== JSON.stringify(pub);
+    $("mPub").disabled = !!bad || !changed || mDraft.some((t) => !(t.titre || "").trim());
+    $("mState").textContent = bad ? "Corrige les tâches trop longues avant de publier." : changed ? "Modifications non publiées" : "Publié ✓";
+    bookViewer($("mBookDraft"), layoutBook(mDraft, todayFr()).pages);
+  };
+  $("mEdit").oninput = (e) => { const box = e.target.closest("[data-i]"); if (!box || !e.target.dataset.f) return; mDraft[+box.dataset.i][e.target.dataset.f] = e.target.value; counters(); };
+  $("mEdit").onclick = (e) => { const box = e.target.closest("[data-i]"); if (!box) return; const i = +box.dataset.i;
+    if (e.target.dataset.mv) { const j = i + +e.target.dataset.mv; [mDraft[i], mDraft[j]] = [mDraft[j], mDraft[i]]; draw(); }
+    else if ("del" in e.target.dataset && confirm(`Supprimer la tâche « ${mDraft[i].titre || i + 1} » ?`)) { mDraft.splice(i, 1); draw(); } };
+  $("mAdd").onclick = () => { if (mDraft.length >= 20) return toast("20 tâches au plus.", true); mDraft.push({ titre: "", description: "", prime: "" }); draw();
+    const last = document.querySelector(`[data-i="${mDraft.length - 1}"] input`); if (last) last.focus(); };
+  $("mPub").onclick = () => { const taches = mDraft.map((t) => ({ titre: t.titre.trim(), description: t.description.trim(), prime: t.prime.trim() }));
+    act(async () => { await call("PUT", "/api/mairie", { taches, livre: layoutBook(taches, todayFr()).pages }); mDraft = null; }, "Tâches publiées : le livre en jeu se met à jour dans les 5 minutes"); };
+  draw();
 }
 
 /* ---------- Joueurs ---------- */
@@ -823,16 +965,69 @@ const icoE = (item) => { const id = String(item || "").replace(/^minecraft:/, ""
 // Boutiques (Marché) en tableau compact : icône, objet, prix, stock, propriétaire, position sur la carte
 function shopRows(list, withOwner) {
   if (!list.length) return '<p class="empty">Aucune.</p>';
-  return `<div class="tbl-wrap"><table class="tbl left shops-mini"><thead><tr><th>Vend</th><th>Prix</th><th>Stock</th>${withOwner ? "<th>Boutique de</th>" : ""}<th>Où</th></tr></thead><tbody>${list.map((b) => {
+  const hist = list.some(canSeeShop);
+  return `<div class="tbl-wrap"><table class="tbl left shops-mini"><thead><tr><th>Vend</th><th>Prix</th><th>Stock</th>${withOwner ? "<th>Boutique de</th>" : ""}<th>Où</th>${hist ? "<th></th>" : ""}</tr></thead><tbody>${list.map((b) => {
     const lot = b.type === "lot", first = lot ? ((b.lot || [])[0] || {}).item : b.item;
     const name = b.type === "service" ? (b.service || "Service") : lot ? `Lot : ${(b.lot || []).map((x) => `${fmt(x.quantite)} ${itemFr(x.item, x.nom)}`).join(", ")}` : itemFr(b.item, b.nom);
     const ench = b.details && b.details.enchantements ? b.details.enchantements.map((e) => esc((e.nom || String(e.id).replace(/^minecraft:/, "")) + (e.niveau > 1 ? " " + e.niveau : ""))).join(", ") : "";
     const owner = b.proprietaireType === "faction" ? (ecoToFac(b.faction) ? flink(ecoToFac(b.faction)) : esc(b.proprietaire)) : plink(b.proprietaire);
     return `<tr><td><span class="shop-name">${b.type === "service" ? "🎫" : icoE(first)}<span><b>${esc(name)}</b>${!lot && b.quantite > 1 ? ` <span class="muted small">× ${fmt(b.quantite)}</span>` : ""}${ench ? `<small class="muted"> · ${ench}</small>` : ""}</span></span></td><td>${suE(b.prix)}</td>
       <td>${b.type === "service" ? '<span class="chip ok">illimité</span>' : b.rupture ? '<span class="chip warn">Rupture</span>'
-        : b.stock != null ? `${fmt(b.stock)}${stockPct(b) != null ? ` <small class="muted">(${stockPct(b)} %)</small>` : ""}${lowStock(b) ? ' <span class="chip warn">faible</span>' : ""}` : ""}</td>${withOwner ? `<td>${owner}</td>` : ""}<td>${mapBtn(b)}</td></tr>`;
+        : b.stock != null ? `${fmt(b.stock)}${stockPct(b) != null ? ` <small class="muted">(${stockPct(b)} %)</small>` : ""}${lowStock(b) ? ' <span class="chip warn">faible</span>' : ""}` : ""}</td>${withOwner ? `<td>${owner}</td>` : ""}<td>${mapBtn(b)}</td>${hist ? `<td>${canSeeShop(b) ? histBtn(b) : ""}</td>` : ""}</tr>`;
   }).join("")}</tbody></table></div>`;
 }
+/* ---------- Historique d'une boutique (propriétaire, membres de sa faction, staff) ---------- */
+const myEcoFacId = () => { const p = me(); if (!p || !ECO) return null; const f = (ECO.factions || []).find((x) => (x.membres || []).some((m) => norm(m.nom) === norm(p.mc_name))); return f ? f.id : null; };
+function canSeeShop(b) {
+  if (!b || !ME || b.proprietaireType === "fisc") return false;
+  if (isStaff()) return true;
+  const p = me();
+  if (!p) return false;
+  return b.proprietaireType === "joueur" ? norm(b.proprietaire) === norm(p.mc_name) : b.proprietaireType === "faction" && !!myEcoFacId() && b.faction === myEcoFacId();
+}
+const histBtn = (b) => `<button type="button" class="btn small ghost" data-shop-hist="${esc(b.id)}">Historique</button>`;
+const SHOP_TX = { ACHAT: "Vente", ACHAT_SERVICE: "Vente (service)", CONFIG_BOUTIQUE: "Réglage", FRAIS_BOUTIQUE: "Création", REMBOURSEMENT_BOUTIQUE: "Suppression",
+  SUPPRESSION_BOUTIQUE: "Suppression", BON_UTILISE: "Bon validé" };
+function shopTxRow(t) {
+  const sale = t.type === "ACHAT" || t.type === "ACHAT_SERVICE";
+  const amount = t.amount || 0, tax = t.tax || 0;
+  const val = sale ? amount - tax : t.type === "FRAIS_BOUTIQUE" ? -amount : amount;
+  const what = t.type === "CONFIG_BOUTIQUE" || t.type === "BON_UTILISE" ? (t.note || "") : sale ? `${t.qty ? t.qty + " × " : ""}${itemLabel(t)}${t.note && /lot/.test(t.note) ? ` (${t.note})` : ""}` : (t.note || "");
+  const who = sale ? (t.actorName || t.fromName || "") : t.actorName || "";
+  return `<tr><td class="nowrap">${new Date(t.t).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</td><td>${esc(SHOP_TX[t.type] || TX[t.type] || t.type)}</td>
+    <td>${esc(what)}${who ? `<span class="muted small"> · ${sale ? "acheté par" : "par"} ${esc(who)}</span>` : ""}</td>
+    <td class="num ${val > 0 ? "amt-pos" : val < 0 ? "amt-neg" : ""}">${val ? (val > 0 ? "+" : "−") + su(Math.abs(val)) : ""}</td><td class="num muted">${sale && tax ? su(tax) : ""}</td></tr>`;
+}
+async function openShopHistory(id) {
+  let dlg = $("shopHistDlg");
+  if (!dlg) { dlg = document.createElement("dialog"); dlg.id = "shopHistDlg"; dlg.className = "hist-dlg"; document.body.appendChild(dlg);
+    dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); }); }
+  const b = ((ECO && ECO.boutiques) || []).find((x) => x.id === id) || {};
+  const name = b.type === "service" ? (b.service || "Service") : b.type === "lot" ? `Lot : ${(b.lot || []).map((x) => itemFr(x.item, x.nom)).join(", ")}` : itemFr(b.item, b.nom);
+  let rows = [], more = false;
+  const draw = (msg) => {
+    const ventes = rows.filter((t) => t.type === "ACHAT" || t.type === "ACHAT_SERVICE");
+    const net = ventes.reduce((a, t) => a + (t.amount || 0) - (t.tax || 0), 0);
+    dlg.innerHTML = `<div class="hist-head"><div><h3>Historique — ${esc(name)}</h3><p class="muted small">${b.proprietaireType === "faction" ? "Boutique de faction" : "Propriétaire : " + esc(b.proprietaire || "?")}${b.x != null ? ` · ${b.x} ${b.y} ${b.z}` : ""}
+        · ${fmt(b.ventes || 0)} vente${b.ventes > 1 ? "s" : ""} depuis la création, chiffre d'affaires ${suE(b.chiffreAffaires || 0)}</p></div>
+        <button type="button" class="x" id="shClose" aria-label="Fermer">✕</button></div>
+      ${msg ? `<p class="empty">${esc(msg)}</p>` : rows.length ? `<p class="small muted">${rows.length} ligne${rows.length > 1 ? "s" : ""} affichée${rows.length > 1 ? "s" : ""} · ${ventes.length} vente${ventes.length > 1 ? "s" : ""}, <b class="amt-pos">+${su(net)}</b> après taxe</p>
+      <div class="tbl-wrap"><table class="tbl left hist"><thead><tr><th>Date</th><th>Opération</th><th>Détail</th><th class="num">Montant</th><th class="num">Taxe</th></tr></thead>
+      <tbody>${rows.map(shopTxRow).join("")}</tbody></table></div>${more ? '<div class="actions"><button class="btn small ghost" id="shMore">Plus ancien</button></div>' : ""}`
+        : '<p class="empty">Rien dans le journal pour cette boutique.</p>'}`;
+    $("shClose").onclick = () => dlg.close();
+    const m = $("shMore"); if (m) m.onclick = () => load(rows[rows.length - 1].t);
+  };
+  const load = async (before) => {
+    try { const r = await call("GET", `/api/boutiques/${encodeURIComponent(id)}/historique${before ? "?before=" + before : ""}`); rows = before ? rows.concat(r.rows) : r.rows; more = r.more; draw(); }
+    catch (e) { draw(e.message); }
+  };
+  draw("Chargement…");
+  if (!dlg.open) dlg.showModal();
+  load();
+}
+document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("[data-shop-hist]"); if (b) { e.preventDefault(); openShopHistory(b.dataset.shopHist); } });
+
 function bindMap() {
   document.querySelectorAll("#espView [data-map]").forEach((b) => (b.onclick = () => { const [x, y, z] = b.dataset.map.split(",").map(Number); if (window.showOnMap) window.showOnMap(x, y, z); }));
 }
@@ -1194,6 +1389,7 @@ function staff() {
       <label>Choix d'usines<select id="setUsOpen"><option value="1"${s.usines_ouvertes === "1" ? " selected" : ""}>Ouverts</option><option value="0"${s.usines_ouvertes !== "1" ? " selected" : ""}>Fermés</option></select></label>
       <label>Création de factions par les joueurs<select id="setFacOpen"><option value="0"${s.factions_ouvertes !== "1" ? " selected" : ""}>Fermée</option><option value="1"${s.factions_ouvertes === "1" ? " selected" : ""}>Ouverte</option></select></label>
       <label>Tour de choix d'usines<select id="setUsTour">${Object.entries(D.usineTours || {}).map(([k, r]) => `<option value="${k}"${String(s.usine_tour || "1") === k ? " selected" : ""}>${esc(r.nom)} : ${esc(r.combos.map(comboTxt).join(" / "))}</option>`).join("")}</select></label>
+      <label>Maire (écrit les tâches municipales)<select id="setMaire"><option value="">— pas de maire —</option>${D.players.map((p) => `<option value="${p.id}"${String(s.maire_id || "") === String(p.id) ? " selected" : ""}>${esc(p.mc_name)}</option>`).join("")}</select></label>
       <div class="wide actions"><button class="btn small" id="saveSettings">Enregistrer les réglages</button></div></section>
     <section class="card" id="st-import"><h3>Importer le Google Sheet</h3>
       <p class="muted small">Fichier JSON produit par <code>tools/import_sheet.py</code>. L'import ajoute ce qui manque et complète les champs vides, sans rien écraser.</p>
@@ -1202,7 +1398,7 @@ function staff() {
       <div id="auditList" class="audit-scroll"><p class="empty">Chargement…</p></div><button class="btn small ghost" id="auditMore" hidden>Plus ancien</button></section>`);
   document.querySelectorAll("[data-jump]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); $(a.dataset.jump).scrollIntoView({ behavior: "smooth", block: "start" }); }));
   $("saveSettings").onclick = () => act(() => call("PUT", "/api/admin/settings",
-    { election: $("setElection").value, usines_ouvertes: $("setUsOpen").value, usine_tour: $("setUsTour").value, factions_ouvertes: $("setFacOpen").value }), "Réglages enregistrés");
+    { election: $("setElection").value, usines_ouvertes: $("setUsOpen").value, usine_tour: $("setUsTour").value, factions_ouvertes: $("setFacOpen").value, maire_id: $("setMaire").value }), "Réglages enregistrés");
   bindFacDem(); bindProjDem();
   document.querySelectorAll("[data-ren-go]").forEach((b) => (b.onclick = () => {
     const sel = document.querySelector(`select[data-ren="${b.dataset.renGo}"]`), p = D.players.find((x) => x.id === +b.dataset.renGo);
@@ -1314,5 +1510,5 @@ window.addEventListener("hashchange", renderAcct);
 start();
 // Pour les autres onglets : retrouver la faction de l'Espace depuis le mod (id) ou un nom d'équipe
 const facByName = (n) => (D && n ? D.factions.find((f) => { const e = ecoFac(f); return [f.name, e && e.tag, e && e.id].map(norm).includes(norm(n)); }) || null : null);
-window.Espace = { show, data: () => D, facOfEco: (id) => ecoToFac(id), facByName, toast };
+window.Espace = { show, data: () => D, facOfEco: (id) => ecoToFac(id), facByName, toast, canSeeShop: (b) => !!D && canSeeShop(b), histBtn };
 })();

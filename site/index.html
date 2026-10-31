@@ -575,6 +575,25 @@ body.busy{cursor:progress}
 .se-tbl{margin:8px 0 4px}button.link.small{background:none;border:0;padding:0;margin-top:6px;cursor:pointer;font:inherit;font-size:.85rem;font-weight:700;color:var(--crystal)}.se-matrix td,.se-matrix th{padding:7px 9px;font-size:.86rem}
 .se-root .tbl th,.se-root .tbl td{padding:8px 10px;font-size:.9rem}.se-root .tbl th{white-space:normal;vertical-align:bottom;font-size:.72rem;letter-spacing:.04em}
 .se-root .tbl td:first-child{white-space:normal;min-width:120px}.se-root .tbl td small{white-space:nowrap}.se-root .se-matrix td{min-width:0}
+/* Mairie : tâches municipales et livre Minecraft */
+.mairie-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start;margin-bottom:16px}
+@media (max-width:760px){.mairie-grid{grid-template-columns:1fr}}
+.taches{display:grid;gap:10px}.tache h4{margin:0 0 6px;font-size:1.05rem}.tache .txt{white-space:pre-line}.tache .prime{margin:8px 0 0;color:var(--leaf-ink)}
+.mcbook{display:flex;justify-content:center}
+.mcpage{width:256px;min-height:calc(14 * 17px + 40px);background:#f3e8cc;border:1px solid #c9b48a;border-radius:4px;padding:14px 16px 18px;box-shadow:inset 0 0 0 3px #efe2c2,0 4px 12px rgba(0,0,0,.15);color:#000;font:14px/17px system-ui,-apple-system,"Segoe UI",sans-serif}
+.mcpage-n{text-align:right;font-size:11px;color:#6b5b3e;margin-bottom:4px}
+.mcl{white-space:pre;overflow:hidden;text-overflow:clip;height:17px}
+.mcl.k-entete{color:#a00;font-weight:700}.mcl.k-titre{color:#00a;font-weight:700}.mcl.k-prime{color:#007a00;font-weight:700}
+.mcl.k-sep,.mcl.k-petit{color:#8a8a8a;font-style:italic}.mcl.k-lien{color:#00a;cursor:pointer}.mcl.k-lien:hover{text-decoration:underline}
+.mcnav{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:8px}
+.mairie-edit .tache-ed{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;display:grid;gap:8px}
+.mairie-edit .tache-ed label{display:grid;gap:4px;font-weight:600;font-size:.9rem}
+.mairie-edit .tache-ed input,.mairie-edit .tache-ed textarea{font:inherit;font-weight:400;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%}
+.tache-ed-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.tache-ed-btns{margin-left:auto;display:flex;gap:4px}
+/* Historique d'une boutique */
+dialog.hist-dlg{width:min(860px,calc(100vw - 32px));max-height:85vh;border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--fg);padding:16px}
+dialog.hist-dlg::backdrop{background:rgba(0,0,0,.45)}.hist-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.hist-head h3{margin:0}
+.my-shops h3{margin-top:4px}
 .se-usines{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.85rem;color:var(--fg);margin-bottom:6px}
 .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:0}

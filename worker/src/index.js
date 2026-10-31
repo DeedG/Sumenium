@@ -331,6 +331,41 @@ async function api(req, env, url, ctx) {
     if (!me) return json({ uuid: null, reason: "fiche", rows: [] });
     return json(await history(env, me.mc_name, url));
   }
+  /* ---- historique d'une boutique : son propriétaire, les membres de sa faction (boutique de faction) et le staff ---- */
+  if ((mm = p.match(/^\/api\/boutiques\/([0-9a-f-]{8,40})\/historique$/)) && m === "GET") {
+    const s = await need(req, env, "attente");
+    return json(await shopHistory(env, s, mm[1], url));
+  }
+
+  /* ---- tâches municipales : écrites par le maire (ou le staff), lues par tous et par le serveur ---- */
+  if (p === "/api/mairie/livre" && m === "GET") {
+    const v = await setting(env, "mairie");
+    const o = v ? JSON.parse(v) : null;
+    return json(o && o.livre ? { titre: "Tâches municipales", auteur: o.auteur || "Mairie", maj: o.maj || 0, pages: o.livre }
+      : { titre: "Tâches municipales", auteur: "Mairie", maj: 0, pages: [] }, 200, { "cache-control": "no-store" });
+  }
+  if (p === "/api/mairie" && m === "PUT") {
+    const s = await need(req, env, "sumenien");
+    const maire = await currentMaire(env);
+    const isMaire = maire && maire.discord_id === s.id;
+    if (s.level !== "staff" && !isMaire) fail(403, "Seuls le maire et le staff écrivent les tâches municipales.");
+    const taches = (Array.isArray(body.taches) ? body.taches : []).slice(0, 20).map((t) => ({
+      titre: str(t && t.titre, 80).trim(), description: str(t && t.description, 1500).replace(/\r/g, ""), prime: str(t && t.prime, 60).trim(),
+    }));
+    if (taches.some((t) => !t.titre)) fail(400, "Chaque tâche doit avoir un titre.");
+    const KINDS = ["entete", "titre", "sep", "texte", "prime", "petit", "lien", "vide"];
+    const livre = (Array.isArray(body.livre) ? body.livre : []).slice(0, 100).map((page) => {
+      if (!Array.isArray(page) || page.length > 14) fail(400, "Page de livre trop longue (14 lignes au plus).");
+      return page.map((l) => ({ k: KINDS.includes(l && l.k) ? l.k : "texte", s: str(l && l.s, 120), ...(Number.isInteger(l && l.p) && l.p > 0 && l.p <= 100 ? { p: l.p } : {}) }));
+    });
+    const before = await setting(env, "mairie");
+    const me = await env.DB.prepare("SELECT mc_name FROM players WHERE discord_id = ? AND deleted = 0").bind(s.id).first();
+    const val = { taches, livre, maj: Date.now(), par: me ? me.mc_name : s.name, auteur: maire ? `Maire ${maire.mc_name}`.slice(0, 32) : "Mairie" };
+    await env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('mairie', ?)").bind(JSON.stringify(val)).run();
+    await audit(env, s, "settings", "mairie", "update", before ? { taches: JSON.parse(before).taches } : null, { taches });
+    return json({ ok: true });
+  }
+
   if (p === "/api/admin/commandes" && m === "GET") {
     await need(req, env, "staff");
     return json(COMMANDES_STAFF);
@@ -781,7 +816,7 @@ async function api(req, env, url, ctx) {
   if (p === "/api/admin/settings" && m === "PUT") {
     const s = await need(req, env, "staff");
     const allowed = { election: ["fermee", "candidatures", "tour1", "tour2", "resultats"], usines_ouvertes: ["0", "1"], usine_tour: Object.keys(USINE_TOURS),
-      factions_ouvertes: ["0", "1"], usines_max: null };
+      factions_ouvertes: ["0", "1"], usines_max: null, maire_id: null };
     const changed = {};
     for (const [k, v] of Object.entries(body)) {
       if (!(k in allowed)) continue;
@@ -1072,6 +1107,33 @@ async function publicEco(env, url, full) {
   return { cols: full.cols, rows, noms: {}, config: full.config, saisonDebut: full.saisonDebut, staff: false };
 }
 
+/** Maire en fonction : fiche choisie par le staff (réglage maire_id). */
+async function currentMaire(env) {
+  const id = Number(await setting(env, "maire_id")) || 0;
+  return id ? env.DB.prepare("SELECT id, mc_name, discord_id FROM players WHERE id = ? AND deleted = 0").bind(id).first() : null;
+}
+
+/** Historique d'une boutique (journal du mod) : ventes, réglages, création. Boutique perso : son propriétaire ;
+ *  boutique de faction : les membres de la faction (d'après le mod) ; le staff voit tout. */
+async function shopHistory(env, s, id, url) {
+  const eco = await ecoData(env);
+  const shop = ((eco && eco.boutiques) || []).find((b) => b.id === id);
+  if (!shop) fail(404, "Boutique introuvable (supprimée, cachée ou pas encore synchronisée).");
+  if (s.level !== "staff") {
+    const me = await env.DB.prepare("SELECT mc_name FROM players WHERE discord_id = ? AND deleted = 0").bind(s.id).first();
+    const n = me ? me.mc_name.toLowerCase() : "";
+    const myFac = n && ((eco.factions || []).find((f) => (f.membres || []).some((m) => String(m.nom).toLowerCase() === n)) || {}).id;
+    const ok = shop.proprietaireType === "joueur" ? String(shop.proprietaire || "").toLowerCase() === n
+      : shop.proprietaireType === "faction" && !!myFac && shop.faction === myFac;
+    if (!ok) fail(403, "Seuls le propriétaire de la boutique (ou les membres de sa faction) et le staff voient son historique.");
+  }
+  const before = int(url.searchParams.get("before")) || 9e15;
+  const LIMIT = 100;
+  const rows = (await env.DB.prepare(`SELECT data FROM tx WHERE json_extract(data, '$.shop') = ? AND t < ? ORDER BY t DESC LIMIT ?`)
+    .bind(id, before, LIMIT + 1).all()).results;
+  return { boutique: shop, rows: rows.slice(0, LIMIT).map((r) => JSON.parse(r.data)), more: rows.length > LIMIT };
+}
+
 async function claim(env, s, name) {
   if (!MC_NAME.test(name)) fail(400, "Pseudo Minecraft invalide (3 à 16 lettres, chiffres ou _).");
   const already = await env.DB.prepare("SELECT * FROM players WHERE discord_id = ? AND deleted = 0").bind(s.id).first();
@@ -1334,10 +1396,14 @@ async function allData(env, s) {
     return out;
   });
   let settings = Object.fromEntries(settingsR.results.map((r) => [r.key, r.value]));
-  if (!staff) settings = { election: settings.election, usines_ouvertes: settings.usines_ouvertes, usine_tour: settings.usine_tour, factions_ouvertes: settings.factions_ouvertes };
+  // Tâches municipales : le texte (le livre mis en page se recalcule dans le navigateur)
+  let mairie = null;
+  try { const o = JSON.parse(settings.mairie || "null"); if (o) mairie = { taches: o.taches || [], maj: o.maj || 0, par: o.par || "" }; } catch (e) {}
+  delete settings.mairie;
+  if (!staff) settings = { election: settings.election, usines_ouvertes: settings.usines_ouvertes, usine_tour: settings.usine_tour, factions_ouvertes: settings.factions_ouvertes, maire_id: settings.maire_id };
   return {
     user: pub ? null : { id: s.id, name: s.name, avatar: s.avatar, level: s.level },
-    players, factions: factionsR.results, usines: usinesR.results, choix: choixR.results, projets: projetsR.results,
+    mairie, players, factions: factionsR.results, usines: usinesR.results, choix: choixR.results, projets: projetsR.results,
     usineTours: USINE_TOURS, usineMax: USINE_MAX, usineFini: finiR.results, saisonDebut: SAISON_DEBUT, mcColors: MC_COLORS,
     factionDemandes: pub ? [] : facDemR.results.map((d) => ({ ...d, membres: JSON.parse(d.membres || "[]") })),
     projetDemandes: pub ? [] : projDemR.results.map((d) => ({ ...d, images: projImgR.results.filter((i) => i.demande_id === d.id).map((i) => i.id) })),
