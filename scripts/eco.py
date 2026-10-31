@@ -221,17 +221,21 @@ def items(eco_path):
 
 # ---------------------------------------------------------------- journal → Worker
 
-def _token(secret):
-    return base64.urlsafe_b64encode(hashlib.sha256(f"sumenium:ingest:{secret}".encode()).digest()).rstrip(b"=").decode()
+def _token():
+    """Jeton d'envoi vers l'Espace : secret dédié INGEST_TOKEN, sinon dérivé du secret Discord (ancien fonctionnement)."""
+    if os.environ.get("INGEST_TOKEN"):
+        return os.environ["INGEST_TOKEN"].strip()
+    secret = os.environ.get("DISCORD_CLIENT_SECRET")
+    return base64.urlsafe_b64encode(hashlib.sha256(f"sumenium:ingest:{secret}".encode()).digest()).rstrip(b"=").decode() if secret else None
 
 
 def push_journal(sftp, read, j, log, notice):
     """Envoie au Worker les lignes du journal qu'il n'a pas encore (reprise depuis sa dernière transaction)."""
-    secret = os.environ.get("DISCORD_CLIENT_SECRET")
-    if not secret:
+    token = _token()
+    if not token:
         return
     base = (os.environ.get("ESPACE_URL") or "https://sumenium.com").rstrip("/") + "/api/ingest/journal"
-    headers = {"content-type": "application/json", "authorization": f"Bearer {_token(secret)}", "user-agent": "sumenium-update/1.0"}
+    headers = {"content-type": "application/json", "authorization": f"Bearer {token}", "user-agent": "sumenium-update/1.0"}
     try:
         with urllib.request.urlopen(urllib.request.Request(base, headers=headers), timeout=20) as r:
             last = int(json.loads(r.read()).get("lastT") or 0)

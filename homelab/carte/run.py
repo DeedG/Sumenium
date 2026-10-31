@@ -11,7 +11,7 @@ fusionnés dans les marqueurs de la carte (seuls les ensembles « sumenium-* » 
 
 Tout se règle dans le fichier .env (voir .env.example).
 """
-import contextlib, io, json, math, os, posixpath, re, shutil, socket, stat, subprocess, sys, tempfile, threading, time
+import base64, contextlib, hashlib, io, json, math, os, posixpath, re, shutil, socket, stat, subprocess, sys, tempfile, threading, time
 from datetime import datetime
 
 import nbtlib
@@ -60,7 +60,16 @@ def connect():
     t = paramiko.Transport(sock)
     t.banner_timeout = t.auth_timeout = 30
     try:
-        t.connect(username=E("SFTP_USER", "").strip(), password=E("SFTP_PASSWORD", "").strip("\r\n"))
+        t.start_client(timeout=30)
+        # Empreinte du serveur SFTP (SFTP_HOSTKEY dans .env, « SHA256:… ») : vérifiée avant d'envoyer le mot de passe
+        key = t.get_remote_server_key()
+        fp = "SHA256:" + base64.b64encode(hashlib.sha256(key.asbytes()).digest()).decode().rstrip("=")
+        expected = [x.strip() for x in E("SFTP_HOSTKEY", "").split(",") if x.strip()]
+        if not expected:
+            log(f"Empreinte du serveur SFTP : {fp} — ajoute SFTP_HOSTKEY={fp} dans .env pour la vérifier à chaque connexion.")
+        elif fp not in expected:
+            raise RuntimeError(f"Empreinte du serveur SFTP inattendue ({fp}) : connexion annulée. Mets à jour SFTP_HOSTKEY si MineStrator a changé de machine.")
+        t.auth_password(E("SFTP_USER", "").strip(), E("SFTP_PASSWORD", "").strip("\r\n"))
         sftp = paramiko.SFTPClient.from_transport(t)
         sftp.get_channel().settimeout(120)
     except BaseException:

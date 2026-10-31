@@ -15,6 +15,9 @@ Toutes les 10 minutes, GitHub Actions lit le serveur en SFTP, calcule les donné
    | `SFTP_USER` | l'identifiant SFTP |
    | `SFTP_PASSWORD` | le mot de passe SFTP |
    | `SFTP_ROOT` | *(facultatif)* le dossier du serveur, si `server.properties` n'est pas à la racine du SFTP |
+   | `SFTP_HOSTKEY` | empreinte du serveur SFTP (`SHA256:…`, affichée en avertissement dans le journal de la mise à jour tant qu'elle manque) : vérifiée avant d'envoyer le mot de passe |
+   | `INGEST_TOKEN` | jeton d'envoi vers l'Espace (`openssl rand -hex 32`), le même pour les deux workflows : le secret Discord n'est alors plus transmis à la mise à jour |
+   | `SESSION_SECRET` | clé de signature des sessions de l'Espace (`openssl rand -hex 32`) ; la créer déconnecte tout le monde une fois |
 
 2. **Pages** : dans *Settings → Pages*, choisir *Source : GitHub Actions*.
 3. **Premier lancement** : onglet *Actions → Mise à jour du site → Run workflow*. Le site est ensuite à l'adresse `https://sumenium.com/` (l'ancienne adresse `deedg.github.io/Sumenium` y renvoie).

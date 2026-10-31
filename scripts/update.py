@@ -65,6 +65,20 @@ class SftpClosed(Exception):
     pass
 
 
+def check_host_key(t, notice=None):
+    """Vérifie l'empreinte du serveur SFTP (secret SFTP_HOSTKEY, « SHA256:… ») avant d'envoyer le mot de passe :
+    sans elle, un faux serveur placé sur le chemin pourrait récupérer l'accès SFTP. Absente : on affiche l'empreinte à copier."""
+    key = t.get_remote_server_key()
+    fp = "SHA256:" + base64.b64encode(hashlib.sha256(key.asbytes()).digest()).decode().rstrip("=")
+    expected = [x.strip() for x in (os.environ.get("SFTP_HOSTKEY") or "").split(",") if x.strip()]
+    if not expected:
+        msg = f"Empreinte du serveur SFTP : {fp} ({key.get_name()}). Ajoute-la dans le secret SFTP_HOSTKEY pour la vérifier à chaque connexion."
+        (notice("warning", msg) if notice else print("::warning::" + msg))
+        return
+    if fp not in expected:
+        raise RuntimeError(f"Empreinte du serveur SFTP inattendue ({fp}) : connexion annulée. Si MineStrator a changé de machine, mets à jour SFTP_HOSTKEY.")
+
+
 def connect():
     # Accepte aussi "sftp://hote:port" ou "hote:port" collés depuis le panel
     host = os.environ["SFTP_HOST"].strip()
@@ -86,7 +100,9 @@ def connect():
     t.banner_timeout = t.auth_timeout = 30
     _open.append(t)
     try:
-        t.connect(username=user, password=password)
+        t.start_client(timeout=30)
+        check_host_key(t)
+        t.auth_password(user, password)
     except EOFError:
         # Le serveur a coupé pendant l'identification : identifiants refusés ou trop de sessions ouvertes
         raise SftpClosed()
@@ -170,10 +186,18 @@ def write_progress(catalog, players, teams):
         json.dump(index, f, ensure_ascii=False, separators=(",", ":"))
 
 
+def ingest_token():
+    """Jeton d'envoi vers l'Espace : secret dédié INGEST_TOKEN, sinon dérivé du secret Discord (ancien fonctionnement)."""
+    if os.environ.get("INGEST_TOKEN"):
+        return os.environ["INGEST_TOKEN"].strip()
+    secret = os.environ.get("DISCORD_CLIENT_SECRET")
+    return base64.urlsafe_b64encode(hashlib.sha256(f"sumenium:ingest:{secret}".encode()).digest()).rstrip(b"=").decode() if secret else None
+
+
 def push_whitelist(sftp, j):
     """Envoie la whitelist à l'Espace (sumenium.com) : seuls ces pseudos peuvent être reliés à un compte Discord."""
-    secret = os.environ.get("DISCORD_CLIENT_SECRET")
-    if not secret:
+    token = ingest_token()
+    if not token:
         return
     try:
         wl = json.loads(read(sftp, j("whitelist.json")))
@@ -183,7 +207,6 @@ def push_whitelist(sftp, j):
         return
     if not players:
         return  # ne jamais vider la liste côté Espace sur une lecture ratée
-    token = base64.urlsafe_b64encode(hashlib.sha256(f"sumenium:ingest:{secret}".encode()).digest()).rstrip(b"=").decode()
     url = (os.environ.get("ESPACE_URL") or "https://sumenium.com").rstrip("/") + "/api/ingest/whitelist"
     req = urllib.request.Request(url, data=json.dumps({"players": players}).encode(), method="POST", headers={
         "content-type": "application/json", "authorization": f"Bearer {token}", "user-agent": "sumenium-update/1.0"})

@@ -51,8 +51,12 @@ jobs:
           SFTP_USER: ${{ secrets.SFTP_USER }}
           SFTP_PASSWORD: ${{ secrets.SFTP_PASSWORD }}
           SFTP_ROOT: ${{ secrets.SFTP_ROOT }}
+          SFTP_HOSTKEY: ${{ secrets.SFTP_HOSTKEY }}
           PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
-          DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
+          # Jeton d'envoi vers l'Espace. Tant que le secret INGEST_TOKEN n'existe pas, il est dérivé du secret Discord
+          # (qui n'est alors plus transmis dès qu'INGEST_TOKEN est créé).
+          INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
+          DISCORD_CLIENT_SECRET: ${{ secrets.INGEST_TOKEN == '' && secrets.DISCORD_CLIENT_SECRET || '' }}
         run: python scripts/update.py
       - name: Têtes des skins (API Mojang, une fois par jour et par joueur)
         run: python scripts/heads.py || echo "::warning::Têtes des skins non mises à jour"

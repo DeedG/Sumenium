@@ -24,6 +24,8 @@ jobs:
       GITHUB_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
       DISCORD_WEBHOOK_TIRAGE: ${{ secrets.DISCORD_WEBHOOK_TIRAGE }}
       BACKUP_TOKEN: ${{ secrets.BACKUP_TOKEN }}
+      SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+      INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -78,8 +80,10 @@ jobs:
         run: |
           umask 077
           jq -n --arg s "$DISCORD_CLIENT_SECRET" --arg g "$GITHUB_DISPATCH_TOKEN" --arg w "$DISCORD_WEBHOOK_TIRAGE" --arg b "$BACKUP_TOKEN" \
+                --arg ss "$SESSION_SECRET" --arg it "$INGEST_TOKEN" \
             '{DISCORD_CLIENT_SECRET:$s} + (if $g != "" then {GITHUB_DISPATCH_TOKEN:$g} else {} end)
-             + (if $w != "" then {DISCORD_WEBHOOK_TIRAGE:$w} else {} end) + (if $b != "" then {BACKUP_TOKEN:$b} else {} end)' > "$RUNNER_TEMP/secrets.json"
+             + (if $w != "" then {DISCORD_WEBHOOK_TIRAGE:$w} else {} end) + (if $b != "" then {BACKUP_TOKEN:$b} else {} end)
+             + (if $ss != "" then {SESSION_SECRET:$ss} else {} end) + (if $it != "" then {INGEST_TOKEN:$it} else {} end)' > "$RUNNER_TEMP/secrets.json"
           set +e
           npx wrangler deploy --secrets-file "$RUNNER_TEMP/secrets.json" 2>&1 | tee "$RUNNER_TEMP/deploy.log"
           status=${PIPESTATUS[0]}
@@ -91,5 +95,7 @@ jobs:
           fi
           [ -n "$DISCORD_WEBHOOK_TIRAGE" ] || echo "::notice::Secret DISCORD_WEBHOOK_TIRAGE absent : pas d'annonce du tirage des usines sur Discord."
           [ -n "$BACKUP_TOKEN" ] || echo "::notice::Secret BACKUP_TOKEN absent : la sauvegarde hebdomadaire du NAS sera refusée."
+          [ ${#SESSION_SECRET} -ge 32 ] || echo "::warning::Secret SESSION_SECRET absent (ou moins de 32 caractères) : les sessions sont signées avec une clé dérivée du secret Discord."
+          [ ${#INGEST_TOKEN} -ge 32 ] || echo "::warning::Secret INGEST_TOKEN absent (ou moins de 32 caractères) : le secret Discord est encore transmis à la mise à jour du site."
           [ -n "$GITHUB_DISPATCH_TOKEN" ] || echo "::warning::Secret GH_DISPATCH_TOKEN absent : la mise à jour du site dépend du cron de GitHub (souvent en retard)."
           echo "::notice::Espace déployé sur https://sumenium.com"

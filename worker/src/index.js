@@ -84,8 +84,10 @@ const unb64url = (s) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(
 async function sha256(text) {
   return new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
 }
+// Clé des sessions : secret dédié SESSION_SECRET (sinon dérivée du secret Discord, ancien fonctionnement)
 async function hmacKey(env, purpose) {
-  const raw = await sha256(`sumenium:${purpose}:${env.DISCORD_CLIENT_SECRET}`);
+  const base = env.SESSION_SECRET && env.SESSION_SECRET.length >= 32 ? env.SESSION_SECRET : env.DISCORD_CLIENT_SECRET;
+  const raw = await sha256(`sumenium:${purpose}:${base}`);
   return crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
 }
 async function sign(env, payload) {
@@ -96,15 +98,23 @@ async function sign(env, payload) {
 async function verify(env, token) {
   if (!token || !token.includes(".")) return null;
   const [body, sig] = token.split(".");
-  const expected = await crypto.subtle.sign("HMAC", await hmacKey(env, "session"), new TextEncoder().encode(body));
-  if (b64url(expected) !== sig) return null;
+  let raw;
+  try { raw = Uint8Array.from(atob(sig.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)); } catch { return null; }
+  // comparaison à temps constant (crypto.subtle.verify)
+  if (!(await crypto.subtle.verify("HMAC", await hmacKey(env, "session"), raw, new TextEncoder().encode(body)))) return null;
   try {
     const p = JSON.parse(unb64url(body));
     return p.exp > now() ? p : null;
   } catch { return null; }
 }
+// Jeton de la mise à jour du site (GitHub Actions → Worker) : secret dédié INGEST_TOKEN, sinon dérivé du secret Discord
 async function ingestToken(env) {
+  if (env.INGEST_TOKEN && env.INGEST_TOKEN.length >= 32) return env.INGEST_TOKEN;
   return b64url(await sha256(`sumenium:ingest:${env.DISCORD_CLIENT_SECRET}`));
+}
+async function needIngest(req, env) {
+  const got = (req.headers.get("authorization") || "").replace(/^Bearer /, "");
+  if (!got || !(await sameSecret(got, await ingestToken(env)))) fail(401, "Jeton invalide.");
 }
 
 function cookies(req) {
@@ -296,6 +306,8 @@ async function api(req, env, url, ctx) {
     const after = Number(url.searchParams.get("after")) || 0, lim = 500;
     const rows = (await env.DB.prepare(`SELECT rowid AS __rowid, * FROM "${t}" WHERE rowid > ? ORDER BY rowid LIMIT ${lim}`).bind(after).all()).results;
     const b64 = (u8) => { let x = ""; for (let i = 0; i < u8.length; i += 0x8000) x += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(x); };
+    // les jetons de renouvellement Discord ne quittent jamais la base (les joueurs se reconnectent après une restauration)
+    if (t === "users") for (const r of rows) r.refresh_token = null;
     for (const r of rows) for (const [k, v] of Object.entries(r)) {
       if (v instanceof ArrayBuffer) r[k] = { $b64: b64(new Uint8Array(v)) };
       else if (ArrayBuffer.isView(v)) r[k] = { $b64: b64(new Uint8Array(v.buffer, v.byteOffset, v.byteLength)) };
@@ -306,7 +318,7 @@ async function api(req, env, url, ctx) {
 
   /* ---- synchronisation depuis GitHub (whitelist) ---- */
   if (p === "/api/ingest/whitelist" && m === "POST") {
-    if (req.headers.get("authorization") !== `Bearer ${await ingestToken(env)}`) fail(401, "Jeton invalide.");
+    await needIngest(req, env);
     const list = Array.isArray(body.players) ? body.players : [];
     const stmts = [env.DB.prepare("DELETE FROM whitelist")];
     for (const w of list) {
@@ -318,7 +330,7 @@ async function api(req, env, url, ctx) {
 
   /* ---- journal des transactions (mod Sumenium Economy), envoyé par la mise à jour du site ---- */
   if (p === "/api/ingest/journal" && (m === "GET" || m === "POST")) {
-    if (req.headers.get("authorization") !== `Bearer ${await ingestToken(env)}`) fail(401, "Jeton invalide.");
+    await needIngest(req, env);
     if (m === "GET") {
       const r = await env.DB.prepare("SELECT MAX(t) AS t FROM tx").first();
       return json({ lastT: (r && r.t) || 0 });
@@ -432,6 +444,24 @@ async function api(req, env, url, ctx) {
     const s = await need(req, env, "sumenien");
     return json(await claim(env, s, str(body.mc_name, 16)));
   }
+  if (p === "/api/me/claim/verifier" && m === "POST") {
+    const s = await need(req, env, "sumenien");
+    return json(await claimCheck(env, s));
+  }
+  if (p === "/api/me/claim" && m === "DELETE") {
+    const s = await need(req, env, "sumenien");
+    await env.DB.prepare("DELETE FROM liens WHERE discord_id = ?").bind(s.id).run();
+    return json({ ok: true });
+  }
+  // Le staff confirme un lien à la place du code en jeu (joueur pas encore whitelisté, par exemple)
+  if ((mm = p.match(/^\/api\/admin\/liens\/(\d{5,25})$/)) && (m === "POST" || m === "DELETE")) {
+    const s = await need(req, env, "staff");
+    const l = await env.DB.prepare("SELECT * FROM liens WHERE discord_id = ?").bind(mm[1]).first();
+    if (!l) fail(404, "Demande de lien introuvable.");
+    await env.DB.prepare("DELETE FROM liens WHERE discord_id = ?").bind(l.discord_id).run();
+    if (m === "DELETE") { await audit(env, s, "liens", l.discord_id, "refus", { mc_name: l.mc_name }, null); return json({ ok: true }); }
+    return json(await linkPlayer(env, l.discord_id, l.mc_name, s));
+  }
   if (p === "/api/me/player" && m === "PUT") {
     const s = await need(req, env, "sumenien");
     const me = await env.DB.prepare("SELECT * FROM players WHERE discord_id = ? AND deleted = 0").bind(s.id).first();
@@ -440,7 +470,12 @@ async function api(req, env, url, ctx) {
     if ("faction_id" in body) {
       const fid = int(body.faction_id);
       if (fid !== me.faction_id) {
-        if (fid !== null) await checkFactionRoom(env, fid);
+        if (fid !== null) {
+          await checkFactionRoom(env, fid);
+          // Rejoindre une faction donne accès à ses coordonnées et à ses usines : il faut en être membre en jeu (mod),
+          // sinon c'est le staff qui place le joueur. Quitter sa faction reste libre.
+          if (s.level !== "staff") await checkModMember(env, fid, me.mc_name);
+        }
         f.faction_id = fid;
       }
     }
@@ -907,6 +942,23 @@ async function ecoData(env) {
     return r.ok ? await r.json() : null;
   } catch (e) { return null; }
 }
+// Faction du mod qui correspond à une faction du site : même nom, id ou tag (accents, espaces, majuscules ignorés), ou début du nom
+const normName = (x) => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+function modFaction(eco, siteName) {
+  const n = normName(siteName), keys = (x) => [x.tag, x.id].map(normName).filter(Boolean);
+  const list = (eco && eco.factions) || [];
+  return list.find((x) => keys(x).includes(n)) || list.find((x) => keys(x).some((k) => k.length >= 3 && (n.startsWith(k) || k.startsWith(n)))) || null;
+}
+async function checkModMember(env, fid, mcName) {
+  const f = await row(env, "factions", fid);
+  const eco = await ecoData(env);
+  if (!eco || !eco.factions) fail(503, "Impossible de vérifier ta faction en jeu pour le moment, réessaie dans quelques minutes.");
+  const mf = modFaction(eco, f && f.name);
+  const n = String(mcName || "").toLowerCase();
+  if (!mf || !(mf.membres || []).some((m) => String(m.nom).toLowerCase() === n)) {
+    fail(403, `Pour rejoindre ${f ? f.name : "cette faction"} sur le site, il faut d'abord en être membre en jeu (invitation du chef). Sinon, demande au staff.`);
+  }
+}
 async function isChef(env, s, fid) {
   const me = await env.DB.prepare("SELECT mc_name, faction_id FROM players WHERE discord_id = ? AND deleted = 0").bind(s.id).first();
   if (!me || me.faction_id !== fid) return false;
@@ -1057,7 +1109,7 @@ async function history(env, mcName, url) {
   const type = str(url.searchParams.get("type"), 40);
   const LIMIT = 100;
   const rows = (await env.DB.prepare(
-    `SELECT data FROM tx WHERE (actor = ? OR from_acc = ? OR to_acc = ?) AND t < ?${type ? " AND type = ?" : ""} ORDER BY t DESC LIMIT ?`
+    `SELECT data FROM tx WHERE (actor = ? OR from_acc = ? OR to_acc = ?) AND t < ? AND type != 'LIEN_SITE'${type ? " AND type = ?" : ""} ORDER BY t DESC LIMIT ?`
   ).bind(uuid, account, account, before, ...(type ? [type] : []), LIMIT + 1).all()).results;
   return { uuid, name: wl.mc_name, rows: rows.slice(0, LIMIT).map((r) => JSON.parse(r.data)), more: rows.length > LIMIT };
 }
@@ -1138,23 +1190,51 @@ async function shopHistory(env, s, id, url) {
   return { boutique: shop, rows: rows.slice(0, LIMIT).map((r) => JSON.parse(r.data)), more: rows.length > LIMIT };
 }
 
+/** Relier son compte Discord à un pseudo. Pseudo nouveau (ni whitelisté, ni fiche) : tout de suite, la fiche se remplit avant
+ *  la whitelist. Pseudo déjà whitelisté ou fiche existante : il faut le prouver en jeu (/site lier <code>) ou attendre le staff,
+ *  sinon n'importe qui pourrait prendre la fiche d'un autre (sa faction, ses coordonnées, son historique). */
 async function claim(env, s, name) {
   if (!MC_NAME.test(name)) fail(400, "Pseudo Minecraft invalide (3 à 16 lettres, chiffres ou _).");
   const already = await env.DB.prepare("SELECT * FROM players WHERE discord_id = ? AND deleted = 0").bind(s.id).first();
   if (already) fail(400, `Ton compte est déjà relié à ${already.mc_name}. Demande au staff pour changer.`);
-  // une ancienne fiche supprimée garde le lien Discord : on le libère
-  await env.DB.prepare("UPDATE players SET discord_id = NULL WHERE discord_id = ? AND deleted = 1").bind(s.id).run();
-  // Le pseudo n'a pas besoin d'être déjà whitelisté : la fiche se remplit AVANT la whitelist.
-  // S'il y est, on reprend l'orthographe exacte du serveur.
   const wl = await env.DB.prepare("SELECT mc_name FROM whitelist WHERE mc_name = ?").bind(name).first();
   const exact = wl ? wl.mc_name : name;
+  // une fiche existante, même supprimée, garde une faction et un historique : preuve demandée
   const existing = await env.DB.prepare("SELECT * FROM players WHERE mc_name = ?").bind(exact).first();
-  if (existing && existing.discord_id && existing.discord_id !== s.id) fail(409, "Ce pseudo est déjà relié à un autre compte Discord. Contacte le staff.");
+  if (existing && !existing.deleted && existing.discord_id && existing.discord_id !== s.id) fail(409, "Ce pseudo est déjà relié à un autre compte Discord. Contacte le staff.");
+  if (wl || existing) {
+    const code = [...crypto.getRandomValues(new Uint8Array(6))].map((b) => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b % 32]).join("");
+    await env.DB.prepare("INSERT OR REPLACE INTO liens (discord_id, mc_name, code, ts) VALUES (?,?,?,?)").bind(s.id, exact, code, now()).run();
+    return { pending: { mc_name: exact, code, ts: now() } };
+  }
+  return linkPlayer(env, s.id, exact, s);
+}
+/** Le joueur a-t-il tapé /site lier <code> en jeu ? (ligne LIEN_SITE du journal du mod, envoyée toutes les 5 minutes) */
+async function claimCheck(env, s) {
+  const l = await env.DB.prepare("SELECT * FROM liens WHERE discord_id = ?").bind(s.id).first();
+  if (!l) fail(404, "Aucun lien en attente.");
+  if (l.ts < now() - 86400) { await env.DB.prepare("DELETE FROM liens WHERE discord_id = ?").bind(s.id).run(); fail(400, "Code expiré (24 h) : recommence."); }
+  const wl = await env.DB.prepare("SELECT uuid FROM whitelist WHERE mc_name = ?").bind(l.mc_name).first();
+  const hit = await env.DB.prepare(`SELECT actor FROM tx WHERE type = 'LIEN_SITE' AND t >= ? AND json_extract(data, '$.note') = ?
+      AND lower(json_extract(data, '$.actorName')) = lower(?) LIMIT 1`).bind(l.ts * 1000 - 60000, l.code, l.mc_name).first();
+  if (!hit || (wl && wl.uuid && String(hit.actor || "").toLowerCase() !== wl.uuid.toLowerCase())) {
+    return { pending: { mc_name: l.mc_name, code: l.code, ts: l.ts }, found: false };
+  }
+  await env.DB.prepare("DELETE FROM liens WHERE discord_id = ?").bind(s.id).run();
+  return linkPlayer(env, s.id, l.mc_name, s);
+}
+/** Relie le compte Discord discordId à la fiche du pseudo (créée si besoin). actor : qui fait l'action (le joueur, ou le staff). */
+async function linkPlayer(env, discordId, exact, actor) {
+  // une ancienne fiche supprimée garde le lien Discord : on le libère
+  await env.DB.prepare("UPDATE players SET discord_id = NULL WHERE discord_id = ? AND deleted = 1").bind(discordId).run();
+  const existing = await env.DB.prepare("SELECT * FROM players WHERE mc_name = ?").bind(exact).first();
+  if (existing && existing.discord_id && existing.discord_id !== discordId) fail(409, "Ce pseudo est déjà relié à un autre compte Discord. Contacte le staff.");
+  if (await env.DB.prepare("SELECT 1 FROM players WHERE discord_id = ? AND deleted = 0").bind(discordId).first()) fail(400, "Ce compte Discord est déjà relié à une fiche.");
   if (existing) {
-    await update(env, s, "players", existing.id, { discord_id: s.id, deleted: 0, mc_name: exact }, "claim");
+    await update(env, actor, "players", existing.id, { discord_id: discordId, deleted: 0, mc_name: exact }, "claim");
     return { player: await row(env, "players", existing.id) };
   }
-  const id = await insert(env, s, "players", { mc_name: exact, discord_id: s.id });
+  const id = await insert(env, actor, "players", { mc_name: exact, discord_id: discordId });
   return { player: await row(env, "players", id) };
 }
 
@@ -1287,6 +1367,7 @@ async function revert(env, s, auditId) {
     else await env.DB.prepare("DELETE FROM usine_fini WHERE faction_id = ? AND tour = ?").bind(fid, tour).run();
     await audit(env, s, "usine_fini", a.entity_id, "revert", JSON.parse(a.after || "null"), before);
   } else if (a.entity === "settings") {
+    if (!before || typeof before.value !== "string") fail(400, "Ce réglage ne s'annule pas depuis l'historique : modifie-le directement.");
     await env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").bind(a.entity_id, before.value).run();
     await audit(env, s, "settings", a.entity_id, "revert", JSON.parse(a.after || "null"), before);
   } else if (TABLES[a.entity]) {
@@ -1416,6 +1497,8 @@ async function allData(env, s) {
     realises: staff ? realisesR.results : realisesR.results.map(({ note, ...r }) => r), settings, bases: basesR.results, candidats: candidatsR.results,
     myVotes: Object.fromEntries(votesR.results.map((v) => [v.tour, v.candidat_id])),
     results: staff || settings.election === "resultats" ? resultsR.results : null,
+    lien: pub ? null : await env.DB.prepare("SELECT mc_name, code, ts FROM liens WHERE discord_id = ?").bind(s.id).first(),
+    liens: staff ? (await env.DB.prepare("SELECT l.discord_id, l.mc_name, l.ts, u.discord_name FROM liens l LEFT JOIN users u ON u.discord_id = l.discord_id WHERE NOT EXISTS (SELECT 1 FROM players p WHERE p.mc_name = l.mc_name AND p.discord_id IS NOT NULL AND p.deleted = 0) ORDER BY l.ts").all()).results : null,
     meId: me ? me.id : null, wlSynced: !pub && wlCountR.results[0].n > 0, wlFree: staff ? wlFreeR.results.map((r) => r.mc_name) : null,
   };
 }

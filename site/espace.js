@@ -208,6 +208,8 @@ function notifs() {
   if (isStaff()) {
     const fd = (D.factionDemandes || []).filter((d) => d.statut === "attente").length, pd = (D.projetDemandes || []).filter((d) => d.statut === "attente").length;
     if (fd) add("st-fd:" + fd, "🛡️", `${plural(fd, "demande", "demandes")} de nouvelle faction à traiter.`, "#espace/staff", "staff");
+    const ln = (D.liens || []).length;
+    if (ln) add("st-ln:" + ln, "🛡️", `${plural(ln, "lien de compte", "liens de compte")} à vérifier.`, "#espace/staff", "staff");
     if (pd) add("st-pd:" + pd, "🛡️", `${plural(pd, "projet", "projets")} à valider.`, "#espace/staff", "staff");
     const wl = D.wlSynced ? D.players.filter((x) => !x.whitelisted && ficheOk(x)).length : 0;
     if (wl) add("st-wl:" + wl, "🛡️", `${plural(wl, "joueur", "joueurs")} à whitelister.`, "#espace/staff", "staff");
@@ -298,12 +300,26 @@ function fiche() {
   const p = me();
   if (!p) {
     if (!canWrite()) return view(head("Ma fiche", "") + '<div class="card"><p>Ta fiche sera disponible quand ton compte sera vérifié par le staff.</p></div>');
+    // Pseudo déjà whitelisté ou fiche existante : preuve en jeu (/site lier <code>) ou validation du staff
+    const L = D.lien;
+    if (L) {
+      view(head("Ma fiche", "Dernière étape : prouve que ce compte Minecraft est bien le tien.") + `<div class="card narrow"><h3>Relier ${esc(L.mc_name)}</h3>
+        <p>Ce pseudo a déjà une fiche ou est déjà sur la whitelist. Pour être sûr que c'est bien toi, connecte-toi au serveur avec <b>${esc(L.mc_name)}</b> et tape :</p>
+        <p class="lien-code">${copyBtn("/site lier " + L.code)}</p>
+        <p class="small">Le site le voit dans les 5 minutes (mise à jour du journal). Puis clique sur « Vérifier ». Le code reste valable 24 h.</p>
+        <p class="muted small">Pas encore whitelisté, ou pas ton pseudo ? Le staff peut aussi valider le lien à ta place depuis ses outils.</p>
+        <div class="actions"><button class="btn" id="lienCheck">Vérifier</button><button class="btn ghost small" id="lienCancel">Changer de pseudo</button></div></div>`);
+      bindCopy();
+      $("lienCheck").onclick = () => act(async () => { const r = await call("POST", "/api/me/claim/verifier"); if (r.found === false) throw new Error("Pas encore vu en jeu. Tape la commande avec le bon pseudo, attends quelques minutes et réessaie."); }, "Pseudo relié !");
+      $("lienCancel").onclick = () => act(() => call("DELETE", "/api/me/claim"));
+      return;
+    }
     view(head("Ma fiche", "Première étape : dis-nous quel est ton compte Minecraft.") + `<div class="card narrow"><h3>Relie ton pseudo Minecraft</h3>
       <p>Écris ton pseudo Minecraft <b>Java</b> exact. Pas besoin d'être déjà whitelisté : remplis ta fiche, et le staff t'ajoute à la whitelist une fois ta candidature validée.</p>
       <form id="claimForm" class="inline"><input name="mc_name" required maxlength="16" pattern="[A-Za-z0-9_]{3,16}" placeholder="Pseudo Minecraft" autocomplete="off" aria-label="Pseudo Minecraft">
       <button class="btn">Relier</button></form>
       <p class="muted small">Un pseudo ne peut être relié qu'à un seul compte Discord. En cas d'erreur, demande au staff.</p></div>`);
-    $("claimForm").onsubmit = (e) => { e.preventDefault(); act(() => call("POST", "/api/me/claim", formData(e.target)), "Pseudo relié !"); };
+    $("claimForm").onsubmit = (e) => { e.preventDefault(); act(async () => { const r = await call("POST", "/api/me/claim", formData(e.target)); if (r.pending) toast("Une vérification en jeu est demandée."); }); };
     return;
   }
   const sc = scaleOf(p.taille_cm);
@@ -1356,6 +1372,19 @@ function staff() {
     <section class="card" id="st-dem"><h3>Demandes des joueurs</h3>
       <h4>Nouvelles factions</h4>${fDem.length ? `<ul class="dem-list">${fDem.map(facDemItem).join("")}</ul>` : '<p class="muted small">Aucune demande.</p>'}
       <h4>Projets communautaires</h4>${pDem.length ? `<ul class="dem-list">${pDem.map(projDemItem).join("")}</ul>` : '<p class="muted small">Aucune demande.</p>'}
+      <h4>Liens Discord ↔ pseudo à vérifier</h4>
+      ${(D.liens || []).length ? `<p class="muted small">Ces joueurs veulent relier un pseudo déjà whitelisté ou une fiche existante. Normalement ils le prouvent en jeu (<code>/site lier &lt;code&gt;</code>) ; valide à leur place seulement si tu es sûr que c'est bien leur compte (vocal, Discord).</p>
+        <ul class="dem-list">${D.liens.map((l) => `<li class="dem"><div><b>${esc(l.mc_name)}</b> <span class="muted small">demandé par @${esc(l.discord_name || l.discord_id)} · ${new Date(l.ts * 1000).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</span></div>
+          <div class="actions"><button class="btn small" data-lien-ok="${esc(l.discord_id)}">Valider</button><button class="btn small ghost" data-lien-no="${esc(l.discord_id)}">Refuser</button></div></li>`).join("")}</ul>`
+        : '<p class="muted small">Aucun.</p>'}
+      ${(() => { if (!ECO || !ECO.factions) return "";
+        // Faction sur le site ≠ faction en jeu : la faction du site donne accès aux coordonnées et aux usines
+        const modOf = (n) => ECO.factions.find((x) => (x.membres || []).some((m) => norm(m.nom) === norm(n))) || null;
+        const bad = D.players.map((p) => { const sf = p.faction_id ? fac(p.faction_id) : null, ef = sf ? ecoFac(sf) : null, mf = modOf(p.mc_name);
+          return (ef ? ef.id : null) === (mf ? mf.id : null) || (sf && !ef) ? null : { p, sf, mf }; }).filter(Boolean);
+        return `<h4>Faction sur le site différente du jeu</h4>${bad.length ? `<p class="muted small">La faction du site donne accès aux coordonnées et aux usines de la faction. Corrige dans Communauté › Joueurs › Modifier (staff).</p>
+          <ul class="small">${bad.map((x) => `<li>${plink(x.p.mc_name)} : site <b>${x.sf ? esc(x.sf.name) : "solo"}</b>, jeu <b>${x.mf ? esc((ecoToFac(x.mf.id) || {}).name || x.mf.tag || x.mf.id) : "solo"}</b></li>`).join("")}</ul>`
+          : '<p class="muted small">Toutes les fiches correspondent au jeu.</p>'}`; })()}
       ${absentes.length ? `<h4>Factions du site absentes du serveur</h4>
         <p class="muted small">Pas encore créées dans le mod (aucune faction en jeu ne correspond). Lance ces commandes en jeu, dans l'ordre : le premier joueur ajouté devient chef.</p>
         ${absentes.map((f) => { const d = (D.factionDemandes || []).find((x) => x.faction_id === f.id), names = d ? d.membres : members(f.id).map((p) => p.mc_name);
@@ -1403,6 +1432,9 @@ function staff() {
     <section class="card" id="st-histo"><h3>Historique</h3><p class="muted small">Chaque modification est enregistrée. « Annuler » remet les valeurs d'avant.</p>
       <div id="auditList" class="audit-scroll"><p class="empty">Chargement…</p></div><button class="btn small ghost" id="auditMore" hidden>Plus ancien</button></section>`);
   document.querySelectorAll("[data-jump]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); $(a.dataset.jump).scrollIntoView({ behavior: "smooth", block: "start" }); }));
+  document.querySelectorAll("[data-lien-ok]").forEach((b) => (b.onclick = () => confirm("Relier ce compte Discord à ce pseudo ? Il aura accès à la fiche, à sa faction et à son historique.")
+    && act(() => call("POST", `/api/admin/liens/${b.dataset.lienOk}`), "Lien validé")));
+  document.querySelectorAll("[data-lien-no]").forEach((b) => (b.onclick = () => act(() => call("DELETE", `/api/admin/liens/${b.dataset.lienNo}`), "Demande refusée")));
   $("saveSettings").onclick = () => act(() => call("PUT", "/api/admin/settings",
     { election: $("setElection").value, usines_ouvertes: $("setUsOpen").value, usine_tour: $("setUsTour").value, factions_ouvertes: $("setFacOpen").value, maire_id: $("setMaire").value, mairie_ouverte: $("setMairie").value }), "Réglages enregistrés");
   bindFacDem(); bindProjDem();

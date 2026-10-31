@@ -1,3 +1,4 @@
-paramiko>=3.4
+# versions figées : une nouvelle version d'un paquet ne s'installe pas sans relecture (le workflow a accès aux secrets SFTP)
+paramiko==5.1.0
 nbtlib==2.0.4
-pillow>=10.4
+pillow==13.0.0
