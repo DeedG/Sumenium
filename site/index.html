@@ -9,7 +9,28 @@ if(location.hostname==="deedg.github.io")location.replace("https://sumenium.com/
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Suménium · Saison 7</title>
 <meta name="description" content="Suménium, serveur Minecraft Java 26.3 semi-RP en UHC : factions PvE, zone commerciale au spawn, métiers, events chaque semaine, bordure qui grandit avec les succès. Carte, classements et comment nous rejoindre.">
-<link rel="icon" type="image/png" href="favicon.png">
+<link rel="icon" type="image/png" href="favicon.png" id="favicon">
+<script>
+/* Saison du site (icône, fond de l'en-tête, couleurs) selon la date à Paris : Halloween et Noël 2 semaines avant à 1 semaine après,
+   Pâques de J-14 au lundi de Pâques + 6 j, été du 21 juin au 21 septembre, le reste du temps le thème de base.
+   Aperçu : ajouter ?saison=halloween|noel|paques|ete|base à l'adresse. */
+(function(){
+  var d=new Date(new Date().toLocaleString("en-US",{timeZone:"Europe/Paris"}));d.setHours(12,0,0,0);
+  var y=d.getFullYear(),D=864e5,t=d.getTime(),at=function(yy,m,j){return new Date(yy,m-1,j,12).getTime()};
+  function paques(yy){var a=yy%19,b=Math.floor(yy/100),c=yy%100,e=Math.floor(b/4),f=b%4,g=Math.floor((b+8)/25),h=Math.floor((b-g+1)/3),
+    i=(19*a+b-e-h+15)%30,k=Math.floor(c/4),l=c%4,L=(32+2*f+2*k-i-l)%7,m=Math.floor((a+11*i+22*L)/451),mo=Math.floor((i+L-7*m+114)/31),da=((i+L-7*m+114)%31)+1;return at(yy,mo,da)}
+  var near=function(c){return t>=c-14*D&&t<=c+7*D};
+  var s="base";
+  if(near(at(y,10,31)))s="halloween";
+  else if(near(at(y,12,25))||near(at(y-1,12,25)))s="noel";
+  else if(near(paques(y)))s="paques";
+  else if(t>=at(y,6,21)&&t<=at(y,9,21))s="ete";
+  try{var q=new URLSearchParams(location.search).get("saison");if(/^(base|halloween|noel|paques|ete)$/.test(q||""))s=q}catch(e){}
+  document.documentElement.dataset.saison=s;
+  window.SAISON=s;
+  var fav=document.getElementById("favicon");if(fav)fav.href="themes/"+s+"-favicon.png";
+})();
+</script>
 <link rel="canonical" href="https://sumenium.com/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,8 +58,25 @@ if(location.hostname==="deedg.github.io")location.replace("https://sumenium.com/
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);margin:0}
 
-/* En-tête : ciel, logo, compteur de bordure */
-.hero{background:linear-gradient(180deg,var(--sky1),var(--sky2));position:relative}
+/* En-tête : l'illustration de la saison en fond, voilée par le ciel à gauche pour la lisibilité */
+.hero{position:relative;background:
+  linear-gradient(90deg,color-mix(in srgb,var(--sky1) 94%,transparent) 0%,color-mix(in srgb,var(--sky1) 84%,transparent) 45%,color-mix(in srgb,var(--sky2) 55%,transparent) 100%),
+  var(--hero-img,none) center 38%/cover no-repeat,linear-gradient(180deg,var(--sky1),var(--sky2));image-rendering:auto}
+:root{--hero-img:url(themes/base-fond.webp);--band1:var(--grass);--band2:var(--grass-dark);--band-dirt:var(--dirt)}
+/* Saisons : ciel de l'en-tête, bande du bas (herbe, citrouilles, neige, sable) et couleur d'accent */
+:root[data-saison=halloween]{--hero-img:url(themes/halloween-fond.webp);--sky1:#efe3fb;--sky2:#fbeedd;--band1:#e2731e;--band2:#7a3fb0;--band-dirt:#3a2348;
+  --sun:#ef7d1a;--sun-soft:#ffe8d2;--sun-ink:#8a3f00}
+:root[data-saison=noel]{--hero-img:url(themes/noel-fond.webp);--sky1:#e2eef9;--sky2:#f6fafd;--band1:#ffffff;--band2:#b9cddc;--band-dirt:#6b4a2e;
+  --sun:#e0b021;--sun-soft:#fdf1cf}
+:root[data-saison=paques]{--hero-img:url(themes/paques-fond.webp);--sky1:#f0e6fa;--sky2:#fdf0f6;--band1:#7cc96a;--band2:#f29ac2;--band-dirt:#9a6a45;
+  --sun:#f08bb9;--sun-soft:#fde3ef;--sun-ink:#8a2456}
+:root[data-saison=ete]{--hero-img:url(themes/ete-fond.webp);--sky1:#cfeefc;--sky2:#fdf2d0;--band1:#f2d68d;--band2:#e3bd62;--band-dirt:#c98f4f}
+@media (prefers-color-scheme:dark){
+  :root[data-saison=halloween]{--sky1:#1c1033;--sky2:#2a1638;--band-dirt:#2a1838;--sun:#f28c28;--sun-soft:#3d2410;--sun-ink:#f8a75a}
+  :root[data-saison=noel]{--sky1:#0d2340;--sky2:#14304d;--band2:#b9cddc;--band-dirt:#4a3220;--sun:#f0c845;--sun-soft:#3a3010}
+  :root[data-saison=paques]{--sky1:#251b3a;--sky2:#1d2a26;--band-dirt:#5b3b22;--sun:#f49ac4;--sun-soft:#3a1f2c;--sun-ink:#f8b5d4}
+  :root[data-saison=ete]{--sky1:#0c2a44;--sky2:#2b2416;--band-dirt:#7a5530}
+}
 .hero-in{max-width:1080px;margin:0 auto;padding-inline:16px;padding-block:28px 40px;display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between}
 .brand{display:flex;align-items:center;gap:16px;min-width:0}
 .brand img{width:84px;height:84px;border-radius:20px;box-shadow:0 6px 18px rgba(20,60,30,.25);flex:none}
@@ -155,9 +193,9 @@ a.border-card:hover{transform:translateY(-2px)}
 .border-card span{font-size:.85rem;color:var(--muted)}
 /* Bande d'herbe pixelisée façon bloc d'herbe */
 .grass{height:18px;background:
-  linear-gradient(90deg,var(--grass) 0 8px,var(--grass-dark) 8px 16px,var(--grass) 16px 24px,var(--grass) 24px 32px,var(--grass-dark) 32px 40px) 0 0/40px 10px repeat-x,
-  linear-gradient(90deg,var(--grass) 0 8px,transparent 8px 16px,var(--grass) 16px 32px,transparent 32px 40px) 0 10px/40px 8px repeat-x,
-  var(--dirt)}
+  linear-gradient(90deg,var(--band1) 0 8px,var(--band2) 8px 16px,var(--band1) 16px 24px,var(--band1) 24px 32px,var(--band2) 32px 40px) 0 0/40px 10px repeat-x,
+  linear-gradient(90deg,var(--band1) 0 8px,transparent 8px 16px,var(--band1) 16px 32px,transparent 32px 40px) 0 10px/40px 8px repeat-x,
+  var(--band-dirt)}
 
 .wrap{max-width:1080px;margin:0 auto;padding-inline:16px;padding-block:24px 56px}
 .updated{display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:var(--muted);font-weight:600;font-size:.92rem;margin-bottom:14px}
@@ -685,7 +723,8 @@ dialog.hist-dlg::backdrop{background:rgba(0,0,0,.45)}.hist-head{display:flex;jus
 <header class="hero">
   <div class="hero-in">
     <div class="brand">
-      <a href="#accueil" class="brand-home" aria-label="Accueil Suménium"><img src="logo.png" alt="" width="84" height="84"></a>
+      <a href="#accueil" class="brand-home" aria-label="Accueil Suménium"><img src="themes/base-logo.webp" alt="" width="84" height="84" id="siteLogo"></a>
+      <script>document.getElementById("siteLogo").src="themes/"+(window.SAISON||"base")+"-logo.webp"</script>
       <div>
         <h1><a href="#accueil" class="brand-home">Suménium</a> <span class="season">SAISON 7</span></h1>
         <p>Carte, succès, factions, marché et classements</p>

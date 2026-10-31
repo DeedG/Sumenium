@@ -53,6 +53,10 @@ Le même passage écrit `site/stats.json` (script `scripts/stats.py`) :
 - **Statistiques** : toutes les statistiques Minecraft (`<monde>/players/stats/`) avec un classement par statistique, plus les causes de mort du mod Player Stats (`stats/player_data/`) ;
 - **Économie** : baltop, magasins et échanges de Savs Common Economy (`config/savs-common-economy/` et `logs/economy.log`).
 
+## Saisons du site
+
+L'icône, le fond de l'en-tête, la bande du bas et la couleur d'accent changent selon la date (heure de Paris) : Halloween du 17 octobre au 7 novembre, Noël du 11 décembre au 1er janvier, Pâques de 14 jours avant à 7 jours après le dimanche de Pâques, été du 21 juin au 21 septembre, le thème de base le reste du temps. Images dans `site/themes/` (`<saison>-logo.webp`, `-favicon.png`, `-fond.webp`). Aperçu d'une saison : `https://sumenium.com/?saison=noel`.
+
 ## Carte du monde
 
 La carte 3D est hébergée sur le homelab et intégrée au site : voir [homelab/README.md](homelab/README.md). Son adresse est réglée dans `site/index.html` (`MAP_URL`).
