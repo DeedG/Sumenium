@@ -511,6 +511,7 @@ const JOUEURS = [
     ["/compte perso", "Acheter et créer des boutiques avec son compte perso", "Tous"],
     ["/compte faction", "Acheter et créer des boutiques avec la banque de faction", "Chef, trésoriers"],
     ["/historique [page]", "Achats, ventes, frais et dépôts des 30 derniers jours, avec le montant sur son compte et sur la banque de sa faction", "Tous"],
+    ["/historique boutique [boutique] [page]", "Sans argument : la liste de tes boutiques et de celles de ta faction (clic pour ouvrir). Avec : toutes les ventes et changements de prix de cette boutique. Aussi sur le site (Ma fiche, fiche de faction, Marché)", "Tous"],
     ["/baltop [page]", "Classement des joueurs les plus riches, 10 par page", "Tous"],
     ["/baltop factions [page]", "Classement des banques de faction", "Tous"],
     ["/boutique (ou /boutique aide)", "Rappel des commandes de boutique, cliquables", "Tous"],

@@ -60,5 +60,12 @@ export const COMMANDES_STAFF = {
       ["/tetes pnj · /tetes pnj retirer", "Place le marchand de têtes à ta position, ou retire le plus proche (6 blocs)"],
       ["/tetes · /tetes ouvrir · /tetes maj", "État du catalogue, ouvrir le menu sans PNJ (test), recharger le catalogue tout de suite (sinon une fois par jour)"],
     ], note: "Les PNJ, la boîte aux lettres et le lutrin ne se cassent qu'avec /sumeco bypass. Pour le site : sumenium-data/export/hdv.json (annonces) et bluemap-markers.json (boutiques, FISC et hôtel des ventes au format BlueMap)." },
+    { titre: "Mairie : tâches municipales", intro: "Le maire (choisi dans Outils staff › Réglages) écrit les tâches sur le site, Communauté › Mairie. Le serveur relit le livre toutes les 5 minutes.", lignes: [
+      ["/mairie lutrin ajouter", "Le lutrin visé affiche le livre des tâches municipales (lisible, mais impossible à prendre)"],
+      ["/mairie lutrin retirer", "Le lutrin visé n'affiche plus les tâches (retire le livre à la main)"],
+      ["/mairie lutrins", "Liste des lutrins et résultat de la dernière lecture du site"],
+      ["/mairie maj", "Relit le livre sur le site tout de suite (sinon toutes les 5 minutes)"],
+      ["/mairie livre", "Te donne une copie du livre pour vérifier la mise en page"],
+    ], note: "Le lutrin ne se casse qu'avec /sumeco bypass. Adresse lue par le serveur : mairieUrl dans la config (https://sumenium.com/api/mairie/livre)." },
   ],
 };
