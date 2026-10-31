@@ -282,8 +282,9 @@ function render() {
         `<a href="#espace/${k}" aria-current="${k === sub ? "page" : "false"}">${l}${badge[k] ? ` <span class="badge">${badge[k]}</span>` : ""}</a>`).join("")}</nav>
       <div id="espView"></div>`;
   } else if (area === "communaute") {
+    if (sub === "mairie" && !seeMairie()) sub = "joueurs";
     const cur = sub === "joueur" ? "joueurs" : sub === "faction" ? "factions" : sub;
-    root.innerHTML = `<nav class="subtabs" aria-label="Communauté">${A.subs.map(([k, l]) =>
+    root.innerHTML = `<nav class="subtabs" aria-label="Communauté">${A.subs.filter(([k]) => k !== "mairie" || seeMairie()).map(([k, l]) =>
         `<a href="#communaute/${k}" aria-current="${k === cur ? "page" : "false"}">${l}</a>`).join("")}</nav>
       <div id="espView"></div>`;
   } else root.innerHTML = '<div id="espView"></div>';
@@ -505,6 +506,9 @@ function bookViewer(el, pages) {
   el.querySelectorAll("[data-goto]").forEach((b) => (b.onclick = () => { mPage = +b.dataset.goto - 1; bookViewer(el, pages); }));
 }
 const maireOf = () => { const id = Number(D.settings && D.settings.maire_id) || 0; return id ? D.players.find((p) => p.id === id) || null : null; };
+const mairieOpen = () => D && D.settings && D.settings.mairie_ouverte === "1";
+const isMaire = () => { const m = maireOf(); return !!(m && me() && me().id === m.id); };
+const seeMairie = () => mairieOpen() || isStaff() || isMaire();
 const canEditMairie = () => isStaff() || (canWrite() && maireOf() && me() && me().id === maireOf().id);
 const todayFr = () => new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
 function mairie() {
@@ -512,7 +516,8 @@ function mairie() {
   if (!mDraft || !edit) mDraft = JSON.parse(JSON.stringify(M.taches || []));
   const pub = M.taches || [];
   const when = M.maj ? new Date(M.maj).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) : todayFr();
-  view(head("Mairie", "Les tâches municipales : le maire propose des travaux pour le serveur. Une fois la tâche faite, la municipalité inspecte et verse la prime.") + `
+  view(head("Mairie", "Les tâches municipales : le maire propose des travaux pour le serveur. Une fois la tâche faite, la municipalité inspecte et verse la prime.") +
+    (mairieOpen() ? "" : '<div class="banner info">Masquée aux joueurs : seuls le staff et le maire voient cette page, et les lutrins restent vides. À ouvrir dans Outils staff › Réglages.</div>') + `
     <div class="mairie-grid">
       <div>
         <p class="small">${maire ? `Maire : ${plink(maire.mc_name)}` : '<span class="muted">Pas encore de maire désigné.</span>'}${M.maj ? ` <span class="muted">· mis à jour le ${esc(new Date(M.maj).toLocaleDateString("fr-FR", { day: "numeric", month: "long" }))}${M.par ? " par " + esc(M.par) : ""}</span>` : ""}</p>
@@ -1389,6 +1394,7 @@ function staff() {
       <label>Choix d'usines<select id="setUsOpen"><option value="1"${s.usines_ouvertes === "1" ? " selected" : ""}>Ouverts</option><option value="0"${s.usines_ouvertes !== "1" ? " selected" : ""}>Fermés</option></select></label>
       <label>Création de factions par les joueurs<select id="setFacOpen"><option value="0"${s.factions_ouvertes !== "1" ? " selected" : ""}>Fermée</option><option value="1"${s.factions_ouvertes === "1" ? " selected" : ""}>Ouverte</option></select></label>
       <label>Tour de choix d'usines<select id="setUsTour">${Object.entries(D.usineTours || {}).map(([k, r]) => `<option value="${k}"${String(s.usine_tour || "1") === k ? " selected" : ""}>${esc(r.nom)} : ${esc(r.combos.map(comboTxt).join(" / "))}</option>`).join("")}</select></label>
+      <label>Tâches municipales<select id="setMairie"><option value="0"${s.mairie_ouverte !== "1" ? " selected" : ""}>Masquées aux joueurs</option><option value="1"${s.mairie_ouverte === "1" ? " selected" : ""}>Visibles (Communauté › Mairie et lutrins)</option></select></label>
       <label>Maire (écrit les tâches municipales)<select id="setMaire"><option value="">— pas de maire —</option>${D.players.map((p) => `<option value="${p.id}"${String(s.maire_id || "") === String(p.id) ? " selected" : ""}>${esc(p.mc_name)}</option>`).join("")}</select></label>
       <div class="wide actions"><button class="btn small" id="saveSettings">Enregistrer les réglages</button></div></section>
     <section class="card" id="st-import"><h3>Importer le Google Sheet</h3>
@@ -1398,7 +1404,7 @@ function staff() {
       <div id="auditList" class="audit-scroll"><p class="empty">Chargement…</p></div><button class="btn small ghost" id="auditMore" hidden>Plus ancien</button></section>`);
   document.querySelectorAll("[data-jump]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); $(a.dataset.jump).scrollIntoView({ behavior: "smooth", block: "start" }); }));
   $("saveSettings").onclick = () => act(() => call("PUT", "/api/admin/settings",
-    { election: $("setElection").value, usines_ouvertes: $("setUsOpen").value, usine_tour: $("setUsTour").value, factions_ouvertes: $("setFacOpen").value, maire_id: $("setMaire").value }), "Réglages enregistrés");
+    { election: $("setElection").value, usines_ouvertes: $("setUsOpen").value, usine_tour: $("setUsTour").value, factions_ouvertes: $("setFacOpen").value, maire_id: $("setMaire").value, mairie_ouverte: $("setMairie").value }), "Réglages enregistrés");
   bindFacDem(); bindProjDem();
   document.querySelectorAll("[data-ren-go]").forEach((b) => (b.onclick = () => {
     const sel = document.querySelector(`select[data-ren="${b.dataset.renGo}"]`), p = D.players.find((x) => x.id === +b.dataset.renGo);

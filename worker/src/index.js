@@ -341,6 +341,7 @@ async function api(req, env, url, ctx) {
   if (p === "/api/mairie/livre" && m === "GET") {
     const v = await setting(env, "mairie");
     const o = v ? JSON.parse(v) : null;
+    if ((await setting(env, "mairie_ouverte")) !== "1") return json({ titre: "Tâches municipales", auteur: "Mairie", maj: -1, pages: [] }, 200, { "cache-control": "no-store" });
     return json(o && o.livre ? { titre: "Tâches municipales", auteur: o.auteur || "Mairie", maj: o.maj || 0, pages: o.livre }
       : { titre: "Tâches municipales", auteur: "Mairie", maj: 0, pages: [] }, 200, { "cache-control": "no-store" });
   }
@@ -390,7 +391,10 @@ async function api(req, env, url, ctx) {
     const usines = {};
     for (const [k, v] of Object.entries(body.usines && typeof body.usines === "object" ? body.usines : {})) {
       if (!Array.isArray(v)) continue;
-      usines[str(k, 80)] = v.map((x) => str(x, 60).toLowerCase().replace(/[^a-z0-9_:*]/g, "")).filter(Boolean).slice(0, 80);
+      usines[str(k, 80)] = v.map((x) => { const t = str(x, 60).toLowerCase();
+        // « service:mot » : mot du nom d'un service (accents retirés) ; sinon un id d'item (lettres, chiffres, _ et *)
+        return t.startsWith("service:") ? "service:" + t.slice(8).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, "").trim()
+          : t.replace(/[^a-z0-9_:*]/g, ""); }).filter((t) => t && t !== "service:").slice(0, 80);
     }
     const num = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
     const cfg = { usines, seuilPct: num(body.seuilPct, 0, 100, 10), seuilVentes: num(body.seuilVentes, 0, 1000, 5) };
@@ -816,7 +820,7 @@ async function api(req, env, url, ctx) {
   if (p === "/api/admin/settings" && m === "PUT") {
     const s = await need(req, env, "staff");
     const allowed = { election: ["fermee", "candidatures", "tour1", "tour2", "resultats"], usines_ouvertes: ["0", "1"], usine_tour: Object.keys(USINE_TOURS),
-      factions_ouvertes: ["0", "1"], usines_max: null, maire_id: null };
+      factions_ouvertes: ["0", "1"], usines_max: null, maire_id: null, mairie_ouverte: ["0", "1"] };
     const changed = {};
     for (const [k, v] of Object.entries(body)) {
       if (!(k in allowed)) continue;
@@ -1400,7 +1404,9 @@ async function allData(env, s) {
   let mairie = null;
   try { const o = JSON.parse(settings.mairie || "null"); if (o) mairie = { taches: o.taches || [], maj: o.maj || 0, par: o.par || "" }; } catch (e) {}
   delete settings.mairie;
-  if (!staff) settings = { election: settings.election, usines_ouvertes: settings.usines_ouvertes, usine_tour: settings.usine_tour, factions_ouvertes: settings.factions_ouvertes, maire_id: settings.maire_id };
+  // Mairie fermée (pas encore construite) : seuls le staff et le maire la voient
+  if (settings.mairie_ouverte !== "1" && !staff && !(me && String(me.id) === String(settings.maire_id))) mairie = null;
+  if (!staff) settings = { election: settings.election, usines_ouvertes: settings.usines_ouvertes, usine_tour: settings.usine_tour, factions_ouvertes: settings.factions_ouvertes, maire_id: settings.maire_id, mairie_ouverte: settings.mairie_ouverte };
   return {
     user: pub ? null : { id: s.id, name: s.name, avatar: s.avatar, level: s.level },
     mairie, players, factions: factionsR.results, usines: usinesR.results, choix: choixR.results, projets: projetsR.results,

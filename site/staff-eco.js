@@ -41,7 +41,7 @@ const DEFAUT_USINES = {
   "Usine à drowned": ["trident", "copper_ingot", "copper_block", "nautilus_shell"],
   "Usine à abeille": ["honey_bottle", "honeycomb", "honey_block", "honeycomb_block"],
   "Usine à mousse": ["moss_block", "moss_carpet"],
-  "Usine à Allay/Tatou pour xp": ["experience_bottle", "armadillo_scute"],
+  "Usine à Allay/Tatou pour xp": ["experience_bottle", "armadillo_scute", "service:xp", "service:niveau", "service:repar", "service:enchant"],
   "Usine à grenouille": ["*_froglight"],
   "Usine avec spawner": ["bone", "arrow", "string", "spider_eye", "rotten_flesh"],
   "Usine à ghast": ["ghast_tear", "gunpowder"],
@@ -67,7 +67,8 @@ async function call(method, path, body) {
 }
 const toast = (msg, bad) => (window.Espace && window.Espace.toast ? window.Espace.toast(msg, bad) : bad && alert(msg));
 let RAW = null, rawAt = 0, loadErr = null, loadingP = null;
-const st = { page: "vue", per: 14, du: "", au: "", fac: "", q: "" };
+const st = { page: "vue", per: 14, du: "", au: "", fac: "", q: "", sort: {} };
+let lastEl = null, lastCtx = null;
 const CSV = [];          // tableaux exportables de la page affichée
 
 /* ---------- jours (heure de Paris) ---------- */
@@ -183,16 +184,27 @@ function daysOf(P, o) { const out = []; for (let d = P.a; d <= P.b; d = addDays(
 /* ---------- usines ---------- */
 const cfg = () => { const c = (RAW && RAW.config) || {}; return { usines: { ...DEFAUT_USINES, ...(c.usines || {}) }, seuilPct: c.seuilPct ?? 10, seuilVentes: c.seuilVentes ?? 5 }; };
 const reCache = new Map();
+const foldS = (x) => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+// Ce que produit une usine : des items (« iron_ingot », « *_log ») et des services (« service:xp » = service dont le nom contient « xp »)
 function matcher(nom) {
   const toks = cfg().usines[nom] || [];
   const k = nom + "|" + toks.join(",");
-  if (!reCache.has(k)) reCache.set(k, toks.length ? new RegExp("^(" + toks.map((t) => idOf(t).replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[a-z0-9_]*")).join("|") + ")$") : null);
+  if (!reCache.has(k)) {
+    const items = toks.filter((t) => !t.startsWith("service:")), svc = toks.filter((t) => t.startsWith("service:")).map((t) => foldS(t.slice(8))).filter(Boolean);
+    const re = items.length ? new RegExp("^(" + items.map((t) => idOf(t).replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[a-z0-9_]*")).join("|") + ")$") : null;
+    reCache.set(k, re || svc.length ? { re, svc, test: (item, service) => (item ? !!re && re.test(item) : !!service && svc.some((w) => foldS(service).includes(w))) } : null);
+  }
   return reCache.get(k);
 }
+// Une boutique produit-elle pour cette usine ? (item, un des items d'un lot, ou nom du service)
+const shopMatches = (m, s) => !!m && (s.type === "service" ? m.test(null, s.service) : s.lot ? s.lot.some((x) => m.test(idOf(x.item))) : m.test(idOf(s.item)));
 const usineOf = (id) => X.D.usines.find((u) => u.id === id);
 function usinesData() {
   const today = dayOf(Date.now()), W = { a: addDays(today, -13), b: today }; W.start = midnight(W.a); W.end = midnight(addDays(today, 1));
-  const ext = EV.filter((e) => e.kind === "commerce" && !e.internal && e.item && inP(e, W));
+  const shopById = new Map(((X.ECO && X.ECO.boutiques) || []).map((s) => [s.id, s]));
+  // ventes externes avec ce qu'elles vendent : item, ou nom du service de la boutique
+  const ext = EV.filter((e) => e.kind === "commerce" && !e.internal && inP(e, W)).map((e) => ({ ...e, service: e.item ? null : (shopById.get(e.shop) || {}).service || null }))
+    .filter((e) => e.item || e.service);
   const extTotal = EV.filter((e) => e.kind === "commerce" && !e.internal && inP(e, W)).reduce((a, e) => a + e.m, 0);
   const C = cfg(), choix = X.D.choix || [];
   const moyenne = choix.length ? extTotal / choix.length : 0, seuil = moyenne * C.seuilPct / 100;
@@ -201,26 +213,34 @@ function usinesData() {
   const shops = (X.ECO && X.ECO.boutiques) || [];
   const list = choix.map((c) => {
     const u = usineOf(c.usine_id) || { nom: "?", taille: "" }, k = keyOfSite(c.faction_id), re = matcher(u.nom);
-    const sales = re ? ext.filter((e) => e.seller === k && re.test(e.item)) : [];
+    const sales = re ? ext.filter((e) => e.seller === k && re.test(e.item, e.service)) : [];
     const ca = sales.reduce((a, e) => a + e.m, 0), clients = new Set(sales.map((e) => e.buyer)).size;
-    const rupt = re ? shops.filter((s) => shopKey(s) === k && s.item && re.test(idOf(s.item)) && s.rupture).length : 0;
+    const mine = re ? shops.filter((s) => shopKey(s) === k && shopMatches(re, s)) : [];
+    const rupt = mine.filter((s) => s.rupture).length, nShops = mine.filter((s) => s.type !== "service").length, nSvc = mine.filter((s) => s.type === "service").length;
     const commerciale = !!re && (ca >= seuil && ca > 0 || sales.length >= C.seuilVentes);
-    return { c, u, k, ca, n: sales.length, clients, rupt, commerciale, origine: c.projet_faction_id ? "★ projet" : `tour ${c.tour || 1}`, sansItems: !re };
+    return { c, u, k, ca, n: sales.length, clients, rupt, nShops, nSvc, commerciale, origine: c.projet_faction_id ? "★ projet" : `tour ${c.tour || 1}`, sansItems: !re };
   });
   // Par type d'usine : détenteurs, vendeurs de ses items, CA venant de factions qui ne l'ont pas (exposé au prochain tour)
   const types = X.D.usines.map((u) => {
     const re = matcher(u.nom), h = holders.get(u.id) || new Set();
-    const s = re ? ext.filter((e) => re.test(e.item)) : [];
+    const s = re ? ext.filter((e) => re.test(e.item, e.service)) : [];
     const vendeurs = new Map();
     for (const e of s) { const v = vendeurs.get(e.seller) || { ca: 0, expose: 0 }; v.ca += e.m; if (!h.has(e.buyer)) v.expose += e.m; vendeurs.set(e.seller, v); }
     const acheteurs = new Set(s.map((e) => e.buyer));
     return { u, holders: h, vendeurs, ca: s.reduce((a, e) => a + e.m, 0), expose: [...vendeurs.values()].reduce((a, v) => a + v.expose, 0), acheteurs, sansItems: !re };
   });
-  return { list, types, moyenne, seuil, W, C };
+  // Services : reliés à une usine (d'après la table usine → items) ou non
+  const services = shops.filter((s) => s.type === "service").map((s) => {
+    const us = X.D.usines.filter((u) => shopMatches(matcher(u.nom), s)), sales = ext.filter((e) => e.shop === s.id);
+    const held = us.filter((u) => (holders.get(u.id) || new Set()).has(shopKey(s)));
+    return { s, us, held, n: sales.length, ca: sales.reduce((a, e) => a + e.m, 0) };
+  });
+  return { list, types, services, moyenne, seuil, W, C };
 }
 
 /* ---------- rendu ---------- */
 function render(el, ctx) {
+  lastEl = el; lastCtx = ctx;
   const Es = window.Espace || {};
   X = { ECO: ctx.ECO, D: (Es.data && Es.data()) || { factions: [], usines: [], choix: [] }, facOfEco: Es.facOfEco };
   if (!["sumenium.com", "localhost", "127.0.0.1"].includes(location.hostname)) {
@@ -255,14 +275,23 @@ function render(el, ctx) {
   if ($("seReload")) $("seReload").onclick = () => { RAW = null; render(el, ctx); };
   const page = $("sePage");
   ({ vue, flux, usines, boutiques, fisc, reglages })[st.page](page, P, el);
-  page.querySelectorAll("[data-csv]").forEach((b) => (b.onclick = () => downloadCsv(CSV[+b.dataset.csv])));
+  bindCsv(page);
 }
 
 /* ---------- aides d'affichage ---------- */
+// Valeur brute d'une cellule pour le tri (nombre si possible ; vide et « — » à la fin)
+const sortVal = (c) => { const v = c && typeof c === "object" ? c.v : c; if (v === null || v === undefined || v === "" || v === "—") return null; return typeof v === "number" ? v : String(v); };
 function table(name, head, rows, opts = {}) {
+  const so = st.sort[name];
+  if (so) {
+    rows = rows.slice().sort((a, b) => { const x = sortVal(a[so.i]), y = sortVal(b[so.i]);
+      if (x === null || y === null) return (x === null) - (y === null);
+      const d = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "fr", { numeric: true, sensitivity: "base" });
+      return so.dir * d; });
+  }
   const i = CSV.push({ name, head: head.map((h) => (Array.isArray(h) ? h[0] : h)), rows: rows.map((r) => r.map((c) => (c && typeof c === "object" ? c.v : c))) }) - 1;
   const cell = (c) => (c && typeof c === "object" ? c.h : typeof c === "number" ? n0(c) : esc(c));
-  return `<div class="se-tbl"><div class="tbl-wrap"><table class="tbl${opts.left ? " left" : ""}"><thead><tr>${head.map((h) => `<th${Array.isArray(h) ? ` title="${esc(h[1])}"` : ""}>${esc(Array.isArray(h) ? h[0] : h)}</th>`).join("")}</tr></thead><tbody>
+  return `<div class="se-tbl"><div class="tbl-wrap"><table class="tbl${opts.left ? " left" : ""}"><thead><tr>${head.map((h, hi) => `<th class="se-sort" data-sort-t="${esc(name)}" data-sort-i="${hi}" aria-sort="${so && so.i === hi ? (so.dir > 0 ? "ascending" : "descending") : "none"}" title="${esc((Array.isArray(h) ? h[1] + " · " : "") + "Cliquer pour trier")}">${esc(Array.isArray(h) ? h[0] : h)}${so && so.i === hi ? (so.dir > 0 ? " ▲" : " ▼") : ""}</th>`).join("")}</tr></thead><tbody>
     ${rows.length ? rows.slice(0, opts.max || 500).map((r) => `<tr>${r.map((c) => `<td>${cell(c)}</td>`).join("")}</tr>`).join("") : `<tr><td colspan="${head.length}" class="empty">${opts.empty || "Rien sur la période."}</td></tr>`}
     </tbody></table></div><button type="button" class="link small" data-csv="${i}">Exporter en CSV</button></div>`;
 }
@@ -318,7 +347,9 @@ const D_SER = [["d_ACHAT_FISC", "Achats au FISC, têtes", "s3"], ["d_REVENTE_FIS
 const GRP = { RACHAT_FISC: "RACHAT_FISC", REPRISE_FISC: "REPRISE_FISC", ACHAT_FISC: "ACHAT_FISC", ACHAT_TETE: "ACHAT_FISC", REVENTE_FISC: "REVENTE_FISC" };
 const grpC = (t) => GRP[t] || "AUTRE", grpD = (t) => GRP[t] || "TAXE";
 function vue(el, P) {
-  const o = agg(P), p = agg(P.prev), E = X.ECO || {}, s = E.stats || {};
+  // Comparaison avec la période précédente seulement si elle tombe dans la saison (pas en vue « Saison »)
+  const cmp = !(st.per === 0 && !st.du && !st.au) && P.prev.start >= Date.parse(RAW.saisonDebut) - DAY;
+  const o = agg(P), p = cmp ? agg(P.prev) : { net: null, ext: null, partFisc: null }, E = X.ECO || {}, s = E.stats || {};
   const M = Number(s.masseMonetaire) || 0, U = usinesData();
   const nCom = U.list.filter((x) => x.commerciale).length;
   const seen = (E.joueurs || []).filter((j) => j.vuLe && Date.parse(j.vuLe) >= P.start).length;
@@ -400,10 +431,10 @@ function usines(el) {
   el.innerHTML = `<div class="banner info">Fenêtre fixe : les 14 derniers jours (${esc(dayLabel(U.W.a))} → ${esc(dayLabel(U.W.b))}). Une usine est <b>commerciale</b> si les boutiques de sa faction ont vendu ses items à d'autres factions pour au moins
       <b>${U.C.seuilPct} %</b> du CA externe moyen par usine (${su(U.moyenne)} → seuil ${su(U.seuil)}), <b>ou</b> en au moins <b>${U.C.seuilVentes} ventes</b> (les items bon marché comptent aussi). ${STAFF() ? "Réglable dans Réglages." : ""}</div>
     <section class="card"><h3>Toutes les usines attribuées</h3>
-      ${table("usines", ["Usine", "Faction", "Taille", "Origine", "Commerciale", "CA 14 j", "Ventes", "Clients", ["Rupt.", "Boutiques de la faction en rupture sur ses items"]],
+      ${table("usines", ["Usine", "Faction", "Taille", "Origine", "Commerciale", ["Bout.", "Boutiques de la faction qui vendent ses items (lots compris)"], ["Serv.", "Services de la faction liés à cette usine"], "CA 14 j", "Ventes", "Clients", ["Rupt.", "Boutiques de la faction en rupture sur ses items"]],
         U.list.sort((a, b) => b.ca - a.ca || a.u.nom.localeCompare(b.u.nom)).map((x) => [x.u.nom, H(facHtml(x.k), facName(x.k)), x.u.taille, x.origine,
           H(x.sansItems ? '<span class="chip warn">items à définir</span>' : x.commerciale ? '<span class="chip ok">oui</span>' : '<span class="chip">non</span>', x.sansItems ? "?" : x.commerciale ? "oui" : "non"),
-          S(x.ca), x.n, x.clients, x.rupt]), { empty: "Aucune usine attribuée." })}</section>
+          H(x.nShops ? n0(x.nShops) : '<span class="chip warn">aucune</span>', x.nShops), x.nSvc || "", S(x.ca), x.n, x.clients, x.rupt]), { empty: "Aucune usine attribuée." })}</section>
     <section class="card"><h3>Par faction</h3>
       ${table("usines-factions", ["Faction", "Usines", "Commerciales", "Taux", "CA ext. de ses usines"],
         [...byFac].sort((a, b) => b[1].ca - a[1].ca).map(([k, f]) => [H(facHtml(k), facName(k)), f.n, f.com, PC(f.com / f.n), S(f.ca)]))}</section>
@@ -413,7 +444,14 @@ function usines(el) {
         U.types.filter((t) => t.holders.size || t.ca).sort((a, b) => b.expose - a.expose || b.ca - a.ca).map((t) => [t.u.nom, t.u.taille,
           H([...t.holders].map(facHtml).join(", ") || '<span class="muted">libre</span>', [...t.holders].map(facName).join(", ")),
           H([...t.vendeurs].sort((a, b) => b[1].ca - a[1].ca).map(([k, v]) => `${facHtml(k)} <small class="muted">${n0(v.ca)}</small>`).join(", ") || "—", [...t.vendeurs].map(([k, v]) => `${facName(k)} ${Math.round(v.ca)}`).join(", ")),
-          S(t.ca), S(t.expose), t.acheteurs.size]))}</section>`;
+          S(t.ca), S(t.expose), t.acheteurs.size]))}</section>
+    <section class="card"><h3>Services</h3>
+      <p class="muted small">${n0(U.services.filter((x) => x.us.length).length)} service${U.services.filter((x) => x.us.length).length > 1 ? "s" : ""} lié${U.services.filter((x) => x.us.length).length > 1 ? "s" : ""} à une usine,
+        <b>${n0(U.services.filter((x) => !x.us.length).length)} non lié${U.services.filter((x) => !x.us.length).length > 1 ? "s" : ""}</b>. Un service est lié quand son nom contient un mot « service: » de la table usine → items${STAFF() ? " (Réglages)" : ""}.</p>
+      ${table("services", ["Service", "Faction", "Usine liée", ["Usine détenue", "La faction du vendeur possède-t-elle cette usine ?"], "Ventes 14 j", "CA 14 j"],
+        U.services.sort((a, b) => b.ca - a.ca).map((x) => [x.s.service || "Service", H(shopKey(x.s) ? facHtml(shopKey(x.s)) : "—", shopKey(x.s) ? facName(shopKey(x.s)) : ""),
+          H(x.us.length ? esc(x.us.map((u) => u.nom).join(", ")) : '<span class="chip warn">aucune</span>', x.us.map((u) => u.nom).join(", ")),
+          x.us.length ? (x.held.length ? "oui" : "non") : "", x.n, S(x.ca)]), { empty: "Aucun service en vente." })}</section>`;
 }
 
 /* ---------- 4. Boutiques et prix ---------- */
@@ -461,7 +499,15 @@ function variant(s) {
   const parts = [d.potion ? (N.potName ? N.potName(d.potion) : idOf(d.potion)) : null, ...ench.map((e) => (N.enchName ? N.enchName(e) : e.id + " " + (e.niveau || 1)))].filter(Boolean);
   return [[idOf(s.item), idOf(d.potion || ""), ...ench.map((e) => e.id + (e.niveau || 1))].join("|"), parts.join(", ")];
 }
-const bindCsv = (el) => el.querySelectorAll("[data-csv]").forEach((b) => (b.onclick = () => downloadCsv(CSV[+b.dataset.csv])));
+// Exports CSV et tri : clic sur un en-tête = croissant, puis décroissant, puis ordre par défaut
+const bindCsv = (el) => {
+  el.querySelectorAll("[data-csv]").forEach((b) => (b.onclick = () => downloadCsv(CSV[+b.dataset.csv])));
+  el.querySelectorAll("[data-sort-t]").forEach((th) => (th.onclick = () => {
+    const t = th.dataset.sortT, i = +th.dataset.sortI, cur = st.sort[t];
+    st.sort[t] = !cur || cur.i !== i ? { i, dir: 1 } : cur.dir > 0 ? { i, dir: -1 } : null;
+    const y = window.scrollY; render(lastEl, lastCtx); window.scrollTo(0, y);
+  }));
+};
 
 /* ---------- 5. FISC et reprise ---------- */
 function fisc(el, P) {
@@ -516,7 +562,7 @@ function reglages(el, P, root) {
       <label>Pourcentage du CA moyen par usine<input type="number" id="seP" min="0" max="100" step="1" value="${C.seuilPct}"></label>
       <label>Ou nombre de ventes externes<input type="number" id="seV" min="0" max="1000" step="1" value="${C.seuilVentes}"></label></section>
     <section class="card form"><h3>Usine → items</h3>
-      <p class="muted small wide">Un item par virgule, avec son id Minecraft (<code>iron_ingot</code>) ; <code>*</code> remplace n'importe quelle suite (<code>*_log</code>, <code>cooked_*</code>). Un item peut appartenir à plusieurs usines. Les services (niveaux, réparation) ne sont pas encore reliés : ils n'ont pas d'item.</p>
+      <p class="muted small wide">Un item par virgule, avec son id Minecraft (<code>iron_ingot</code>) ; <code>*</code> remplace n'importe quelle suite (<code>*_log</code>, <code>cooked_*</code>). Un item peut appartenir à plusieurs usines. Pour un service, écris <code>service:mot</code> : tout service dont le nom contient ce mot est relié à l'usine (<code>service:xp</code>, <code>service:repar</code> ; accents et majuscules ignorés).</p>
       <div class="wide se-usines">${X.D.usines.map((u) => `<label>${esc(u.nom)} <small class="muted">${esc(u.taille)}</small><input type="text" data-us="${esc(u.nom)}" value="${esc((C.usines[u.nom] || []).join(", "))}"></label>`).join("")}</div>
       <div class="wide actions"><button class="btn small" id="seSave">Enregistrer</button><button type="button" class="btn small ghost" id="seDef">Remettre les valeurs de la spec</button></div></section>`;
   const save = (usines) => call("PUT", "/api/staff/eco/config", { seuilPct: +$("seP").value, seuilVentes: +$("seV").value, usines })
