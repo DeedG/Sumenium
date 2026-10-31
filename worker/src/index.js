@@ -1454,9 +1454,9 @@ async function allData(env, s) {
     Q("SELECT id, projet_id, faction_id, usine_id, note, ts FROM projet_faction WHERE deleted = 0 ORDER BY ts"),
     Q("SELECT * FROM prix WHERE deleted = 0 ORDER BY ordre, id"),
     Q("SELECT * FROM settings"),
-    // Coordonnées : visibles seulement par la faction concernée et le staff
+    // Coordonnées : hubs et bases publics ; usines seulement pour la faction concernée et le staff
     staff ? Q("SELECT * FROM bases WHERE deleted = 0 ORDER BY faction_id, type, nom")
-      : Q(`SELECT * FROM bases WHERE deleted = 0 AND faction_id = ${myFaction} ORDER BY type, nom`, s.id),
+      : Q(`SELECT * FROM bases WHERE deleted = 0 AND (type != 'usine' OR faction_id = ${myFaction}) ORDER BY faction_id, type, nom`, s.id),
     Q("SELECT c.*, p.mc_name, a.updated AS affiche_v FROM candidats c JOIN players p ON p.id = c.player_id LEFT JOIN affiches a ON a.candidat_id = c.id WHERE c.deleted = 0 ORDER BY c.id"),
     Q("SELECT tour, candidat_id FROM votes WHERE discord_id = ?", s.id),
     Q("SELECT tour, candidat_id, COUNT(*) AS n FROM votes GROUP BY tour, candidat_id"),

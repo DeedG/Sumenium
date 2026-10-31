@@ -647,7 +647,7 @@ function bindPlayerEditors() {
 function factions() {
   const myF = me() && me().faction_id;
   const list = [...D.factions].sort((a, b) => (b.id === myF) - (a.id === myF) || a.name.localeCompare(b.name));
-  view(head("Factions", "De 3 à 8 joueurs par faction. Les coordonnées ne sont visibles que par les membres de la faction et le staff.") +
+  view(head("Factions", "De 3 à 8 joueurs par faction. Les coordonnées des hubs et des bases sont publiques ; celles des usines restent visibles seulement par la faction et le staff.") +
     `${isStaff() ? '<form class="bar inline" id="addFac"><input name="name" required maxlength="40" placeholder="Nom de la faction" aria-label="Nom de la nouvelle faction"><button class="btn small">Créer une faction</button></form>' : ""}
     ${loginHint("Pour modifier ta faction ou ajouter ses coordonnées,")}
     <div class="fac-grid">${list.map(facCard).join("") || '<p class="empty">Aucune faction.</p>'}</div>
@@ -734,7 +734,7 @@ function facCard(f) {
   const pr = (D.realises || []).filter((r) => r.faction_id === f.id);
   const bases = D.bases.filter((b) => b.faction_id === f.id);
   const mine = me() && me().faction_id === f.id;
-  const showBases = isStaff() || mine;
+  const showBases = bases.length || canEditFac(f.id);  // hubs et bases publics, usines visibles par la faction et le staff
   const ef = ecoFac(f);
   const row = (l, v) => (v ? `<dt>${l}</dt><dd>${esc(v)}</dd>` : "");
   return `<article class="card fac${mine ? " mine" : ""}" id="fac-${f.id}">

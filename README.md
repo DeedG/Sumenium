@@ -72,7 +72,7 @@ Fonctionnement :
 
 - `worker/` : un Worker Cloudflare sert le site (copie de GitHub Pages) et l'API `/api/*`, avec une base D1. Déployé par `.github/workflows/deploy-worker.yml` à chaque modification de `worker/`.
 - Un joueur relie son compte Discord à **un** pseudo de la whitelist. La mise à jour toutes les 10 minutes envoie `whitelist.json` à l'Espace.
-- Les coordonnées ne sont visibles que par la faction concernée et le staff ; la taille IRL seulement par le joueur et le staff ; les votes sont secrets (le staff voit les totaux).
+- Les coordonnées des hubs et des bases sont publiques ; celles des usines seulement par la faction concernée et le staff ; la taille IRL seulement par le joueur et le staff ; les votes sont secrets (le staff voit les totaux).
 - Chaque modification est inscrite dans l'historique (onglet Staff) et peut être annulée. Une suppression est toujours annulable.
 
 Mise en route :
