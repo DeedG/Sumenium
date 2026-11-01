@@ -239,7 +239,7 @@ async function audit(env, s, entity, id, action, before, after) {
 
 const TABLES = {
   players: ["mc_name", "discord_id", "faction_id", "metier", "metier_desc", "perso_desc", "activite", "mort", "taille_cm", "taille_appliquee", "taille_fixe", "deleted"],
-  factions: ["name", "theme", "hub", "projet_commu", "autres_projets", "recrutement", "tirage", "deleted"],
+  factions: ["name", "theme", "hub", "projet_commu", "autres_projets", "recrutement", "tirage", "usines_souhaitees", "projets_souhaites", "deleted"],
   bases: ["faction_id", "type", "nom", "x", "y", "z", "deleted"],
   candidats: ["player_id", "resume", "lien", "affiche", "tour2", "deleted"],
   prix: ["minerai", "roche", "prix", "ordre", "deleted"],
@@ -489,6 +489,13 @@ async function api(req, env, url, ctx) {
     await canManageFaction(env, s, fid);  // le chef de la faction (rôle du mod) ou le staff
     const f = {};
     for (const k of ["theme", "hub", "autres_projets"]) if (k in body) f[k] = str(body[k]);
+    // Souhaits indicatifs (avant le tirage, pour les joueurs qui cherchent une faction) : usines et projets communautaires
+    const ids = async (v, table) => { const want = [...new Set((Array.isArray(v) ? v : []).map(int).filter(Boolean))].slice(0, 12);
+      if (!want.length) return "[]";
+      const ok = (await env.DB.prepare(`SELECT id FROM ${table} WHERE id IN (${want.map(() => "?").join(",")})`).bind(...want).all()).results.map((x) => x.id);
+      return JSON.stringify(want.filter((x) => ok.includes(x))); };
+    if ("usines_souhaitees" in body) f.usines_souhaitees = await ids(body.usines_souhaitees, "usines");
+    if ("projets_souhaites" in body) f.projets_souhaites = await ids(body.projets_souhaites, "projets");
     if ("name" in body) {
       const n = str(body.name, 40).trim();
       if (n.length < 2) fail(400, "Le nom de la faction doit faire au moins 2 caractères.");
@@ -564,6 +571,9 @@ async function api(req, env, url, ctx) {
       }
     }
     for (const [i, id] of order.entries()) if ((fs.find((f) => f.id === id) || {}).tirage !== i + 1) await update(env, s, "factions", id, { tirage: i + 1 });
+    // rang gardé pour le tour en cours (la fiche de faction montre le rang de chaque tour)
+    const tourT = Number(await setting(env, "usine_tour")) || 1;
+    await env.DB.batch(order.map((id, i) => env.DB.prepare("INSERT OR REPLACE INTO tirages (tour, faction_id, rang) VALUES (?,?,?)").bind(tourT, id, i + 1)));
     if (!Array.isArray(body.order)) {
       const names = (await env.DB.prepare("SELECT name FROM factions WHERE deleted = 0 ORDER BY tirage").all()).results;
       announce(env, ctx, `🎲 **Tirage au sort de l'ordre des factions** : ${names.map((f, i) => `${i + 1}. ${f.name}`).join(" · ")}`);
@@ -1105,13 +1115,17 @@ async function history(env, mcName, url) {
   const wl = await env.DB.prepare("SELECT mc_name, uuid FROM whitelist WHERE mc_name = ?").bind(mcName).first();
   if (!wl || !wl.uuid) return { uuid: null, reason: "whitelist", rows: [] };
   const uuid = wl.uuid.toLowerCase(), account = `joueur:${uuid}`;
+  // banque de la faction du joueur (d'après le mod) : ses dépôts, retraits, achats et ventes de faction, comme /historique en jeu
+  const eco = await ecoData(env);
+  const ej = ((eco && eco.joueurs) || []).find((j) => String(j.nom).toLowerCase() === wl.mc_name.toLowerCase());
+  const facAcc = ej && ej.faction ? `faction:${String(ej.faction).toLowerCase()}` : "~";
   const before = int(url.searchParams.get("before")) || 9e15;
   const type = str(url.searchParams.get("type"), 40);
   const LIMIT = 100;
   const rows = (await env.DB.prepare(
-    `SELECT data FROM tx WHERE (actor = ? OR from_acc = ? OR to_acc = ?) AND t < ? AND type != 'LIEN_SITE'${type ? " AND type = ?" : ""} ORDER BY t DESC LIMIT ?`
-  ).bind(uuid, account, account, before, ...(type ? [type] : []), LIMIT + 1).all()).results;
-  return { uuid, name: wl.mc_name, rows: rows.slice(0, LIMIT).map((r) => JSON.parse(r.data)), more: rows.length > LIMIT };
+    `SELECT data FROM tx WHERE (actor = ? OR from_acc = ? OR to_acc = ? OR from_acc = ? OR to_acc = ?) AND t < ? AND type != 'LIEN_SITE' AND type NOT LIKE 'CONFIG_%' AND NOT (type = 'MARCHE_NOIR' AND COALESCE(actor, '') != ?)${type ? " AND type = ?" : ""} ORDER BY t DESC LIMIT ?`
+  ).bind(uuid, account, account, facAcc, facAcc, before, uuid, ...(type ? [type] : []), LIMIT + 1).all()).results;
+  return { uuid, faction: facAcc === "~" ? null : facAcc, name: wl.mc_name, rows: rows.slice(0, LIMIT).map((r) => JSON.parse(r.data)), more: rows.length > LIMIT };
 }
 
 /** Tableau de bord Économie (staff) : lignes du journal avec de l'argent, en tableaux compacts (le navigateur fait les calculs).
@@ -1490,7 +1504,7 @@ async function allData(env, s) {
   if (!staff) settings = { election: settings.election, usines_ouvertes: settings.usines_ouvertes, usine_tour: settings.usine_tour, factions_ouvertes: settings.factions_ouvertes, maire_id: settings.maire_id, mairie_ouverte: settings.mairie_ouverte };
   return {
     user: pub ? null : { id: s.id, name: s.name, avatar: s.avatar, level: s.level },
-    mairie, players, factions: factionsR.results, usines: usinesR.results, choix: choixR.results, projets: projetsR.results,
+    mairie, players, factions: factionsR.results, tirages: (await env.DB.prepare("SELECT tour, faction_id, rang FROM tirages ORDER BY tour").all()).results, usines: usinesR.results, choix: choixR.results, projets: projetsR.results,
     usineTours: USINE_TOURS, usineMax: USINE_MAX, usineFini: finiR.results, saisonDebut: SAISON_DEBUT, mcColors: MC_COLORS,
     factionDemandes: pub ? [] : facDemR.results.map((d) => ({ ...d, membres: JSON.parse(d.membres || "[]") })),
     projetDemandes: pub ? [] : projDemR.results.map((d) => ({ ...d, images: projImgR.results.filter((i) => i.demande_id === d.id).map((i) => i.id) })),

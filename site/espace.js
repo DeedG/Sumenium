@@ -396,23 +396,27 @@ const TX = { ACHAT: "Achat en boutique", ACHAT_SERVICE: "Achat de service", RACH
   ACHAT_TETE: "Achat d'une tête", REPRISE_FISC: "Objet rare vendu au FISC", REVENTE_FISC: "Objet rare acheté au FISC", DEMANDE_REPRISE: "Objet rare demandé au FISC", MARCHE_NOIR: "Marché noir" };
 const su = (cents) => (cents / 100).toLocaleString("fr-FR", { minimumFractionDigits: cents % 100 ? 2 : 0, maximumFractionDigits: 2 }) + "\u00a0Su";
 const itemLabel = (t) => { const id = String(t.item || "").replace(/^minecraft:/, ""); return (typeof NAMES !== "undefined" && NAMES[id]) || t.itemName || id.replace(/_/g, " "); };
-function txRow(t, uuid) {
+// Une ligne d'historique : d'abord le compte perso du joueur, sinon la banque de sa faction (fac = "faction:<id>"), comme /historique en jeu
+function txRow(t, uuid, fac) {
   const me = `joueur:${uuid}`, from = (t.from || "").toLowerCase(), to = (t.to || "").toLowerCase();
-  const amount = t.amount || 0, tax = t.tax || 0;
-  let sign = 0, value = amount, who = "";
+  const amount = t.amount || 0, tax = t.tax || 0, net = (x) => x - (t.type === "RACHAT_FISC" || t.type === "REPRISE_FISC" ? 0 : tax);
+  let sign = 0, value = amount, who = "", bank = false;
   if (from === me && to !== me) { sign = -1; who = t.toName || (t.to === "fisc" ? "FISC" : ""); }
-  else if (to === me && from !== me) { sign = 1; value = amount - (t.type === "RACHAT_FISC" ? 0 : tax); who = t.fromName || (t.from === "fisc" ? "FISC" : ""); }
+  else if (to === me && from !== me) { sign = 1; value = net(amount); who = t.fromName || (t.from === "fisc" ? "FISC" : ""); }
+  else if (fac && from === fac && to !== fac) { sign = -1; bank = true; who = t.toName || (t.to === "fisc" ? "FISC" : ""); }
+  else if (fac && to === fac && from !== fac) { sign = 1; bank = true; value = net(amount); who = t.fromName || (t.from === "fisc" ? "FISC" : ""); }
   else if (from.startsWith("faction:") || to.startsWith("faction:")) who = from.startsWith("faction:") ? `banque ${from.slice(8)}` : `banque ${to.slice(8)}`;
+  if (bank && t.actorName && String(t.actor || "").toLowerCase() !== String(uuid).toLowerCase()) who = (who ? who + ", " : "") + "par " + t.actorName;
   const units = t.unitFirst != null && t.qty > 1 ? ` (de ${su(t.unitFirst)} à ${su(t.unitLast)} l'unité)` : "";
   const what = t.type === "ACHAT_SERVICE" ? `🎫 ${t.qty > 1 ? t.qty + " × " : ""}${t.itemName || "Service"}`
     : t.item ? `${t.qty ? t.qty + " × " : ""}${itemLabel(t)}${units}` : (t.note || "");
   const taxShown = t.type === "REVENTE_FISC" ? 0 : tax;  // la revente du FISC n'est pas une taxe
   return `<tr><td class="nowrap">${new Date(t.t).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</td>
     <td>${esc(TX[t.type] || t.type)}</td><td>${esc(what)}${who ? `<span class="muted small"> · ${sign < 0 ? "à" : sign > 0 ? "de" : ""} ${esc(who)}</span>` : ""}</td>
-    <td class="num ${sign < 0 ? "amt-neg" : sign > 0 ? "amt-pos" : ""}">${sign < 0 ? "−" : sign > 0 ? "+" : ""}${su(value)}${!sign && (from || to) && !from.startsWith("joueur:") ? '<span class="muted small"> (faction)</span>' : ""}</td>
+    <td class="num ${sign < 0 ? "amt-neg" : sign > 0 ? "amt-pos" : ""}">${sign < 0 ? "−" : sign > 0 ? "+" : ""}${su(value)}${bank || (!sign && (from || to) && !from.startsWith("joueur:")) ? '<span class="muted small"> (banque)</span>' : ""}</td>
     <td class="num muted">${taxShown ? su(taxShown) : ""}</td></tr>`;
 }
-let hType = "", hRows = [], hMore = false, hUuid = null;
+let hType = "", hRows = [], hMore = false, hUuid = null, hFac = null;
 async function loadHistory(path, el, append) {
   try {
     const before = append && hRows.length ? hRows[hRows.length - 1].t : "";
@@ -421,14 +425,14 @@ async function loadHistory(path, el, append) {
       el.innerHTML = `<p class="empty">${r.reason === "fiche" ? "Relie d'abord ton pseudo Minecraft (onglet Ma fiche)." : "Ce pseudo n'est pas encore dans la whitelist : l'historique arrivera une fois whitelisté."}</p>`;
       return;
     }
-    hUuid = r.uuid; hRows = append ? hRows.concat(r.rows) : r.rows; hMore = r.more;
+    hUuid = r.uuid; hFac = r.faction || null; hRows = append ? hRows.concat(r.rows) : r.rows; hMore = r.more;
   } catch (e) { el.innerHTML = `<p class="empty">${esc(e.message)}</p>`; return; }
   const sum = hRows.reduce((a, t) => { const me = `joueur:${hUuid}`, f = (t.from || "").toLowerCase(), to = (t.to || "").toLowerCase();
-    if (f === me && to !== me) a.out += t.amount || 0; else if (to === me && f !== me) a.in += (t.amount || 0) - (t.type === "RACHAT_FISC" ? 0 : t.tax || 0); return a; }, { in: 0, out: 0 });
+    if (f === me && to !== me) a.out += t.amount || 0; else if (to === me && f !== me) a.in += (t.amount || 0) - (t.type === "RACHAT_FISC" ? 0 : t.tax || 0); return a; }, { in: 0, out: 0 });  // compte perso seulement
   el.innerHTML = hRows.length ? `<p class="small muted">${hRows.length} opération${hRows.length > 1 ? "s" : ""} affichée${hRows.length > 1 ? "s" : ""} ·
-      reçu <b class="amt-pos">+${su(sum.in)}</b> · dépensé <b class="amt-neg">−${su(sum.out)}</b></p>
+      compte perso : reçu <b class="amt-pos">+${su(sum.in)}</b> · dépensé <b class="amt-neg">−${su(sum.out)}</b></p>
     <div class="tbl-wrap"><table class="tbl left hist"><thead><tr><th>Date</th><th>Opération</th><th>Détail</th><th class="num">Montant</th><th class="num">Taxe</th></tr></thead>
-    <tbody>${hRows.map((t) => txRow(t, hUuid)).join("")}</tbody></table></div>
+    <tbody>${hRows.map((t) => txRow(t, hUuid, hFac)).join("")}</tbody></table></div>
     ${hMore ? '<div class="actions"><button class="btn small ghost" id="hMore">Plus ancien</button></div>' : ""}`
     : '<p class="empty">Aucune opération pour l\'instant.</p>';
   const more = el.querySelector("#hMore");
@@ -436,7 +440,7 @@ async function loadHistory(path, el, append) {
 }
 const typeSelect = (id) => `<select id="${id}" aria-label="Type d'opération"><option value="">Toutes les opérations</option>${Object.entries(TX).map(([k, v]) => `<option value="${k}"${k === hType ? " selected" : ""}>${v}</option>`).join("")}</select>`;
 function historique() {
-  view(head("Mon historique", "Tes achats, ventes, frais et dépôts, d'après le journal du serveur (mis à jour toutes les 5 minutes). Visible seulement par toi et le staff.") +
+  view(head("Mon historique", "Tes achats, ventes, frais et dépôts, et les mouvements de la banque de ta faction (comme /historique en jeu), d'après le journal du serveur (mis à jour toutes les 5 minutes). Visible seulement par toi, ta faction pour sa banque, et le staff.") +
     `<div class="bar">${typeSelect("hType")}</div><div id="hList"><p class="empty">Chargement…</p></div>`);
   $("hType").onchange = (e) => { hType = e.target.value; loadHistory("/api/me/historique", $("hList"), false); };
   loadHistory("/api/me/historique", $("hList"), false);
@@ -728,14 +732,23 @@ function usineChip(c) {
   const u = usine(c.usine_id);
   return u ? `<span class="chip u-${u.taille}"${c.projet_faction_id ? ' title="Débloquée par un projet communautaire"' : (c.tour || 1) > 1 ? ` title="Choisie au ${c.tour}e tour"` : ""}>${c.projet_faction_id ? "★ " : ""}${esc(u.nom)}${!c.projet_faction_id && (c.tour || 1) > 1 ? ` <small>T${c.tour}</small>` : ""}</span>` : "";
 }
+// Souhaits d'une faction (indicatifs) : listes d'id en JSON
+const wishes = (v) => { try { const a = JSON.parse(v || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
+const wishUsine = (id) => { const u = usine(id); return u ? `<span class="chip wish u-${u.taille}" title="Souhaitée, pas encore obtenue">${esc(u.nom)}</span>` : ""; };
+const wishProjet = (id) => { const pr = projet(id); return pr ? `<span class="chip wish" title="Souhaité, pas encore réalisé">${esc(pr.nom)}</span>` : ""; };
+const tourName = (t) => (t === 1 ? "1er tour" : `${t}e tour`);
 function facCard(f) {
   const ms = members(f.id);
   const ok = ms.length >= 3 && ms.length <= 8;
-  const ch = D.choix.filter((c) => c.faction_id === f.id);
+  const ch = D.choix.filter((c) => c.faction_id === f.id && !c.projet_faction_id);  // usines du tirage
   const pr = (D.realises || []).filter((r) => r.faction_id === f.id);
   const bases = D.bases.filter((b) => b.faction_id === f.id);
+  const pub = bases.filter((b) => b.type !== "usine");  // hub et bases : publics, affichés à part
+  const tirs = (D.tirages || []).filter((t) => t.faction_id === f.id).sort((a, b) => a.tour - b.tour);
+  const wU = wishes(f.usines_souhaitees), wP = wishes(f.projets_souhaites);
+  const projUsine = (r) => { const u = r.usine_id && usine(r.usine_id); return `<span class="proj-real"><a class="chip${u ? " u-" + u.taille : ""}" href="#communaute/projets">${esc((projet(r.projet_id) || {}).nom || "?")}</a>${u ? ` <span class="muted small">→</span> <span class="chip u-${u.taille}">★ ${esc(u.nom)}</span>` : ""}</span>`; };
   const mine = me() && me().faction_id === f.id;
-  const showBases = bases.length || canEditFac(f.id);  // hubs et bases publics, usines visibles par la faction et le staff
+  const showBases = isStaff() || mine || canEditFac(f.id);  // toutes les coordonnées (usines comprises) : la faction et le staff
   const ef = ecoFac(f);
   const row = (l, v) => (v ? `<dt>${l}</dt><dd>${esc(v)}</dd>` : "");
   return `<article class="card fac${mine ? " mine" : ""}" id="fac-${f.id}">
@@ -743,12 +756,16 @@ function facCard(f) {
     <p class="members">${ms.map((p) => { const r = ef && (ef.membres.find((m) => norm(m.nom) === norm(p.mc_name)) || {}).role;
       return `<span>${plink(p.mc_name)}${ROLE_MOD[r] ? ` <small class="muted">${ROLE_MOD[r]}</small>` : ""}</span>`; }).join("") || '<span class="muted">Aucun membre</span>'}</p>
     ${ef ? `<p class="fac-bank"><b>${suE(ef.banque)}</b> <span class="muted small">en banque</span></p>` : ""}
-    <dl>${row("Thème", f.theme)}${row("Hub et usines prévues", f.hub)}${row("Autres projets", f.autres_projets)}
+    ${pub.length ? `<p class="fac-coords">${pub.map((b) => `<span>📍 <b>${esc({ hub: "Hub", base: "Base" }[b.type] || "Base")}${b.nom ? " " + esc(b.nom) : ""}</b> ${b.x != null && b.z != null ? mapBtn(b) : `${b.x ?? "?"} / ${b.y ?? "?"} / ${b.z ?? "?"}`}</span>`).join("")}</p>` : ""}
+    <dl>${row("Thème", f.theme)}
+      ${f.hub || wU.length ? `<dt>Hub et usines prévues</dt><dd>${f.hub ? `<span class="txt">${esc(f.hub)}</span>` : ""}${wU.length ? `<div class="wishes">${wU.map(wishUsine).join(" ")}</div>` : ""}</dd>` : ""}
+      ${wP.length ? `<dt>Projet communautaire souhaité</dt><dd><div class="wishes">${wP.map(wishProjet).join(" ")}</div></dd>` : ""}
+      ${row("Autres projets", f.autres_projets)}
       ${f.recrutement ? (() => { const c = ms.find((p) => norm(p.mc_name) === norm(f.recrutement));
         return `<dt>Recrutement</dt><dd>${c ? `Contacter ${plink(c.mc_name)}` : esc(f.recrutement)}</dd>`; })() : ""}
-      ${f.tirage ? `<dt>Tirage des usines</dt><dd>${f.tirage}ᵉ</dd>` : ""}
-      ${ch.length ? `<dt>Usines</dt><dd>${ch.map(usineChip).join(" ")}</dd>` : ""}
-      <dt>Projets communautaires validés</dt><dd>${pr.length ? pr.map((r) => `<a class="chip" href="#communaute/projets">${esc((projet(r.projet_id) || {}).nom || "?")}</a>`).join(" ") : '<span class="muted">Aucun pour l\'instant</span>'}</dd></dl>
+      ${tirs.length ? `<dt>Tirage des usines</dt><dd>${tirs.map((t) => `${tourName(t.tour)} : <b>${t.rang}ᵉ</b>`).join(" · ")}</dd>` : f.tirage ? `<dt>Tirage des usines</dt><dd>${f.tirage}ᵉ</dd>` : ""}
+      ${ch.length ? `<dt>Usines du tirage</dt><dd>${ch.map(usineChip).join(" ")}</dd>` : ""}
+      <dt>Projets communautaires réalisés</dt><dd>${pr.length ? `<div class="proj-list">${pr.map(projUsine).join("")}</div>` : '<span class="muted">Aucun pour l\'instant</span>'}</dd></dl>
     ${showBases ? `<details class="bases"><summary>Coordonnées (${bases.length})</summary>
       <table class="mini"><tbody>${bases.map((b) => `<tr><td>${esc({ hub: "Hub", usine: "Usine", base: "Base" }[b.type])}</td><td>${esc(b.nom)}</td>
         <td class="num">${b.x != null && b.z != null ? mapBtn(b) : `${b.x ?? "?"} / ${b.y ?? "?"} / ${b.z ?? "?"}`}</td>
@@ -767,6 +784,10 @@ function facEdit(fid) {
     <label>Nom<input name="name" value="${esc(f.name)}" maxlength="40" required></label>
     <label class="wide">Thème<textarea name="theme" rows="2">${esc(f.theme)}</textarea></label>
     <label class="wide">Hub et usines prévues<textarea name="hub" rows="2">${esc(f.hub)}</textarea></label>
+    <fieldset class="wide wish-pick"><legend>Usines souhaitées <span class="muted small">(indicatif, affiché en grisé)</span></legend>
+      ${["grosse", "moyenne", "petite"].map((t) => `<div>${D.usines.filter((u) => u.taille === t).map((u) => `<label class="chip-toggle u-${t}"><input type="checkbox" data-wu value="${u.id}"${wishes(f.usines_souhaitees).includes(u.id) ? " checked" : ""}>${esc(u.nom)}</label>`).join("")}</div>`).join("")}</fieldset>
+    <fieldset class="wide wish-pick"><legend>Projet communautaire souhaité <span class="muted small">(indicatif)</span></legend>
+      <div>${(D.projets || []).map((p2) => `<label class="chip-toggle"><input type="checkbox" data-wp value="${p2.id}"${wishes(f.projets_souhaites).includes(p2.id) ? " checked" : ""}>${esc(p2.nom)}</label>`).join("")}</div></fieldset>
     <label class="wide">Autres projets<textarea name="autres_projets" rows="2">${esc(f.autres_projets)}</textarea></label>
     ${(() => { const ms = members(fid), cur = f.recrutement || "", inList = ms.some((p) => p.mc_name === cur);
       return `<label>Contact recrutement<select name="recrutement"><option value="">— personne —</option>
@@ -774,7 +795,9 @@ function facEdit(fid) {
         ${ms.map((p) => `<option${p.mc_name === cur ? " selected" : ""}>${esc(p.mc_name)}</option>`).join("")}</select></label>`; })()}
     <p class="muted small wide">L'ordre au tirage des usines est donné par le tirage au sort (le staff peut le corriger dans Communauté › Usines).</p>
     <div class="wide actions"><button class="btn small">Enregistrer</button><button type="button" class="btn small ghost" id="facCancel">Annuler</button></div></form>`;
-  card.querySelector("form").onsubmit = (e) => { e.preventDefault(); act(() => call("PUT", `/api/factions/${fid}`, formData(e.target)), "Faction enregistrée"); };
+  card.querySelector("form").onsubmit = (e) => { e.preventDefault();
+    const pick = (attr) => [...e.target.querySelectorAll(`[${attr}]:checked`)].map((x) => +x.value);
+    act(() => call("PUT", `/api/factions/${fid}`, { ...formData(e.target), usines_souhaitees: pick("data-wu"), projets_souhaites: pick("data-wp") }), "Faction enregistrée"); };
   $("facCancel").onclick = () => render();
 }
 
