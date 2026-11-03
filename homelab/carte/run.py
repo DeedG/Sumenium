@@ -31,6 +31,10 @@ _R = (E("MAP_RADIUS") or "auto").strip().lower()
 RADIUS = None if _R == "auto" else int(_R)
 MIN_RADIUS = 10000
 INTERVAL = int(E("INTERVAL_MINUTES", "60")) * 60
+# RENDER_WINDOW « 3-6 » : un seul passage par jour, de 3 h à 6 h (heure de TZ), arrêté proprement à 6 h s'il n'a pas fini
+# (BlueMap reprend où il en était la nuit suivante). Vide = un passage toutes les INTERVAL_MINUTES, jour et nuit.
+_W = re.fullmatch(r"\s*(\d{1,2})\s*-\s*(\d{1,2})\s*", E("RENDER_WINDOW", "3-6") or "")
+WINDOW = (int(_W[1]) % 24, int(_W[2]) % 24) if _W else None
 THREADS = int(E("RENDER_THREADS", "8"))
 XMX = E("JAVA_XMX", "6G")
 MAP_NAME = E("MAP_NAME", "Suménium · Overworld")
@@ -398,14 +402,53 @@ def reset_if_needed():
             f.write(RENDER_VERSION)
 
 
-def render():
+def in_window(now=None):
+    if not WINDOW:
+        return True
+    h, (a, b) = (now or datetime.now()).hour, WINDOW
+    return a <= h < b if a < b else (h >= a or h < b)
+
+
+def window_end():
+    """Heure (timestamp) de fin de la plage en cours, None sans plage."""
+    if not WINDOW:
+        return None
+    now = datetime.now()
+    end = now.replace(hour=WINDOW[1], minute=0, second=0, microsecond=0)
+    if end.timestamp() <= now.timestamp():
+        end = end.fromtimestamp(end.timestamp() + 86400)
+    return end.timestamp()
+
+
+def until_window():
+    """Secondes avant le début de la prochaine plage."""
+    now = datetime.now()
+    start = now.replace(hour=WINDOW[0], minute=0, second=0, microsecond=0)
+    t = start.timestamp()
+    if t <= now.timestamp():
+        t += 86400
+    return t - now.timestamp()
+
+
+def render(deadline=None):
     cmd = ["java", f"-Xmx{XMX}", "-jar", "/opt/bluemap-cli.jar", "-c", f"{BM}/config",
            "-v", MC_VERSION, "-r", "-g", "-s", "--markers"]
     log("BlueMap :", " ".join(cmd[3:]))
     t = time.time()
     # Le script anti-spoil doit être en place avant le rendu (qui peut durer des heures)
     shutil.copy("/app/anti-spoil.js", f"{WEB}/anti-spoil.js")
-    res = subprocess.run(cmd, cwd=BM)
+    proc = subprocess.Popen(cmd, cwd=BM)
+    while proc.poll() is None:
+        if deadline and time.time() >= deadline:
+            log("Fin de la plage horaire : rendu arrêté, il reprendra la nuit prochaine")
+            proc.terminate()  # BlueMap enregistre ce qui est déjà dessiné
+            try:
+                proc.wait(timeout=180)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            break
+        time.sleep(10)
+    res = proc
     shutil.copy("/app/anti-spoil.js", f"{WEB}/anti-spoil.js")
     merge_markers()  # BlueMap réécrit markers.json : on remet tout de suite les marqueurs du mod
     log(f"BlueMap terminé (code {res.returncode}) en {int((time.time() - t) / 60)} min")
@@ -414,16 +457,30 @@ def render():
 def main():
     if not E("SFTP_HOST"):
         sys.exit("SFTP_HOST manquant dans .env")
-    threading.Thread(target=markers_loop, daemon=True).start()
+    threading.Thread(target=markers_loop, daemon=True).start()  # boutiques sur la carte : toute la journée (léger)
+    if WINDOW:
+        log(f"Rendu de la carte une fois par jour, de {WINDOW[0]} h à {WINDOW[1]} h")
     while True:
+        if WINDOW and not in_window():
+            wait = until_window()
+            log(f"Prochain passage à {WINDOW[0]} h (dans {int(wait // 3600)} h {int(wait % 3600 // 60)} min)")
+            time.sleep(wait + 5)
+            continue
         start = time.time()
         try:
             border, box = sync()
             write_config(border, box)
             reset_if_needed()
-            render()
+            if in_window():
+                render(window_end())
         except Exception as e:
             log("Erreur :", type(e).__name__, e)
+        if WINDOW:
+            # un seul passage par nuit : on attend la fin de la plage, puis la boucle attend la suivante
+            end = window_end()
+            if end and in_window():
+                time.sleep(max(60, end - time.time() + 5))
+            continue
         wait = max(60, INTERVAL - (time.time() - start))
         log(f"Prochain passage dans {int(wait / 60)} min")
         time.sleep(wait)

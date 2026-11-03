@@ -57,6 +57,10 @@ Vérifie ensuite que `https://carte.sumenium.com` affiche la carte. Le site GitH
 
 Après une modification : `docker compose up -d`.
 
+## Horaire du rendu
+
+Par défaut la carte n'est redessinée qu'une fois par nuit, de 3 h à 6 h (`RENDER_WINDOW=3-6` dans `.env`, heure de `TZ`) : le rendu fait chauffer le processeur. S'il n'a pas fini à 6 h, il s'arrête proprement et reprend la nuit suivante. Les boutiques sur la carte restent mises à jour toutes les 5 minutes, jour et nuit (c'est léger). `RENDER_WINDOW=` (vide) revient à un passage toutes les `INTERVAL_MINUTES`.
+
 ## Anti-spoil
 
 La bordure est tracée en jaune et mise à jour à chaque passage. Tout ce qui est au-delà est recouvert par un calque « Masquer hors bordure ». Sur le site, la case **« Voir toute la carte (spoil) »** l'enlève ; dans la carte en plein écran, c'est dans le menu des marqueurs. Ce calque évite de se spoiler sans le vouloir, il ne protège pas un joueur qui veut vraiment voir.
