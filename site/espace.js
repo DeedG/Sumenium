@@ -18,7 +18,7 @@ const TAILLE_USINE = { grosse: ["Grosses usines", 3], moyenne: ["Moyennes usines
 const TAILLE_MOT = { grosse: "grosse", moyenne: "moyenne", petite: "petite" };
 // Zones rendues par ce fichier : chacune a sa racine dans la page et ses sous-onglets
 const AREAS = {
-  espace: { root: "espaceRoot", subs: [["fiche", "Ma fiche"], ["historique", "Mon historique"], ["staff", "Outils staff"]] },
+  espace: { root: "espaceRoot", subs: [["fiche", "Ma fiche"], ["stats", "Mes stats"], ["historique", "Mon historique"], ["staff", "Outils staff"]] },
   communaute: { root: "comRoot", subs: [["joueurs", "Joueurs"], ["factions", "Factions"], ["usines", "Usines"], ["projets", "Projets"], ["elections", "Élections"], ["mairie", "Mairie"]] },
 };
 // Échelle RP : 1,87 m IRL = taille normale (1), comme dans l'ancien tableau
@@ -290,7 +290,7 @@ function render() {
         `<a href="#communaute/${k}" aria-current="${k === cur ? "page" : "false"}">${l}</a>`).join("")}</nav>
       <div id="espView"></div>`;
   } else root.innerHTML = '<div id="espView"></div>';
-  ({ fiche, historique, staff, mairie, joueurs, factions, usines, elections, projets, joueur: joueurPage, faction: factionPage })[sub]();
+  ({ fiche, stats: mesStats, historique, staff, mairie, joueurs, factions, usines, elections, projets, joueur: joueurPage, faction: factionPage })[sub]();
 }
 const view = (h) => ($("espView").innerHTML = h);
 const STAFF_SUBS = ["staff"];
@@ -1079,9 +1079,17 @@ function bindMap() {
 function notFound(what) {
   view(`<div class="card center"><h3>${what} introuvable</h3><p class="muted">Le nom a peut-être changé.</p><a class="btn ghost" href="#communaute/${what === "Joueur" ? "joueurs" : "factions"}">Voir la liste</a></div>`);
 }
+// Statistiques Minecraft d'un joueur (bloc commun avec Classements › Statistiques, dans index.html)
+function mesStats() {
+  const p = me();
+  if (!p) { view(head("Mes stats", "") + '<p class="empty">Relie d\'abord ton pseudo Minecraft (onglet Ma fiche).</p>'); return; }
+  view(head("Mes stats", "Tes statistiques Minecraft et ta place dans chaque classement du serveur, de la meilleure à la moins bonne.") + '<div class="card" id="pstats"></div>');
+  if (SD().mountPlayerStats) SD().mountPlayerStats($("pstats"), p.mc_name);
+}
 function joueurPage() {
-  const p = D.players.find((x) => norm(x.mc_name) === norm(arg));
-  const name = p ? p.mc_name : arg;
+  const [argName, argTab] = arg.split("/");
+  const p = D.players.find((x) => norm(x.mc_name) === norm(argName));
+  const name = p ? p.mc_name : argName;
   const S = SD().stats(), bb = SD().borderBlocks();
   const tabs = ((S && S.tab) || []).map((t) => [t.label, rankOf(t.rows, name)]);
   const eco = ecoPlayer(name), rich = rankOf(((ECO && ECO.joueurs) || []).filter((j) => j.solde > 0).map((j) => [j.nom, j.solde]), name);
@@ -1106,16 +1114,18 @@ function joueurPage() {
         ${p && p.metier ? `<p class="metier">${esc(p.metier)}</p>` : `<p class="muted">${p ? "Métier non renseigné" : "Pas encore de fiche RP sur le site"}</p>`}
       </div>
     </section>
-    <div class="stats">
+    <nav class="subtabs" aria-label="Fiche du joueur"><a href="#communaute/joueur/${encodeURIComponent(name)}" aria-current="${argTab !== "stats" ? "page" : "false"}">Fiche</a><a href="#communaute/joueur/${encodeURIComponent(name)}/stats" aria-current="${argTab === "stats" ? "page" : "false"}">Statistiques</a></nav>
+    ${argTab === "stats" ? '<div class="card" id="pstats"></div>' : `<div class="stats">
       ${tabs.map(([l, x]) => tile(l, x ? fmt(x.v) : "–", x)).join("")}
       ${tile("Blocs de bordure", border ? "+" + fmt(Math.round(border.v)) : "–", border, "sun")}
       ${tile("Solde", eco ? suE(eco.solde) : "–", rich, "leaf")}
     </div>
     ${p && (p.metier_desc || p.perso_desc) ? `<div class="boards boards-2">${p.metier_desc ? `<div class="board"><h3>Métier</h3>${para(p.metier_desc)}</div>` : ""}${p.perso_desc ? `<div class="board"><h3>Personnage</h3>${para(p.perso_desc)}</div>` : ""}</div>` : ""}
-    <div class="profile-links"><a class="btn small ghost" href="#monde/succes" data-who="${esc(name)}">Voir ses succès</a><a class="btn small ghost" href="#classements/stats">Statistiques</a></div>
+    <div class="profile-links"><a class="btn small ghost" href="#monde/succes" data-who="${esc(name)}">Voir ses succès</a><a class="btn small ghost" href="#communaute/joueur/${encodeURIComponent(name)}/stats">Ses statistiques</a></div>
     <h3 class="sec">Ses boutiques <small>${fmt(shops.length)}</small></h3>${shopRows(shops)}
     ${facShops ? `<h3 class="sec">Boutiques de sa faction <small>${fmt(facShops.length)}</small></h3>${shopRows(facShops, true)}` : ""}
-    ${hdv.length ? `<h3 class="sec">À l'hôtel des ventes <small>${fmt(hdv.length)}</small></h3><ul class="now">${hdv.map((a) => `<li><a href="#marche/hdv">${esc(itemFr(a.item, a.nom))}${a.quantite > 1 ? ` × ${fmt(a.quantite)}` : ""}</a> · ${suE(a.offreActuelle || a.prixDepart)}</li>`).join("")}</ul>` : ""}`);
+    ${hdv.length ? `<h3 class="sec">À l'hôtel des ventes <small>${fmt(hdv.length)}</small></h3><ul class="now">${hdv.map((a) => `<li><a href="#marche/hdv">${esc(itemFr(a.item, a.nom))}${a.quantite > 1 ? ` × ${fmt(a.quantite)}` : ""}</a> · ${suE(a.offreActuelle || a.prixDepart)}</li>`).join("")}</ul>` : ""}`}`);
+  if (argTab === "stats" && SD().mountPlayerStats) SD().mountPlayerStats($("pstats"), name);
   document.querySelectorAll("[data-who]").forEach((b) => (b.onclick = () => { try { localStorage.setItem("sumenium-who", b.dataset.who); } catch (e) {} if (window.setWho) window.setWho(b.dataset.who); }));
   bindMap();
 }

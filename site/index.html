@@ -725,6 +725,23 @@ dialog.hist-dlg::backdrop{background:rgba(0,0,0,.45)}.hist-head{display:flex;jus
   table.tbl.tirage tr.turn{background:color-mix(in srgb,var(--sun) 14%,var(--surface));border-color:var(--sun)}
   table.tbl.tirage tr.mine td,table.tbl.tirage tr.turn td{background:none}
 }
+/* Statistiques d'un joueur */
+.ps-sum{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.ps-sum .chip{font-size:.85rem;padding:4px 10px}
+.ps-sum .ps1{background:var(--sun-soft);color:var(--sun-ink)}
+.ps-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px}
+.ps-bar input{flex:1;min-width:160px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:var(--surface);color:var(--muted);font:600 .88rem var(--body);padding:7px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--sun-soft);color:var(--fg)}
+.ps-tbl td{vertical-align:middle}
+.ps-tbl td:first-child{width:5.5rem;white-space:nowrap}
+.ps-rank{font-weight:700;white-space:nowrap}
+.ps-rank.r1{color:var(--sun-ink)}
+.ps-rank small{display:block;font-weight:600;font-size:.72rem}
+@media (max-width:560px){.ps-cat{display:none}}
+.ps-more{margin-top:10px}.ps-more summary{cursor:pointer;font-weight:700}
+.rank li.hl{outline:2px solid var(--sun);background:var(--sun-soft)}
 </style>
 </head>
 <body>
@@ -857,9 +874,10 @@ dialog.hist-dlg::backdrop{background:rgba(0,0,0,.45)}.hist-head{display:flex;jus
     </div>
     <div class="subpanel" data-sub="richesse"><div id="richRoot"></div></div>
     <div class="subpanel" data-sub="stats">
-      <div class="sec-head"><h3>Statistiques</h3><p class="sub2">Toutes les statistiques Minecraft des joueurs, avec le classement de chacune.</p></div>
+      <div class="sec-head"><h3>Statistiques</h3><p class="sub2">Toutes les statistiques Minecraft des joueurs, avec le classement de chacune. Choisis un joueur pour voir où il est premier, deuxième…</p></div>
       <div class="explorer">
         <div class="picker">
+          <select id="statWho" aria-label="Joueur"></select>
           <select id="statCat" aria-label="Catégorie de statistiques"></select>
           <input id="statQ" type="search" placeholder="Chercher une statistique…" aria-label="Chercher une statistique">
           <div class="statlist" id="statList"></div>
@@ -1469,19 +1487,19 @@ document.addEventListener("click",e=>{const b=e.target.closest(".slot");if(b){if
 window.addEventListener("scroll",()=>{if(tipFor)hideTip()},{passive:true});
 
 // ---------- Classements ----------
-let STATS=null, mapReady=false, statSel=null;
+let STATS=null, mapReady=false, statSel=null, statWho=null;
 const okName=n=>/^[A-Za-z0-9_]{2,16}$/.test(n);
 // Lien vers la fiche d'un joueur (Communauté › Joueurs)
 const plink=n=>`<a class="plink" href="#communaute/joueur/${encodeURIComponent(n)}">${esc(n)}</a>`;
 // Lien vers la fiche d'une faction à partir d'un nom d'équipe en jeu (si l'Espace la connaît)
 const tlink=t=>{const f=window.Espace&&window.Espace.facByName&&window.Espace.facByName(t);return f?`<a class="plink" href="#communaute/faction/${f.id}">${esc(t)}</a>`:esc(t)};
 const teamOf=n=>(STATS&&STATS.playerTeams&&STATS.playerTeams[n])||"";
-function rankList(rows,fmtv,limit){
+function rankList(rows,fmtv,limit,hl){
   rows=(rows||[]).filter(r=>okName(r[0])).slice(0,limit||1000);
   if(!rows.length)return '<p class="empty">Pas encore de données.</p>';
   const max=Math.max(...rows.map(r=>Math.abs(r[1])),1);
   return '<div class="rank-scroll"><ol class="rank">'+rows.map((r,i)=>{const t=teamOf(r[0]);
-    return `<li><span class="pos">${i+1}</span><span class="who">${plink(r[0])}${t?`<small>${tlink(t)}</small>`:""}</span><span class="val">${fmtv(r[1])}</span><span class="bar2"><s style="width:${Math.max(2,Math.round(Math.abs(r[1])/max*100))}%"></s></span></li>`}).join("")+'</ol></div>';
+    return `<li${hl&&String(r[0]).toLowerCase()===String(hl).toLowerCase()?' class="hl" id="rankHl"':""}><span class="pos">${rows.findIndex(q=>q[1]===r[1])+1}</span><span class="who">${plink(r[0])}${t?`<small>${tlink(t)}</small>`:""}</span><span class="val">${fmtv(r[1])}</span><span class="bar2"><s style="width:${Math.max(2,Math.round(Math.abs(r[1])/max*100))}%"></s></span></li>`}).join("")+'</ol></div>';
 }
 // Blocs de bordure gagnés : chaque succès compte pour le premier joueur qui l'a obtenu (et sa faction)
 function borderBlocks(){
@@ -1489,8 +1507,60 @@ function borderBlocks(){
   Object.values(DATA.adv||{}).forEach(r=>{if(!r.done||!r.by||!r.b)return;p[r.by]=(p[r.by]||0)+r.b;if(r.team)t[r.team]=(t[r.team]||0)+r.b});
   return {players:Object.entries(p).sort((a,b)=>b[1]-a[1]),teams:t};
 }
+// Classements d'un joueur dans toutes les statistiques : rang (ex aequo = même rang), valeur, nombre de joueurs classés
+function playerStats(name){
+  if(!STATS||!name)return [];
+  const n=String(name).toLowerCase(),out=[];
+  for(const c of STATS.categories)for(const id of c.stats){
+    const x=STATS.stats[id],rows=(x.r||[]).filter(r=>okName(r[0])),i=rows.findIndex(r=>String(r[0]).toLowerCase()===n);
+    if(i<0)continue;
+    const v=rows[i][1];
+    out.push({id,l:x.l,cat:c.label,catId:c.id,u:x.u,v,rank:rows.findIndex(r=>r[1]===v)+1,n:rows.length});
+  }
+  return out.sort((a,b)=>a.rank-b.rank||b.n-a.n||a.l.localeCompare(b.l));
+}
+const statNames=()=>STATS?[...new Set(Object.values(STATS.stats).flatMap(x=>(x.r||[]).map(r=>r[0])).filter(okName))].sort((a,b)=>a.localeCompare(b)):[];
+const rankTxt=r=>r===1?"🥇 1er":r===2?"🥈 2e":r===3?"🥉 3e":r+"e";
+const PS_GROUPS=[["1re place",x=>x.rank===1],["2e place",x=>x.rank===2],["3e place",x=>x.rank===3],["De la 4e à la 10e place",x=>x.rank>3&&x.rank<=10],["Au-delà de la 10e place",x=>x.rank>10]];
+// Bloc « statistiques d'un joueur » : par classement (là où il est le mieux placé d'abord) ou toutes ses stats par catégorie
+function mountPlayerStats(el,name){
+  if(!el)return;
+  el.dataset.pstats=name;
+  if(!STATS){el.innerHTML='<p class="empty">Les statistiques arrivent…</p>';return}
+  const all=playerStats(name);
+  if(!all.length){el.innerHTML=`<p class="empty">Pas encore de statistiques pour ${esc(name)} (il faut s'être connecté au serveur).</p>`;return}
+  const st=el._ps||(el._ps={view:"rang",cat:"",q:""});
+  const cnt=k=>all.filter(x=>x.rank===k).length,top10=all.filter(x=>x.rank<=10).length;
+  const cats=[...new Map(all.map(x=>[x.catId,x.cat])).entries()];
+  const list=all.filter(x=>(!st.cat||x.catId===st.cat)&&(!st.q||fold(x.l+" "+x.cat).includes(fold(st.q))));
+  const row=x=>`<tr><td class="ps-rank r${Math.min(x.rank,4)}">${rankTxt(x.rank)}<small class="muted">sur ${fmt(x.n)}</small></td><td><button type="button" class="linkbtn" data-stat="${esc(x.id)}">${esc(x.l)}</button>${st.view==="rang"&&!st.cat?`<small class="muted ps-cat"> · ${esc(x.cat)}</small>`:""}</td><td class="num"><b>${fmtUnit(x.u)(x.v)}</b></td></tr>`;
+  const table=rows=>`<div class="tbl-wrap"><table class="tbl left ps-tbl"><tbody>${rows.map(row).join("")}</tbody></table></div>`;
+  let body;
+  if(!list.length)body='<p class="empty">Aucune statistique ne correspond.</p>';
+  else if(st.view==="rang")body=PS_GROUPS.map(([lab,f],gi)=>{const g=list.filter(f);if(!g.length)return"";
+    const inner=`<h4 class="cat-h">${lab} <small class="muted">${fmt(g.length)}</small></h4>${table(g)}`;
+    return gi===4&&!st.q&&!st.cat?`<details class="ps-more"><summary>${lab} (${fmt(g.length)})</summary>${table(g)}</details>`:inner}).join("");
+  else body=cats.filter(([id])=>!st.cat||id===st.cat).map(([id,lab])=>{const g=list.filter(x=>x.catId===id).sort((a,b)=>a.l.localeCompare(b.l));
+    return g.length?`<h4 class="cat-h">${esc(lab)} <small class="muted">${fmt(g.length)}</small></h4>${table(g)}`:""}).join("");
+  el.innerHTML=`<div class="ps-sum"><span class="chip ps1">🥇 ${fmt(cnt(1))} première${cnt(1)>1?"s":""} place${cnt(1)>1?"s":""}</span><span class="chip ps2">🥈 ${fmt(cnt(2))}</span><span class="chip ps3">🥉 ${fmt(cnt(3))}</span>
+      <span class="chip">Top 10 : ${fmt(top10)}</span><span class="chip muted">${fmt(all.length)} statistiques</span></div>
+    <div class="bar ps-bar"><div class="seg" role="group" aria-label="Affichage"><button type="button" data-psv="rang" aria-pressed="${st.view==="rang"}">Par classement</button><button type="button" data-psv="cat" aria-pressed="${st.view==="cat"}">Toutes ses stats</button></div>
+      <select data-psc aria-label="Catégorie"><option value="">Toutes les catégories</option>${cats.map(([id,l])=>`<option value="${esc(id)}"${id===st.cat?" selected":""}>${esc(l)}</option>`).join("")}</select>
+      <input type="search" data-psq placeholder="Chercher une statistique…" value="${esc(st.q)}" aria-label="Chercher une statistique"></div>${body}`;
+  el.querySelectorAll("[data-psv]").forEach(b=>b.onclick=()=>{st.view=b.dataset.psv;mountPlayerStats(el,name)});
+  el.querySelector("[data-psc]").onchange=e=>{st.cat=e.target.value;mountPlayerStats(el,name)};
+  const q=el.querySelector("[data-psq]");q.oninput=()=>{st.q=q.value;const pos=q.selectionStart;mountPlayerStats(el,name);const q2=el.querySelector("[data-psq]");q2.focus();q2.setSelectionRange(pos,pos)};
+  el.querySelectorAll("[data-stat]").forEach(b=>b.onclick=()=>openStat(b.dataset.stat,name));
+}
+// Ouvre une statistique dans Classements › Statistiques, avec le joueur mis en avant
+function openStat(id,who){
+  statWho=who||statWho;statSel=id;
+  const c=STATS.categories.find(c=>c.stats.includes(id));if(c)$("statCat").value=c.id;
+  $("statQ").value="";if($("statWho"))$("statWho").value=statWho||"";
+  location.hash="#classements/stats";renderStatList();renderStatView();
+}
 // Pour les fiches joueur / faction (espace.js)
-window.SiteData={stats:()=>STATS,data:()=>DATA,cat:()=>CAT,borderBlocks:()=>borderBlocks()};
+window.SiteData={stats:()=>STATS,data:()=>DATA,cat:()=>CAT,borderBlocks:()=>borderBlocks(),mountPlayerStats};
 function renderClassement(){
   if(!STATS){$("tabBoards").innerHTML='<p class="empty">Les classements arrivent à la prochaine mise à jour du serveur.</p>';return}
   const bb=borderBlocks();
@@ -1511,29 +1581,44 @@ function renderStatList(){
   if(!cat){$("statList").innerHTML='<p class="empty">Pas encore de données.</p>';return}
   const q=$("statQ").value.toLowerCase();
   const ids=cat.stats.filter(id=>!q||STATS.stats[id].l.toLowerCase().includes(q)).sort((a,b)=>STATS.stats[b].t-STATS.stats[a].t);
-  $("statList").innerHTML=ids.map(id=>{const x=STATS.stats[id];return `<button data-id="${esc(id)}" aria-pressed="${id===statSel}">${esc(x.l)}<span>${fmtUnit(x.u)(x.t)}</span></button>`}).join("")||'<p class="empty">Aucune statistique.</p>';
+  const pr=statWho?Object.fromEntries(playerStats(statWho).map(x=>[x.id,x])):null;
+  $("statList").innerHTML=ids.map(id=>{const x=STATS.stats[id],m=pr&&pr[id];return `<button data-id="${esc(id)}" aria-pressed="${id===statSel}">${esc(x.l)}<span>${m?`<b class="ps-rank r${Math.min(m.rank,4)}">${rankTxt(m.rank)}</b> `:""}${fmtUnit(x.u)(m?m.v:x.t)}</span></button>`}).join("")||'<p class="empty">Aucune statistique.</p>';
+  if(statWho&&!statSel){renderStatView();return}
   if(!statSel||!cat.stats.includes(statSel)){statSel=ids[0]||null;renderStatView();renderStatListSel()}
 }
 function renderStatListSel(){document.querySelectorAll("#statList button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.id===statSel))}
 function renderStatView(){
   const x=statSel&&STATS.stats[statSel];
+  // Joueur choisi, sans statistique : toutes ses places, de la meilleure à la moins bonne
+  if(statWho&&!x){$("statView").innerHTML=`<h3><span>Classements de ${plink(statWho)}</span><small>là où il est le mieux placé d'abord</small></h3><div id="statWhoView"></div>`;mountPlayerStats($("statWhoView"),statWho);return}
   if(!x){$("statView").innerHTML='<p class="empty">Choisis une statistique.</p>';return}
   const cat=STATS.categories.find(c=>c.stats.includes(statSel));
-  $("statView").innerHTML=`<h3>${esc(x.l)}<small>${esc(cat?cat.label:"")}</small></h3><p class="empty">Total du serveur : <b>${fmtUnit(x.u)(x.t)}</b></p>${rankList(x.r,fmtUnit(x.u))}`;
+  const m=statWho&&playerStats(statWho).find(y=>y.id===statSel);
+  $("statView").innerHTML=`<h3>${esc(x.l)}<small>${esc(cat?cat.label:"")}</small></h3>
+    ${statWho?`<p class="small"><button type="button" class="linkbtn" id="statBack">← Tous les classements de ${esc(statWho)}</button>${m?` · ${esc(statWho)} : <b>${rankTxt(m.rank)}</b> sur ${fmt(m.n)} (${fmtUnit(x.u)(m.v)})`:` · ${esc(statWho)} n'a rien dans cette statistique`}</p>`:""}
+    <p class="empty">Total du serveur : <b>${fmtUnit(x.u)(x.t)}</b></p>${rankList(x.r,fmtUnit(x.u),0,statWho)}`;
+  const back=$("statBack");if(back)back.onclick=()=>{statSel=null;renderStatList();renderStatView()};
+  const hl=$("rankHl");if(hl)hl.scrollIntoView({block:"nearest"});
 }
 function setupStats(){
   if(!STATS)return;
   const sel=$("statCat"),cur=sel.value;
   sel.innerHTML=STATS.categories.map(c=>`<option value="${esc(c.id)}">${esc(c.label)} (${c.stats.length})</option>`).join("");
   if(cur)sel.value=cur;
+  const w=$("statWho"),wc=w.value;
+  w.innerHTML='<option value="">Tous les joueurs</option>'+statNames().map(n=>`<option>${esc(n)}</option>`).join("");
+  w.value=statWho||wc||"";
   renderStatList();
 }
 $("statCat").onchange=()=>{statSel=null;renderStatList()};
+// Filtre par joueur : ses places dans toutes les statistiques, et son rang à côté de chaque statistique
+$("statWho").onchange=e=>{statWho=e.target.value||null;statSel=null;renderStatList();if(!statWho)renderStatList();renderStatView()};
 $("statQ").oninput=()=>renderStatList();
 $("statList").onclick=e=>{const b=e.target.closest("button");if(!b)return;statSel=b.dataset.id;renderStatListSel();renderStatView()};
 async function loadStats(){
   try{const r=await fetch("stats.json?t="+Date.now());if(r.ok)STATS=await r.json();}catch(e){}
   renderClassement();setupStats();refreshHome();
+  document.querySelectorAll("[data-pstats]").forEach(el=>mountPlayerStats(el,el.dataset.pstats));
 }
 
 // ---------- Onglets ----------
