@@ -742,6 +742,9 @@ dialog.hist-dlg::backdrop{background:rgba(0,0,0,.45)}.hist-head{display:flex;jus
 @media (max-width:560px){.ps-cat{display:none}}
 .ps-more{margin-top:10px}.ps-more summary{cursor:pointer;font-weight:700}
 .rank li.hl{outline:2px solid var(--sun);background:var(--sun-soft)}
+.st-name{display:inline-flex;align-items:center;gap:8px;min-width:0}
+.st-ico{width:22px;height:22px;flex:none}
+.st-emo{display:inline-grid;place-items:center;width:22px;height:22px;font-size:1rem;flex:none}
 </style>
 </head>
 <body>
@@ -1507,6 +1510,38 @@ function borderBlocks(){
   Object.values(DATA.adv||{}).forEach(r=>{if(!r.done||!r.by||!r.b)return;p[r.by]=(p[r.by]||0)+r.b;if(r.team)t[r.team]=(t[r.team]||0)+r.b});
   return {players:Object.entries(p).sort((a,b)=>b[1]-a[1]),teams:t};
 }
+// Icône et nom français d'une statistique : objet du jeu (icône de l'objet) ou pictogramme selon le type
+const STAT_ITEM_CATS=["minecraft:mined","minecraft:crafted","minecraft:used","minecraft:broken","minecraft:picked_up","minecraft:dropped"];
+const STAT_EMO={"minecraft:mined":"⛏️","minecraft:crafted":"🔨","minecraft:used":"✋","minecraft:broken":"💥","minecraft:picked_up":"🎒","minecraft:dropped":"🫳","minecraft:killed":"⚔️","minecraft:killed_by":"💀","Causes de mort":"🪦"};
+const statKey=id=>String(id).split("|")[1]?.replace("minecraft:","")||"";
+function statEmo(id){
+  const cat=String(id).split("|")[0],k=statKey(id),x=STATS&&STATS.stats[id];
+  if(cat!=="minecraft:custom")return STAT_EMO[cat]||"📊";
+  if(x&&x.u==="time"||/time|rest/.test(k))return "⏱️";
+  if(x&&x.u==="cm"||/one_cm/.test(k)){const m=[["swim","🏊"],["boat","🚣"],["aviate","🪂"],["fly","🕊️"],["horse","🐴"],["pig","🐷"],["strider","🔥"],["minecart","🛤️"],["climb","🧗"],["fall","🪂"]].find(([w])=>k.includes(w));return m?m[1]:"🏃"}
+  if(x&&x.u==="dmg"||/damage/.test(k))return "❤️";
+  if(/death|deaths/.test(k))return "💀";
+  if(/kill/.test(k))return "⚔️";
+  if(/jump/.test(k))return "🦘";
+  if(/open|interact|inspect/.test(k))return "📦";
+  if(/eat|cake/.test(k))return "🍗";
+  if(/sleep|bed/.test(k))return "🛏️";
+  if(/trade|villager/.test(k))return "🤝";
+  if(/fish/.test(k))return "🎣";
+  if(/enchant/.test(k))return "✨";
+  if(/drop|leave|play/.test(k))return "🎮";
+  return "📊";
+}
+function statIco(id){
+  const cat=String(id).split("|")[0],k=statKey(id),e=statEmo(id);
+  return STAT_ITEM_CATS.includes(cat)&&/^[a-z0-9_]+$/.test(k)
+    ?`<img class="eco-ico st-ico" src="icons/${k}.png" alt="" loading="lazy" onerror="this.outerHTML='<span class=&quot;st-emo&quot; aria-hidden=&quot;true&quot;>${e}</span>'">`
+    :`<span class="st-emo" aria-hidden="true">${e}</span>`;
+}
+function statLabel(id){
+  const cat=String(id).split("|")[0],k=statKey(id),x=STATS&&STATS.stats[id];
+  return (cat!=="minecraft:custom"&&NAMES[k])||(x?x.l:k);
+}
 // Classements d'un joueur dans toutes les statistiques : rang (ex aequo = même rang), valeur, nombre de joueurs classés
 function playerStats(name){
   if(!STATS||!name)return [];
@@ -1515,7 +1550,7 @@ function playerStats(name){
     const x=STATS.stats[id],rows=(x.r||[]).filter(r=>okName(r[0])),i=rows.findIndex(r=>String(r[0]).toLowerCase()===n);
     if(i<0)continue;
     const v=rows[i][1];
-    out.push({id,l:x.l,cat:c.label,catId:c.id,u:x.u,v,rank:rows.findIndex(r=>r[1]===v)+1,n:rows.length});
+    out.push({id,l:statLabel(id),en:x.l,cat:c.label,catId:c.id,u:x.u,v,rank:rows.findIndex(r=>r[1]===v)+1,n:rows.length});
   }
   return out.sort((a,b)=>a.rank-b.rank||b.n-a.n||a.l.localeCompare(b.l));
 }
@@ -1532,8 +1567,8 @@ function mountPlayerStats(el,name){
   const st=el._ps||(el._ps={view:"rang",cat:"",q:""});
   const cnt=k=>all.filter(x=>x.rank===k).length,top10=all.filter(x=>x.rank<=10).length;
   const cats=[...new Map(all.map(x=>[x.catId,x.cat])).entries()];
-  const list=all.filter(x=>(!st.cat||x.catId===st.cat)&&(!st.q||fold(x.l+" "+x.cat).includes(fold(st.q))));
-  const row=x=>`<tr><td class="ps-rank r${Math.min(x.rank,4)}">${rankTxt(x.rank)}<small class="muted">sur ${fmt(x.n)}</small></td><td><button type="button" class="linkbtn" data-stat="${esc(x.id)}">${esc(x.l)}</button>${st.view==="rang"&&!st.cat?`<small class="muted ps-cat"> · ${esc(x.cat)}</small>`:""}</td><td class="num"><b>${fmtUnit(x.u)(x.v)}</b></td></tr>`;
+  const list=all.filter(x=>(!st.cat||x.catId===st.cat)&&(!st.q||fold(x.l+" "+x.en+" "+x.cat).includes(fold(st.q))));
+  const row=x=>`<tr><td class="ps-rank r${Math.min(x.rank,4)}">${rankTxt(x.rank)}<small class="muted">sur ${fmt(x.n)}</small></td><td><span class="st-name">${statIco(x.id)}<button type="button" class="linkbtn" data-stat="${esc(x.id)}">${esc(x.l)}</button></span>${st.view==="rang"&&!st.cat?`<small class="muted ps-cat"> · ${esc(x.cat)}</small>`:""}</td><td class="num"><b>${fmtUnit(x.u)(x.v)}</b></td></tr>`;
   const table=rows=>`<div class="tbl-wrap"><table class="tbl left ps-tbl"><tbody>${rows.map(row).join("")}</tbody></table></div>`;
   let body;
   if(!list.length)body='<p class="empty">Aucune statistique ne correspond.</p>';
@@ -1580,9 +1615,9 @@ function renderStatList(){
   const cat=STATS.categories.find(c=>c.id===$("statCat").value)||STATS.categories[0];
   if(!cat){$("statList").innerHTML='<p class="empty">Pas encore de données.</p>';return}
   const q=$("statQ").value.toLowerCase();
-  const ids=cat.stats.filter(id=>!q||STATS.stats[id].l.toLowerCase().includes(q)).sort((a,b)=>STATS.stats[b].t-STATS.stats[a].t);
+  const ids=cat.stats.filter(id=>!q||fold(statLabel(id)+" "+STATS.stats[id].l).includes(fold(q))).sort((a,b)=>STATS.stats[b].t-STATS.stats[a].t);
   const pr=statWho?Object.fromEntries(playerStats(statWho).map(x=>[x.id,x])):null;
-  $("statList").innerHTML=ids.map(id=>{const x=STATS.stats[id],m=pr&&pr[id];return `<button data-id="${esc(id)}" aria-pressed="${id===statSel}">${esc(x.l)}<span>${m?`<b class="ps-rank r${Math.min(m.rank,4)}">${rankTxt(m.rank)}</b> `:""}${fmtUnit(x.u)(m?m.v:x.t)}</span></button>`}).join("")||'<p class="empty">Aucune statistique.</p>';
+  $("statList").innerHTML=ids.map(id=>{const x=STATS.stats[id],m=pr&&pr[id];return `<button data-id="${esc(id)}" aria-pressed="${id===statSel}"><span class="st-name">${statIco(id)}${esc(statLabel(id))}</span><span>${m?`<b class="ps-rank r${Math.min(m.rank,4)}">${rankTxt(m.rank)}</b> `:""}${fmtUnit(x.u)(m?m.v:x.t)}</span></button>`}).join("")||'<p class="empty">Aucune statistique.</p>';
   if(statWho&&!statSel){renderStatView();return}
   if(!statSel||!cat.stats.includes(statSel)){statSel=ids[0]||null;renderStatView();renderStatListSel()}
 }
@@ -1594,7 +1629,7 @@ function renderStatView(){
   if(!x){$("statView").innerHTML='<p class="empty">Choisis une statistique.</p>';return}
   const cat=STATS.categories.find(c=>c.stats.includes(statSel));
   const m=statWho&&playerStats(statWho).find(y=>y.id===statSel);
-  $("statView").innerHTML=`<h3>${esc(x.l)}<small>${esc(cat?cat.label:"")}</small></h3>
+  $("statView").innerHTML=`<h3><span class="st-name">${statIco(statSel)}${esc(statLabel(statSel))}</span><small>${esc(cat?cat.label:"")}</small></h3>
     ${statWho?`<p class="small"><button type="button" class="linkbtn" id="statBack">← Tous les classements de ${esc(statWho)}</button>${m?` · ${esc(statWho)} : <b>${rankTxt(m.rank)}</b> sur ${fmt(m.n)} (${fmtUnit(x.u)(m.v)})`:` · ${esc(statWho)} n'a rien dans cette statistique`}</p>`:""}
     <p class="empty">Total du serveur : <b>${fmtUnit(x.u)(x.t)}</b></p>${rankList(x.r,fmtUnit(x.u),0,statWho)}`;
   const back=$("statBack");if(back)back.onclick=()=>{statSel=null;renderStatList();renderStatView()};

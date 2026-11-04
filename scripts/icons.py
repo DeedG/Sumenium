@@ -10,7 +10,7 @@ SITE = os.path.join(HERE, "..", "site")
 OUT = os.path.join(SITE, "icons")
 CACHE = os.path.join(HERE, "..", "work")
 WANTED_VERSION = os.environ.get("MC_VERSION", "26.3")
-NAMES_V = 2  # format de names_fr.json (2 : noms précisés pour les objets homonymes) ; changer force la régénération
+NAMES_V = 3  # 3 : objets et créatures des statistiques ; format de names_fr.json (2 : noms précisés pour les objets homonymes) ; changer force la régénération
 # Objets sans texture simple : on prend celle d'un objet qui leur ressemble
 ALIAS = {"enchanted_golden_apple": "golden_apple", "debug_stick": "stick"}
 
@@ -56,7 +56,7 @@ def french_names(items):
     lang = json.loads(get(f"https://resources.download.minecraft.net/{h[:2]}/{h}"))
     names, keys = {}, {}
     for it in items:
-        for key in (f"item.minecraft.{it}", f"block.minecraft.{it}"):
+        for key in (f"item.minecraft.{it}", f"block.minecraft.{it}", f"entity.minecraft.{it}"):
             if key in lang:
                 names[it], keys[it] = lang[key], key
                 break
@@ -80,13 +80,32 @@ def french_names(items):
     print(f"Noms français : {len(names) - 1}/{len(items)} objets")
 
 
+def stat_ids():
+    """Objets et créatures des statistiques Minecraft (site/stats.json) : noms français et icônes sur le site."""
+    try:
+        st = json.load(open(os.path.join(SITE, "stats.json"), encoding="utf-8"))
+    except Exception:
+        return set(), set()
+    items, mobs = set(), set()
+    for sid in st.get("stats") or {}:
+        cat, _, key = sid.partition("|")
+        k = key.replace("minecraft:", "")
+        if not k.replace("_", "").isalnum():
+            continue
+        if cat in ("minecraft:mined", "minecraft:crafted", "minecraft:used", "minecraft:broken", "minecraft:picked_up", "minecraft:dropped"):
+            items.add(k)
+        elif cat in ("minecraft:killed", "minecraft:killed_by"):
+            items.add(k)  # créatures : nom via entity.minecraft.<id>
+    return items, mobs
+
+
 def main():
     cat = json.load(open(os.path.join(SITE, "catalog.json"), encoding="utf-8"))
     items = {i["id"] for e in cat for k in ("rw", "tr") for i in e.get(k, [])}
     # Objets vendus en boutique, au FISC et à l'hôtel des ventes (si l'économie a déjà été lue)
     sys.path.insert(0, HERE)
     import eco
-    items = sorted(items | eco.items(os.path.join(SITE, "eco.json")))
+    items = sorted(items | eco.items(os.path.join(SITE, "eco.json")) | stat_ids()[0])
     os.makedirs(OUT, exist_ok=True)
     try:
         french_names(items)
