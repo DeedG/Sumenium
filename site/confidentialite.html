@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Confidentialité · Suménium</title>
-<meta name="description" content="Ce que le site du serveur Minecraft Suménium collecte, pourquoi, et comment le supprimer.">
+<meta name="description" content="Ce que le site du serveur Minecraft Suménium collecte, pourquoi, combien de temps, et comment exercer tes droits.">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="canonical" href="https://sumenium.com/confidentialite.html">
 <style>
-:root{--bg:#f3f7ec;--surface:#fff;--fg:#1f2d1b;--muted:#5f6d58;--line:#dde6d2;--grass:#3d7f2c;color-scheme:light}
-@media (prefers-color-scheme:dark){:root{--bg:#0f1912;--surface:#16231a;--fg:#e8f1e3;--muted:#9db199;--line:#26382a;--grass:#8fd27a;color-scheme:dark}}
+:root{--bg:#f3f7ec;--surface:#fff;--fg:#1f2d1b;--muted:#5f6d58;--line:#dde6d2;--grass:#3d7f2c;--warn:#a23c2a;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1912;--surface:#16231a;--fg:#e8f1e3;--muted:#9db199;--line:#26382a;--grass:#8fd27a;--warn:#f39a85;color-scheme:dark}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,sans-serif}
 main{max-width:760px;margin:0 auto;padding:32px 16px 56px}
@@ -20,51 +20,69 @@ p,li{color:var(--fg)}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-top:18px}
 a{color:var(--grass);font-weight:600}
 ul{padding-left:20px}
+table{width:100%;border-collapse:collapse;font-size:.93rem}th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line)}th{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+label{display:grid;gap:4px;font-weight:600;margin-top:12px}
+input,select,textarea{font:inherit;font-weight:400;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px;width:100%}
+button{font:inherit;font-weight:700;background:var(--grass);color:#fff;border:0;border-radius:12px;padding:10px 18px;margin-top:16px;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.msg{margin-top:12px;font-weight:600}.msg.bad{color:var(--warn)}
+nav.legal{margin-top:32px;font-size:.9rem}
 </style>
 </head>
 <body>
 <main>
   <p><a href="/">← Retour au site Suménium</a></p>
   <h1>Confidentialité</h1>
-  <p class="muted">Site communautaire du serveur Minecraft Suménium (saison 7), géré bénévolement par le staff du serveur. Aucun lien avec Mojang, Microsoft ou Discord.</p>
+  <p class="muted">Mise à jour le 5 novembre 2026. Site communautaire du serveur Minecraft Suménium, géré bénévolement. Aucun lien avec Mojang, Microsoft ou Discord.</p>
 
   <div class="card">
-    <b>En bref :</b> on ne demande jamais de mot de passe. La connexion se fait sur <b>discord.com</b> (vérifie l'adresse), et on reçoit seulement ton identifiant Discord, ton pseudo, ton avatar et tes rôles sur le serveur Discord Suménium. Rien n'est vendu ni partagé, et rien n'est publié sur Discord.
+    <b>En bref :</b> on ne demande jamais de mot de passe ni d'adresse e-mail. La connexion se fait sur discord.com, et le site reçoit seulement ton identifiant Discord, ton pseudo, ton avatar et tes rôles sur le serveur Discord Suménium. Rien n'est vendu, aucune publicité, aucun outil de mesure d'audience.
   </div>
 
+  <h2>Responsable</h2>
+  <p>L'administrateur du serveur Suménium (DeedG en jeu), joignable par le <a href="contact.html">formulaire de contact</a> ou sur le Discord Suménium. Le site sert à faire vivre la communauté du serveur : fiches de joueurs, factions, élections, économie du jeu. Base légale : l'intérêt légitime de la communauté à organiser son serveur, et ce que tu choisis toi-même de renseigner.</p>
+
   <h2>Connexion avec Discord</h2>
-  <p>Le bouton « Se connecter avec Discord » t'envoie sur la page officielle de Discord, qui te demande d'autoriser l'application « Sumenium 2 ». Les autorisations demandées sont :</p>
+  <p>Le bouton « Se connecter avec Discord » t'envoie sur la page officielle de Discord, qui demande d'autoriser l'application « Sumenium 2 » :</p>
   <ul>
     <li><b>identify</b> : ton identifiant, ton pseudo et ton avatar Discord (pas ton adresse e-mail) ;</li>
     <li><b>guilds.members.read</b> : tes rôles sur le serveur Discord Suménium uniquement, pour savoir si tu es joueur ou staff.</li>
   </ul>
-  <p>Le site ne voit jamais ton mot de passe Discord et ne peut rien publier ni lire tes messages. Tu peux retirer l'autorisation à tout moment dans Discord : <i>Paramètres → Applications autorisées</i>.</p>
+  <p>Le site ne voit jamais ton mot de passe et ne peut ni publier ni lire tes messages. Tu peux retirer l'autorisation à tout moment dans Discord : Paramètres › Applications autorisées.</p>
 
-  <h2>Ce qui est enregistré</h2>
+  <h2>Ce qui est enregistré, qui le voit, combien de temps</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Donnée</th><th>Visible par</th><th>Gardée</th></tr></thead>
+    <tbody>
+      <tr><td>Compte : identifiant, pseudo et avatar Discord, rôles, jeton de reconnexion</td><td>Le staff (le jeton : personne)</td><td>Tant que tu utilises le site ; supprimé sur demande</td></tr>
+      <tr><td>Ta fiche : pseudo Minecraft, faction, métier, descriptions, choix « mourir ou survivre »</td><td>Tout le monde</td><td>La saison ; ensuite supprimée ou archivée</td></tr>
+      <tr><td>Ta taille IRL (facultative)</td><td>Toi et le staff</td><td>La saison</td></tr>
+      <tr><td>Factions, coordonnées des hubs et des bases, usines, projets, candidatures</td><td>Tout le monde (coordonnées des usines : la faction et le staff)</td><td>La saison</td></tr>
+      <tr><td>Votes</td><td>Tout le monde voit les totaux ; chaque vote est relié à ton compte dans la base pour empêcher de voter deux fois, sans être affiché</td><td>La saison</td></tr>
+      <tr><td>Économie du jeu : solde, faction, dernière connexion, boutiques (propriétaire, prix, ventes)</td><td>Tout le monde (classement Richesse, Marché)</td><td>Mis à jour en continu</td></tr>
+      <tr><td>Détail de l'économie : transactions regroupées par faction, sans nom</td><td>Tout le monde ; les noms seulement pour le staff</td><td>180 jours</td></tr>
+      <tr><td>Ton historique économique, celui de la banque de ta faction et de tes boutiques</td><td>Toi, ta faction pour sa banque et ses boutiques, et le staff</td><td>180 jours</td></tr>
+      <tr><td>Historique des modifications du site (qui a changé quoi)</td><td>Le staff</td><td>La saison</td></tr>
+      <tr><td>Messages du formulaire de contact</td><td>Le staff</td><td>1 an après leur traitement ; l'empreinte de l'adresse IP (contre les abus) 30 jours</td></tr>
+      <tr><td>Cookie de session (rester connecté) et préférences d'affichage dans ton navigateur</td><td>Ton navigateur</td><td>30 jours ; pas de cookie publicitaire ni de traceur, donc pas de bandeau</td></tr>
+    </tbody>
+  </table></div>
+  <p>Les classements, succès et statistiques publics viennent du serveur Minecraft (pseudos et scores de jeu). Une sauvegarde de la base du site est faite chaque semaine sur un ordinateur du staff, jamais publiée ; les 12 dernières sont gardées.</p>
+
+  <h2>Prestataires et transferts hors de l'Union européenne</h2>
   <ul>
-    <li><b>Ta fiche</b> (pseudo Minecraft, faction, métier, descriptions, choix « mourir ou survivre ») : publique, visible par tous les visiteurs du site, comme les factions, usines, projets et candidatures.</li>
-    <li><b>Ta taille IRL</b>, si tu la donnes : visible seulement par toi et le staff, pour régler ta taille en jeu.</li>
-    <li><b>Les coordonnées de ta faction</b> : hubs et bases visibles par tous ; usines visibles seulement par ta faction et le staff.</li>
-    <li><b>Les votes</b> : secrets, le site ne montre que les totaux.</li>
-    <li><b>Ton historique économique</b> (achats, ventes du mod Sumenium Economy) : visible seulement par toi et le staff, gardé 180 jours.</li>
-    <li><b>Un cookie de session</b> pour rester connecté 30 jours sur cet appareil. Pas de cookie publicitaire ni de traceur.</li>
+    <li><b>Cloudflare</b> (États-Unis) : hébergement du site, de la base de données et de la carte (carte.sumenium.com).</li>
+    <li><b>GitHub</b> (États-Unis) : fichiers publics du site et mise à jour automatique.</li>
+    <li><b>Discord</b> (États-Unis) : connexion.</li>
+    <li><b>Mojang</b> : têtes des skins, tirées des skins publics de Minecraft par le site ; <b>mc-heads.net</b> sert seulement de secours quand une tête manque (ton navigateur leur demande alors l'image du pseudo).</li>
   </ul>
-  <p>Les classements, succès et statistiques publics viennent du serveur Minecraft (pseudos et scores de jeu).</p>
-  <p>Une copie de sauvegarde de la base du site est faite chaque semaine sur un ordinateur du staff, jamais publiée ; les 12 dernières sont gardées.</p>
+  <p>Ces prestataires appliquent les garanties prévues par le RGPD pour les transferts vers les États-Unis (cadre de protection des données UE–États-Unis ou clauses contractuelles types). Les polices d'écriture sont hébergées par le site lui-même : aucune requête vers Google.</p>
 
-  <h2>Services tiers</h2>
-  <ul>
-    <li>Les têtes des skins sont tirées des skins publics de Minecraft (API de Mojang) par le site lui-même ; <b>mc-heads.net</b> sert seulement de secours quand une tête manque (ton navigateur leur demande alors l'image du pseudo).</li>
-    <li><b>Google Fonts</b> fournit les polices du site.</li>
-    <li><b>Cloudflare</b> héberge le site et la carte (carte.sumenium.com).</li>
-  </ul>
-  <p>Aucune publicité, aucun outil de mesure d'audience.</p>
-
-  <h2>Supprimer tes données</h2>
-  <p>Demande au staff sur le Discord Suménium : on supprime ta fiche et le lien avec ton compte Discord.</p>
-
-  <h2>Contact</h2>
-  <p>Le staff du serveur, sur le Discord Suménium.</p>
+  <h2>Tes droits</h2>
+  <p>Tu peux demander à voir, corriger ou supprimer tes données, t'opposer à leur utilisation ou en demander une copie. Écris via le <a href="contact.html">formulaire de contact</a> (sujet « Mes données ») ou au staff sur Discord : on répond sous un mois. Supprimer ta fiche retire aussi le lien avec ton compte Discord. Si tu estimes que tes droits ne sont pas respectés, tu peux saisir la <a href="https://www.cnil.fr/fr/plaintes" rel="noopener">CNIL</a>.</p>
+  <nav class="legal muted"><a href="confidentialite.html">Confidentialité</a> · <a href="mentions-legales.html">Mentions légales</a> · <a href="contact.html">Contact</a></nav>
 </main>
 </body>
 </html>

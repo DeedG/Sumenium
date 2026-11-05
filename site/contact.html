@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact · Suménium</title>
+<meta name="description" content="Écrire au staff du serveur Minecraft Suménium : question, problème, demande sur tes données.">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="canonical" href="https://sumenium.com/contact.html">
+<style>
+:root{--bg:#f3f7ec;--surface:#fff;--fg:#1f2d1b;--muted:#5f6d58;--line:#dde6d2;--grass:#3d7f2c;--warn:#a23c2a;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1912;--surface:#16231a;--fg:#e8f1e3;--muted:#9db199;--line:#26382a;--grass:#8fd27a;--warn:#f39a85;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:32px 16px 56px}
+h1{font-size:1.9rem;margin:0 0 4px}
+h2{font-size:1.15rem;margin:28px 0 6px}
+p,li{color:var(--fg)}
+.muted{color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-top:18px}
+a{color:var(--grass);font-weight:600}
+ul{padding-left:20px}
+table{width:100%;border-collapse:collapse;font-size:.93rem}th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line)}th{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+label{display:grid;gap:4px;font-weight:600;margin-top:12px}
+input,select,textarea{font:inherit;font-weight:400;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px;width:100%}
+button{font:inherit;font-weight:700;background:var(--grass);color:#fff;border:0;border-radius:12px;padding:10px 18px;margin-top:16px;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.msg{margin-top:12px;font-weight:600}.msg.bad{color:var(--warn)}
+nav.legal{margin-top:32px;font-size:.9rem}
+</style>
+</head>
+<body>
+<main>
+  <p><a href="/">← Retour au site Suménium</a></p>
+  <h1>Contact</h1>
+  <p class="muted">Ton message n'est lu que par le staff du serveur, dans ses outils sur le site. Rien n'est publié.</p>
+  <form id="f" class="card" novalidate>
+    <label>Sujet<select name="sujet">
+      <option value="question">Une question</option>
+      <option value="probleme">Un problème sur le site ou le serveur</option>
+      <option value="donnees">Mes données (voir, corriger, supprimer)</option>
+      <option value="autre">Autre</option></select></label>
+    <label>Ton pseudo (facultatif)<input name="nom" maxlength="60" autocomplete="nickname" placeholder="Pseudo Minecraft ou Discord"></label>
+    <label>Comment te répondre (facultatif)<input name="reponse" maxlength="120" placeholder="Pseudo Discord ou adresse e-mail"></label>
+    <label>Message<textarea name="message" rows="7" maxlength="3000" required placeholder="Ton message (10 caractères au moins)"></textarea></label>
+    <div class="hp" aria-hidden="true"><label>Ne pas remplir<input name="site" tabindex="-1" autocomplete="off"></label></div>
+    <button id="b">Envoyer</button>
+    <p class="msg" id="m" role="status"></p>
+  </form>
+  <p class="muted">Sans moyen de réponse, le staff ne pourra pas te répondre directement. Pour une demande sur tes données, indique ton pseudo Minecraft.</p>
+  <script>
+  (function () {
+    var f = document.getElementById("f"), b = document.getElementById("b"), m = document.getElementById("m");
+    f.onsubmit = function (e) {
+      e.preventDefault();
+      var d = Object.fromEntries(new FormData(f).entries());
+      if ((d.message || "").trim().length < 10) { m.className = "msg bad"; m.textContent = "Écris au moins quelques mots (10 caractères)."; return; }
+      b.disabled = true; m.className = "msg"; m.textContent = "Envoi…";
+      fetch("/api/contact", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json", "x-requested-with": "sumenium" }, body: JSON.stringify(d) })
+        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.error || "Envoi impossible pour le moment (erreur " + r.status + ")."); }); })
+        .then(function () { f.reset(); m.className = "msg"; m.textContent = "Message envoyé, merci ! Le staff le lira bientôt."; })
+        .catch(function (err) { m.className = "msg bad"; m.textContent = location.hostname.endsWith("sumenium.com") || location.hostname === "localhost" ? err.message : "Le formulaire fonctionne sur sumenium.com."; })
+        .finally(function () { b.disabled = false; });
+    };
+  })();
+  </script>
+  <nav class="legal muted"><a href="confidentialite.html">Confidentialité</a> · <a href="mentions-legales.html">Mentions légales</a> · <a href="contact.html">Contact</a></nav>
+</main>
+</body>
+</html>

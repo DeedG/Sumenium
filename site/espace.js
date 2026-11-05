@@ -210,6 +210,8 @@ function notifs() {
     if (fd) add("st-fd:" + fd, "🛡️", `${plural(fd, "demande", "demandes")} de nouvelle faction à traiter.`, "#espace/staff", "staff");
     const ln = (D.liens || []).length;
     if (ln) add("st-ln:" + ln, "🛡️", `${plural(ln, "lien de compte", "liens de compte")} à vérifier.`, "#espace/staff", "staff");
+    const ct = (D.contacts || []).filter((c) => !c.traite).length;
+    if (ct) add("st-ct:" + ct, "✉️", `${plural(ct, "message", "messages")} de contact à lire.`, "#espace/staff", "staff");
     if (pd) add("st-pd:" + pd, "🛡️", `${plural(pd, "projet", "projets")} à valider.`, "#espace/staff", "staff");
     const wl = D.wlSynced ? D.players.filter((x) => !x.whitelisted && ficheOk(x)).length : 0;
     if (wl) add("st-wl:" + wl, "🛡️", `${plural(wl, "joueur", "joueurs")} à whitelister.`, "#espace/staff", "staff");
@@ -1400,7 +1402,8 @@ function staff() {
   const aWl = D.wlSynced ? D.players.filter((p) => !p.whitelisted).sort((a, b) => ficheOk(b) - ficheOk(a) || a.mc_name.localeCompare(b.mc_name)) : [];
   const fDem = (D.factionDemandes || []).filter((d) => d.statut === "attente"), pDem = (D.projetDemandes || []).filter((d) => PD_OPEN.includes(d.statut));
   const absentes = D.factions.filter((f) => ECO && !ecoFac(f));
-  const nav = [["st-dem", `Demandes (${fDem.length + pDem.filter((d) => d.statut === "attente").length})`], ["st-wl", `À whitelister (${aWl.filter(ficheOk).length})`], ["st-taille", `Tailles RP (${todo.length})`], ["st-bordure", "Bordure"], ["st-hist", "Historique d'un joueur"], ["st-reglages", "Réglages"], ["st-import", "Import"], ["st-histo", "Historique"]];
+  const ctN = (D.contacts || []).filter((c) => !c.traite).length;
+  const nav = [["st-dem", `Demandes (${fDem.length + pDem.filter((d) => d.statut === "attente").length})`], ["st-ct", `Messages (${ctN})`], ["st-wl", `À whitelister (${aWl.filter(ficheOk).length})`], ["st-taille", `Tailles RP (${todo.length})`], ["st-bordure", "Bordure"], ["st-hist", "Historique d'un joueur"], ["st-reglages", "Réglages"], ["st-import", "Import"], ["st-histo", "Historique"]];
   view(head("Outils staff", "Whitelist, tailles RP, bordure, réglages et historique de toutes les modifications.") +
     `<nav class="anchors">${nav.map(([id, l]) => `<a href="#" data-jump="${id}">${l}</a>`).join("")}</nav>
     <section class="card" id="st-dem"><h3>Demandes des joueurs</h3>
@@ -1425,6 +1428,13 @@ function staff() {
           return `<details class="cmds-box"><summary>${colTag(d ? d.couleur : "white", f.name)} <span class="muted small">${names.length} joueurs${d ? "" : " · couleur à choisir (white par défaut)"}</span></summary>
             <ul class="cmd-list">${facCmds(f.name, d ? d.couleur : "white", names).map((c) => `<li>${copyBtn(c)}</li>`).join("")}</ul></details>`; }).join("")}` : ""}
     </section>
+    <section class="card" id="st-ct"><h3>Messages de contact</h3>
+      <p class="muted small">Envoyés depuis le <a href="contact.html">formulaire</a>. Pour « Mes données », réponds sous un mois. Les messages traités sont effacés au bout d'un an.</p>
+      ${(D.contacts || []).length ? `<ul class="dem-list">${D.contacts.map((c) => `<li class="dem${c.traite ? " muted" : ""}"><div><b>${esc(({ donnees: "Mes données", question: "Question", probleme: "Problème", autre: "Autre" })[c.sujet] || c.sujet)}</b>
+          <span class="muted small">${c.nom ? esc(c.nom) : "anonyme"}${c.discord_name ? ` · connecté @${esc(c.discord_name)}` : ""}${c.reponse ? ` · répondre : <b>${esc(c.reponse)}</b>` : ""} · ${new Date(c.ts * 1000).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}${c.traite ? ` · traité${c.traite_par ? " par " + esc(c.traite_par) : ""}` : ""}</span>
+          <p class="small" style="white-space:pre-wrap;margin:6px 0 0">${esc(c.message)}</p></div>
+          <div class="actions"><button class="btn small${c.traite ? " ghost" : ""}" data-ct-ok="${c.id}" data-v="${c.traite ? 0 : 1}">${c.traite ? "Rouvrir" : "Traité"}</button><button class="btn small ghost" data-ct-del="${c.id}">Supprimer</button></div></li>`).join("")}</ul>`
+        : '<p class="muted small">Aucun message.</p>'}</section>
     <section class="card" id="st-wl"><h3>À whitelister</h3>
       ${D.wlSynced ? `<p class="muted small">Joueurs avec une fiche mais absents de la whitelist. Vérifie la candidature, lance la commande en jeu : ils disparaissent d'ici la prochaine synchronisation (10 min).</p>
       ${D.wlFree && D.wlFree.length ? `<p class="muted small">Si une fiche porte un pseudo Discord ou une faute de frappe alors que le joueur est déjà whitelisté, choisis son vrai pseudo dans « Pseudo du serveur » et renomme la fiche (${plural(D.wlFree.length, "pseudo whitelisté", "pseudos whitelistés")} sans fiche).</p>` : ""}
@@ -1469,6 +1479,8 @@ function staff() {
   document.querySelectorAll("[data-lien-ok]").forEach((b) => (b.onclick = () => confirm("Relier ce compte Discord à ce pseudo ? Il aura accès à la fiche, à sa faction et à son historique.")
     && act(() => call("POST", `/api/admin/liens/${b.dataset.lienOk}`), "Lien validé")));
   document.querySelectorAll("[data-lien-no]").forEach((b) => (b.onclick = () => act(() => call("DELETE", `/api/admin/liens/${b.dataset.lienNo}`), "Demande refusée")));
+  document.querySelectorAll("[data-ct-ok]").forEach((b) => (b.onclick = () => act(() => call("PUT", `/api/admin/contact/${b.dataset.ctOk}`, { traite: b.dataset.v === "1" }), b.dataset.v === "1" ? "Marqué traité" : "Rouvert")));
+  document.querySelectorAll("[data-ct-del]").forEach((b) => (b.onclick = () => confirm("Supprimer ce message définitivement ?") && act(() => call("DELETE", `/api/admin/contact/${b.dataset.ctDel}`), "Message supprimé")));
   $("saveSettings").onclick = () => act(() => call("PUT", "/api/admin/settings",
     { election: $("setElection").value, usines_ouvertes: $("setUsOpen").value, usine_tour: $("setUsTour").value, factions_ouvertes: $("setFacOpen").value, maire_id: $("setMaire").value, mairie_ouverte: $("setMairie").value }), "Réglages enregistrés");
   bindFacDem(); bindProjDem();

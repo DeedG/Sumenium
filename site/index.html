@@ -32,10 +32,17 @@ if(location.hostname==="deedg.github.io")location.replace("https://sumenium.com/
 })();
 </script>
 <link rel="canonical" href="https://sumenium.com/">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Pixelify+Sans:wght@400;600&display=swap">
 <style>
+/* Polices hébergées sur le site (licence OFL, fonts/LICENSE-OFL.txt) : aucun appel à Google Fonts */
+@font-face{font-family:"Fredoka";font-weight:500;font-display:swap;src:url(fonts/fredoka-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Fredoka";font-weight:600;font-display:swap;src:url(fonts/fredoka-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Fredoka";font-weight:700;font-display:swap;src:url(fonts/fredoka-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Nunito";font-weight:400;font-display:swap;src:url(fonts/nunito-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Nunito";font-weight:600;font-display:swap;src:url(fonts/nunito-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Nunito";font-weight:700;font-display:swap;src:url(fonts/nunito-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Nunito";font-weight:800;font-display:swap;src:url(fonts/nunito-latin-800-normal.woff2) format("woff2")}
+@font-face{font-family:"Pixelify Sans";font-weight:400;font-display:swap;src:url(fonts/pixelify-sans-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Pixelify Sans";font-weight:600;font-display:swap;src:url(fonts/pixelify-sans-latin-600-normal.woff2) format("woff2")}
 /* Suménium Saison 7 : ciel d'été → prairie, bordure en herbe pixelisée, tournesol en accent, cristal bleu pour les chiffres */
 :root{
   --bg:#f3f7ec; --surface:#ffffff; --fg:#1f2d1b; --muted:#5f6d58; --line:#dde6d2;
@@ -896,7 +903,7 @@ dialog.hist-dlg::backdrop{background:rgba(0,0,0,.45)}.hist-head{display:flex;jus
 
   <section class="panel" id="p-aide" hidden>
     <nav class="subtabs" aria-label="Aide" data-area="aide">
-      <a href="#aide/rejoindre" data-sub="rejoindre">Rejoindre le serveur</a><a href="#aide/guides" data-sub="guides">Guides</a><a href="#aide/commandes" data-sub="commandes">Commandes</a><a href="confidentialite.html">Confidentialité</a>
+      <a href="#aide/rejoindre" data-sub="rejoindre">Rejoindre le serveur</a><a href="#aide/guides" data-sub="guides">Guides</a><a href="#aide/commandes" data-sub="commandes">Commandes</a><a href="confidentialite.html">Confidentialité</a><a href="contact.html">Contact</a>
     </nav>
     <div class="subpanel" data-sub="rejoindre">
       <section class="card join-hero">
@@ -1063,7 +1070,7 @@ dialog.hist-dlg::backdrop{background:rgba(0,0,0,.45)}.hist-head{display:flex;jus
     <div class="subpanel" data-sub="commandes"><div id="cmdRoot"></div></div>
   </section>
 </main>
-<p class="site-foot">Site communautaire du serveur Minecraft Suménium, sans lien avec Mojang, Microsoft ou Discord · <a href="confidentialite.html">Confidentialité</a></p>
+<p class="site-foot">Site communautaire du serveur Minecraft Suménium, sans lien avec Mojang, Microsoft ou Discord · <a href="confidentialite.html">Confidentialité</a> · <a href="mentions-legales.html">Mentions légales</a> · <a href="contact.html">Contact</a></p>
 <div class="toast" id="toast" role="status" hidden></div>
 <script src="espace.js?v=__BUILD__"></script>
 <script src="economie.js?v=__BUILD__"></script>

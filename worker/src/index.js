@@ -21,6 +21,11 @@ const ACTIVITE = ["", "tres", "bcp", "moyen", "peu"];
 export default {
   // Déclencheur fiable (Cloudflare) de la mise à jour du site : le cron de GitHub est souvent retardé de plusieurs heures
   async scheduled(event, env) {
+    // Formulaire de contact : empreintes d'IP effacées après 30 jours, messages traités effacés après un an
+    try {
+      await env.DB.batch([env.DB.prepare("UPDATE contact SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND ts < ?").bind(now() - 30 * 86400),
+        env.DB.prepare("DELETE FROM contact WHERE traite = 1 AND ts < ?").bind(now() - 365 * 86400)]);
+    } catch (e) { console.error("Nettoyage du contact :", e); }
     if (!env.GITHUB_DISPATCH_TOKEN) return;
     const r = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/actions/workflows/update.yml/dispatches`, {
       method: "POST",
@@ -40,7 +45,7 @@ export default {
       return Response.redirect(pub.origin + url.pathname + url.search, 301);
     }
     if (url.pathname === "/.well-known/security.txt") {
-      return new Response(`Contact: ${pub.origin}/confidentialite.html\nPreferred-Languages: fr, en\nCanonical: ${pub.origin}/.well-known/security.txt\nExpires: ${new Date(Date.now() + 300 * 86400000).toISOString()}\n`,
+      return new Response(`Contact: ${pub.origin}/contact.html\nPreferred-Languages: fr, en\nCanonical: ${pub.origin}/.well-known/security.txt\nExpires: ${new Date(Date.now() + 300 * 86400000).toISOString()}\n`,
         { headers: securityHeaders(new Headers({ "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=86400" })) });
     }
     if (!url.pathname.startsWith("/api/")) return proxy(req, env, url);
@@ -158,8 +163,8 @@ async function proxy(req, env, url) {
   return out;
 }
 
-const CSP = ["default-src 'self'", "script-src 'self' 'unsafe-inline'", "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src https://fonts.gstatic.com", "img-src 'self' data: blob: https://mc-heads.net https://textures.minecraft.net https://cdn.discordapp.com", "connect-src 'self'",
+const CSP = ["default-src 'self'", "script-src 'self' 'unsafe-inline'", "style-src 'self' 'unsafe-inline'",
+  "font-src 'self'", "img-src 'self' data: blob: https://mc-heads.net https://textures.minecraft.net https://cdn.discordapp.com", "connect-src 'self'",
   "frame-src https://carte.sumenium.com", "frame-ancestors 'self'", "base-uri 'self'", "form-action 'self'", "object-src 'none'"].join("; ");
 function securityHeaders(h) {
   h.set("strict-transport-security", "max-age=31536000");
@@ -347,6 +352,34 @@ async function api(req, env, url, ctx) {
   if ((mm = p.match(/^\/api\/boutiques\/([0-9a-f-]{8,40})\/historique$/)) && m === "GET") {
     const s = await need(req, env, "attente");
     return json(await shopHistory(env, s, mm[1], url));
+  }
+
+  /* ---- formulaire de contact (public) : lu par le staff dans ses outils ---- */
+  if (p === "/api/contact" && m === "POST") {
+    if (req.headers.get("x-requested-with") !== "sumenium") fail(400, "Requête refusée.");
+    if (str(body.site)) return json({ ok: true });  // champ piège rempli par les robots : ignoré sans le dire
+    const SUJETS = ["donnees", "question", "probleme", "autre"];
+    const sujet = SUJETS.includes(body.sujet) ? body.sujet : "autre";
+    const message = str(body.message, 3000).trim();
+    if (message.length < 10) fail(400, "Écris au moins quelques mots (10 caractères).");
+    const ip = req.headers.get("cf-connecting-ip") || "";
+    const ipHash = ip ? b64url(await sha256(`sumenium:contact:${env.SESSION_SECRET || env.DISCORD_CLIENT_SECRET}:${ip}`)).slice(0, 22) : null;
+    if (ipHash) {
+      const n = await env.DB.prepare("SELECT SUM(ts > ?) AS h, COUNT(*) AS d FROM contact WHERE ip_hash = ? AND ts > ?").bind(now() - 3600, ipHash, now() - 86400).first();
+      if ((n && n.h >= 3) || (n && n.d >= 10)) fail(429, "Trop de messages envoyés : réessaie plus tard.");
+    }
+    const s = await session(req, env);
+    await env.DB.prepare("INSERT INTO contact (ts, sujet, nom, reponse, message, discord_id, ip_hash) VALUES (?,?,?,?,?,?,?)")
+      .bind(now(), sujet, str(body.nom, 60), str(body.reponse, 120), message, s ? s.id : null, ipHash).run();
+    return json({ ok: true });
+  }
+  if ((mm = p.match(/^\/api\/admin\/contact\/(\d+)$/)) && (m === "PUT" || m === "DELETE")) {
+    const s = await need(req, env, "staff");
+    const id = Number(mm[1]);
+    if (m === "DELETE") await env.DB.prepare("DELETE FROM contact WHERE id = ?").bind(id).run();
+    else await env.DB.prepare("UPDATE contact SET traite = ?, traite_par = ?, traite_ts = ? WHERE id = ?").bind(body.traite ? 1 : 0, s.name || "", now(), id).run();
+    await audit(env, s, "contact", id, m === "DELETE" ? "delete" : "update", null, m === "DELETE" ? null : { traite: !!body.traite });
+    return json({ ok: true });
   }
 
   /* ---- tâches municipales : écrites par le maire (ou le staff), lues par tous et par le serveur ---- */
@@ -1512,6 +1545,7 @@ async function allData(env, s) {
     myVotes: Object.fromEntries(votesR.results.map((v) => [v.tour, v.candidat_id])),
     results: staff || settings.election === "resultats" ? resultsR.results : null,
     lien: pub ? null : await env.DB.prepare("SELECT mc_name, code, ts FROM liens WHERE discord_id = ?").bind(s.id).first(),
+    contacts: staff ? (await env.DB.prepare("SELECT c.id, c.ts, c.sujet, c.nom, c.reponse, c.message, c.traite, c.traite_par, u.discord_name FROM contact c LEFT JOIN users u ON u.discord_id = c.discord_id WHERE c.traite = 0 OR c.ts > ? ORDER BY c.traite, c.ts DESC LIMIT 100").bind(now() - 30 * 86400).all()).results : null,
     liens: staff ? (await env.DB.prepare("SELECT l.discord_id, l.mc_name, l.ts, u.discord_name FROM liens l LEFT JOIN users u ON u.discord_id = l.discord_id WHERE NOT EXISTS (SELECT 1 FROM players p WHERE p.mc_name = l.mc_name AND p.discord_id IS NOT NULL AND p.deleted = 0) ORDER BY l.ts").all()).results : null,
     meId: me ? me.id : null, wlSynced: !pub && wlCountR.results[0].n > 0, wlFree: staff ? wlFreeR.results.map((r) => r.mc_name) : null,
   };
