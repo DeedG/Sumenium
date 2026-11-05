@@ -99,6 +99,56 @@ def stat_ids():
     return items, mobs
 
 
+# Icônes des types de statistiques (site/icons/stat/<type>.png) : textures du jeu, plusieurs candidates par type
+STAT_ICONS = {
+    "mined": ["item/iron_pickaxe"], "crafted": ["block/crafting_table_front"], "used": ["item/flint_and_steel"],
+    "broken": ["block/damaged_anvil_top", "item/wooden_pickaxe"], "picked_up": ["item/hopper"], "dropped": ["block/dropper_front"],
+    "killed": ["item/iron_sword"], "killed_by": ["item/bone"], "deaths": ["item/totem_of_undying"],
+    "time": ["item/clock_00"], "walk": ["item/leather_boots"], "sprint": ["item/golden_boots"], "crouch": ["item/leather_leggings"],
+    "swim": ["item/water_bucket"], "boat": ["item/oak_boat"], "horse": ["item/saddle"], "pig": ["item/carrot_on_a_stick"],
+    "strider": ["item/warped_fungus_on_a_stick"], "minecart": ["item/minecart"], "aviate": ["item/elytra"], "fly": ["item/feather"],
+    "fall": ["item/feather"], "climb": ["block/ladder"], "jump": ["item/rabbit_foot"], "player_kill": ["item/diamond_sword"],
+    "open": ["block/barrel_top"], "enchant": ["item/enchanted_book"], "eat": ["item/cake", "item/cooked_beef"], "sleep": ["item/clock_00"],
+    "trade": ["item/emerald"], "fish": ["item/fishing_rod"], "brew": ["item/brewing_stand"], "anvil": ["block/anvil_top"],
+    "note": ["block/note_block"], "plant": ["item/wheat_seeds"], "clean": ["item/water_bucket"], "bell": ["item/bell"],
+    "raid": ["item/ominous_banner", "item/crossbow_standby"], "target": ["block/target_side"], "generic": ["item/book"],
+    "heart": ["gui/sprites/hud/heart/full", "gui/sprites/hud/heart/container"],
+}
+
+
+def stat_icons(z, names):
+    out = os.path.join(OUT, "stat")
+    os.makedirs(out, exist_ok=True)
+    base, made = "assets/minecraft/textures/", 0
+    for key, cands in STAT_ICONS.items():
+        path = os.path.join(out, key + ".png")
+        if os.path.exists(path):
+            continue
+        for c in cands:
+            if base + c + ".png" in names:
+                with open(path, "wb") as f:
+                    f.write(z.read(base + c + ".png"))
+                made += 1
+                break
+    # Cœur brisé (dégâts infligés) : le cœur du jeu, fendu en deux
+    heart, broken = os.path.join(out, "heart.png"), os.path.join(out, "heart_broken.png")
+    if os.path.exists(heart) and not os.path.exists(broken):
+        try:
+            from PIL import Image
+            im = Image.open(heart).convert("RGBA")
+            w, h = im.size
+            res = Image.new("RGBA", (w + 2, h), (0, 0, 0, 0))
+            mid = w // 2
+            res.paste(im.crop((0, 0, mid, h)), (0, 1))          # moitié gauche un peu plus bas
+            res.paste(im.crop((mid, 0, w, h)), (mid + 2, 0))    # moitié droite décalée : la fente
+            res.save(broken)
+            made += 1
+        except Exception as e:
+            print("Cœur brisé non créé :", e)
+    have = len([f for f in os.listdir(out) if f.endswith(".png")])
+    print(f"::notice title=Icônes des statistiques::{have} sur {len(STAT_ICONS) + 1} ({made} ajoutées)")
+
+
 def main():
     cat = json.load(open(os.path.join(SITE, "catalog.json"), encoding="utf-8"))
     items = {i["id"] for e in cat for k in ("rw", "tr") for i in e.get(k, [])}
@@ -112,6 +162,12 @@ def main():
     except Exception as e:
         print(f"::warning title=Noms français::{type(e).__name__}: {e}")
     missing = [i for i in items if not os.path.exists(os.path.join(OUT, i + ".png"))]
+    if not os.path.exists(os.path.join(OUT, "stat", "heart_broken.png")):
+        try:
+            zz = zipfile.ZipFile(client_jar())
+            stat_icons(zz, set(zz.namelist()))
+        except Exception as e:
+            print(f"::warning title=Icônes des statistiques::{type(e).__name__}: {e}")
     if not missing:
         print("Icônes déjà à jour")
         return

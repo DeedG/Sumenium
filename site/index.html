@@ -743,7 +743,7 @@ dialog.hist-dlg::backdrop{background:rgba(0,0,0,.45)}.hist-head{display:flex;jus
 .ps-more{margin-top:10px}.ps-more summary{cursor:pointer;font-weight:700}
 .rank li.hl{outline:2px solid var(--sun);background:var(--sun-soft)}
 .st-name{display:inline-flex;align-items:center;gap:8px;min-width:0}
-.st-ico{width:22px;height:22px;flex:none}
+.st-ico{width:22px;height:22px;flex:none;image-rendering:pixelated;object-fit:contain}
 .st-emo{display:inline-grid;place-items:center;width:22px;height:22px;font-size:1rem;flex:none}
 </style>
 </head>
@@ -1511,7 +1511,6 @@ function borderBlocks(){
   return {players:Object.entries(p).sort((a,b)=>b[1]-a[1]),teams:t};
 }
 // Icône et nom français d'une statistique : objet du jeu (icône de l'objet) ou pictogramme selon le type
-const STAT_ITEM_CATS=["minecraft:mined","minecraft:crafted","minecraft:used","minecraft:broken","minecraft:picked_up","minecraft:dropped"];
 const STAT_EMO={"minecraft:mined":"⛏️","minecraft:crafted":"🔨","minecraft:used":"✋","minecraft:broken":"💥","minecraft:picked_up":"🎒","minecraft:dropped":"🫳","minecraft:killed":"⚔️","minecraft:killed_by":"💀","Causes de mort":"🪦"};
 const statKey=id=>String(id).split("|")[1]?.replace("minecraft:","")||"";
 function statEmo(id){
@@ -1532,11 +1531,20 @@ function statEmo(id){
   if(/drop|leave|play/.test(k))return "🎮";
   return "📊";
 }
+// Type d'une statistique → icône du jeu (icons/stat/<type>.png, extraites par scripts/icons.py) ; pictogramme en secours
+const STAT_CAT_TYPE={"minecraft:mined":"mined","minecraft:crafted":"crafted","minecraft:used":"used","minecraft:broken":"broken","minecraft:picked_up":"picked_up","minecraft:dropped":"dropped","minecraft:killed":"killed","minecraft:killed_by":"killed_by","Causes de mort":"deaths"};
+const STAT_RULES=[[/damage_dealt/,"heart_broken"],[/damage_(taken|absorbed|resisted|blocked)/,"heart"],[/deaths?$/,"deaths"],[/player_kills/,"player_kill"],[/mob_kills/,"killed"],
+  [/sleep|bed/,"sleep"],[/time|leave_game/,"time"],[/under_water|swim/,"swim"],[/sprint/,"sprint"],[/crouch/,"crouch"],[/boat/,"boat"],[/horse/,"horse"],[/pig/,"pig"],[/strider/,"strider"],
+  [/minecart/,"minecart"],[/aviate/,"aviate"],[/fly|happy_ghast/,"fly"],[/fall/,"fall"],[/climb/,"climb"],[/walk|one_cm/,"walk"],[/jump/,"jump"],
+  [/crafting_table/,"crafted"],[/anvil/,"anvil"],[/brewingstand/,"brew"],[/enchant/,"enchant"],[/eat|cake/,"eat"],[/trade|talked/,"trade"],[/fish/,"fish"],
+  [/noteblock/,"note"],[/pot_flower/,"plant"],[/clean/,"clean"],[/bell/,"bell"],[/raid/,"raid"],[/target/,"target"],[/^drop$/,"dropped"],[/open|inspect|interact/,"open"]];
+function statType(id){
+  const cat=String(id).split("|")[0],k=statKey(id);
+  return STAT_CAT_TYPE[cat]||(STAT_RULES.find(([re])=>re.test(k))||[,"generic"])[1];
+}
 function statIco(id){
-  const cat=String(id).split("|")[0],k=statKey(id),e=statEmo(id);
-  return STAT_ITEM_CATS.includes(cat)&&/^[a-z0-9_]+$/.test(k)
-    ?`<img class="eco-ico st-ico" src="icons/${k}.png" alt="" loading="lazy" onerror="this.outerHTML='<span class=&quot;st-emo&quot; aria-hidden=&quot;true&quot;>${e}</span>'">`
-    :`<span class="st-emo" aria-hidden="true">${e}</span>`;
+  const e=statEmo(id);
+  return `<img class="st-ico" src="icons/stat/${statType(id)}.png" alt="" loading="lazy" onerror="this.outerHTML='<span class=&quot;st-emo&quot; aria-hidden=&quot;true&quot;>${e}</span>'">`;
 }
 function statLabel(id){
   const cat=String(id).split("|")[0],k=statKey(id),x=STATS&&STATS.stats[id];
