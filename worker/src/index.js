@@ -288,6 +288,8 @@ const pick = (o, cols) => Object.fromEntries(cols.map((c) => [c, o ? o[c] : null
 async function api(req, env, url, ctx) {
   const p = url.pathname;
   const m = req.method;
+  // Détail de l'économie précalculé : texte brut (plusieurs Mo), jamais décodé en JSON ici
+  if (p === "/api/ingest/ecodetail") return ingestEcoDetail(req, env, url);
   const body = m === "GET" || m === "HEAD" ? {} : await req.json().catch(() => ({}));
   let mm;
 
@@ -304,7 +306,7 @@ async function api(req, env, url, ctx) {
   if (p === "/api/admin/backup" && m === "GET") {
     const tok = env.BACKUP_TOKEN || "", got = (req.headers.get("authorization") || "").replace(/^Bearer /, "");
     if (tok.length < 32 || !(await sameSecret(got, tok))) fail(401, "Jeton de sauvegarde invalide.");
-    const tables = (await env.DB.prepare("SELECT name, type, sql FROM sqlite_master WHERE type IN ('table','index') AND sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY type DESC, name").all()).results;
+    const tables = (await env.DB.prepare("SELECT name, type, sql FROM sqlite_master WHERE type IN ('table','index') AND sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' AND name != 'eco_detail' AND tbl_name != 'eco_detail' ORDER BY type DESC, name").all()).results;
     const t = url.searchParams.get("table");
     if (!t) return json({ version: 1, at: new Date().toISOString(), schema: tables });
     if (!tables.some((x) => x.type === "table" && x.name === t)) fail(400, "Table inconnue.");
@@ -419,10 +421,16 @@ async function api(req, env, url, ctx) {
   /* ---- tableau de bord Économie (staff) : journal du mod (centimes) + réglages ---- */
   // Marché › Détail de l'économie : complet pour le staff ; pour les autres, comptes anonymisés (faction seulement), en cache 5 min
   if ((p === "/api/eco/detail" || p === "/api/staff/eco") && m === "GET") {
-    const s = await session(req, env);
-    if (s && s.level === "staff") return json({ ...(await staffEco(env, url)), staff: true });
+    const s = await session(req, env), staff = !!(s && s.level === "staff");
+    // Précalculé par la mise à jour du site (toutes les 5 min) : on recolle les morceaux et on ajoute les réglages, sans rien décoder
+    const [pre, cfg] = await Promise.all([ecoDetailText(env, staff ? "staff" : "public"), setting(env, "eco_staff")]);
+    if (pre && pre.length > 2 && pre[0] === "{") {
+      return new Response(`{"config":${cfg || "null"},"staff":${staff},${pre.slice(1)}`,
+        { headers: securityHeaders(new Headers({ "content-type": "application/json; charset=utf-8", "cache-control": "no-store" })) });
+    }
+    // Secours (pas encore précalculé) : calcul à la volée, en cache 5 min pour le public
+    if (staff) return json({ ...(await staffEco(env, url)), staff: true });
     const cache = caches.default, key = new Request(new URL("/api/eco/detail?public", url).toString());
-    // Le navigateur ne garde rien (la réponse change si on se connecte en staff) ; seul le cache du Worker sert 5 min
     const out = (b) => new Response(b, { headers: securityHeaders(new Headers({ "content-type": "application/json; charset=utf-8", "cache-control": "no-store" })) });
     const hit = await cache.match(key);
     if (hit) return out(await hit.text());
@@ -1183,6 +1191,31 @@ async function staffEco(env, url) {
     noms: Object.fromEntries(wl.results.map((w) => [String(w.uuid).toLowerCase(), w.mc_name])),
     config: cfg ? JSON.parse(cfg) : null, saisonDebut: SAISON_DEBUT,
   };
+}
+
+/** Détail de l'économie précalculé (k = staff, public ou hors), recollé à partir de ses morceaux ; null s'il n'existe pas. */
+const ECO_KEYS = ["staff", "public", "hors"];
+async function ecoDetailText(env, k) {
+  const r = (await env.DB.prepare("SELECT body FROM eco_detail WHERE k = ? ORDER BY part").bind(k).all()).results;
+  return r.length ? r.map((x) => x.body).join("") : null;
+}
+/** GET : renvoie le texte stocké (la mise à jour du site repart de là) ; POST : le remplace. Jeton d'envoi obligatoire. */
+async function ingestEcoDetail(req, env, url) {
+  await needIngest(req, env);
+  const k = url.searchParams.get("k");
+  if (!ECO_KEYS.includes(k)) fail(400, "Clé inconnue.");
+  if (req.method === "GET") {
+    const t = await ecoDetailText(env, k);
+    return new Response(t === null ? "null" : t, { headers: securityHeaders(new Headers({ "content-type": "application/json; charset=utf-8", "cache-control": "no-store" })) });
+  }
+  if (req.method !== "POST") fail(405, "Méthode non permise.");
+  const text = await req.text();
+  if (text.length > 30e6 || !/^[\[{]/.test(text)) fail(400, "Contenu invalide.");
+  // 600 000 caractères ≤ 1,8 Mo même en UTF-8 (limite D1 : 2 Mo par valeur)
+  const PART = 600000, ts = now(), stmts = [env.DB.prepare("DELETE FROM eco_detail WHERE k = ?").bind(k)];
+  for (let i = 0, n = 0; i < text.length; i += PART, n++) stmts.push(env.DB.prepare("INSERT INTO eco_detail (k, part, body, ts) VALUES (?,?,?,?)").bind(k, n, text.slice(i, i + PART), ts));
+  await env.DB.batch(stmts);
+  return json({ ok: true, parts: stmts.length - 1, size: text.length });
 }
 
 /** Version publique : chaque compte de joueur devient sa faction (ou « solo:n », anonyme) ; pas de joueur, pas de nom, rien hors circuit. */

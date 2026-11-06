@@ -317,6 +317,10 @@ def main():
         eco_mod.push_journal(sftp, read, j, log, notice)
     except Exception as e:
         notice("warning", f"Journal non envoyé : {type(e).__name__}: {e}")
+    try:
+        eco_mod.push_detail(sftp, read, j, log, notice, os.path.join(SITE, "eco.json"))
+    except Exception as e:
+        notice("warning", f"Détail de l'économie non précalculé : {type(e).__name__}: {e}")
     close_sftp()
 
     catalog = json.load(open(os.path.join(SITE, "catalog.json"), encoding="utf-8"))

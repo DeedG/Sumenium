@@ -274,3 +274,154 @@ def push_journal(sftp, read, j, log, notice):
             break
     if sent:
         log(f"Journal : {sent} nouvelles transactions envoyées à l'Espace")
+
+
+# ---------------------------------------------------------------- détail de l'économie, précalculé pour le Worker
+# Même résultat que staffEco() / publicEco() du Worker, mais calculé ici : le plan gratuit Cloudflare limite chaque requête
+# à 10 ms de calcul, trop peu pour relire des dizaines de milliers de transactions. Le Worker sert ces textes tels quels.
+# L'état vit dans la base de l'Espace (jamais dans le dépôt public ni dans le cache d'Actions, lisible depuis une fork) :
+# on relit la version stockée, on remplace les derniers jours par le journal relu, et on renvoie.
+
+DETAIL_COLS = ["t", "type", "from", "to", "actor", "item", "amount", "tax", "qty", "shop", "actorName", "fromName", "toName"]
+ECO_HORS = {"MARCHE_NOIR", "CONFIG_MARCHE_NOIR"}
+ECO_SANS = {"IMPORT"} | ECO_HORS
+DETAIL_MAX = 60000         # transactions gardées (les plus récentes), comme le Worker
+DETAIL_JOURS = 180         # durée de vie des transactions dans l'Espace
+
+
+def _acc(v):
+    return None if v is None or v == "" else str(v)[:80].lower()
+
+
+def _amt(v):
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) else 0
+
+
+def _row(o):
+    """Ligne du journal → ligne compacte du tableau de bord, ou None (pas d'argent, import, hors circuit)."""
+    typ = str(o.get("type"))[:40].strip()
+    if typ in ECO_SANS or _amt(o.get("amount")) + _amt(o.get("tax")) <= 0:
+        return None
+    sc = lambda v: v if v is None or isinstance(v, (int, float, str)) else None
+    return [int(round(float(o["t"]))), typ, _acc(o.get("from")), _acc(o.get("to")), _acc(o.get("actor")),
+            str(o["item"])[:80].strip() if o.get("item") else None,
+            sc(o.get("amount")), sc(o.get("tax")), sc(o.get("qty")), sc(o.get("shop")),
+            sc(o.get("actorName")), sc(o.get("fromName")), sc(o.get("toName"))]
+
+
+def _anon_rows(rows, noms, eco_path):
+    """Comme publicEco() : chaque compte de joueur devient sa faction (ou « solo:n »), aucun nom."""
+    try:
+        eco = json.load(open(eco_path, encoding="utf-8"))
+    except Exception:
+        eco = {}
+    fac_of = {str(j.get("nom")).lower(): (str(j["faction"]).lower() if j.get("faction") else None) for j in (eco.get("joueurs") or [])}
+    names = dict(noms)
+    for r in rows:
+        if r[4] and r[10]:
+            names[r[4]] = r[10]
+    solo = {}
+
+    def anon(a):
+        if not a or not a.startswith("joueur:"):
+            return a
+        u = a[7:]
+        n = names.get(u)
+        f = fac_of.get(str(n).lower()) if n else None
+        if f:
+            return "faction:" + f
+        if u not in solo:
+            solo[u] = f"solo:{len(solo) + 1}"
+        return solo[u]
+
+    out = []
+    for r in rows:
+        o = list(r)
+        o[2] = anon("joueur:" + r[4]) if r[1] == "HDV_VENTE" and r[4] else anon(r[2])
+        o[3] = anon(r[3])
+        o[4] = o[10] = o[11] = o[12] = None
+        out.append(o)
+    return out
+
+
+def push_detail(sftp, read, j, log, notice, eco_path):
+    token = _token()
+    if not token:
+        return
+    base = (os.environ.get("ESPACE_URL") or "https://sumenium.com").rstrip("/") + "/api/ingest/ecodetail"
+    headers = {"authorization": f"Bearer {token}", "user-agent": "sumenium-update/1.0"}
+
+    def get(k):
+        with urllib.request.urlopen(urllib.request.Request(f"{base}?k={k}", headers=headers), timeout=60) as r:
+            return json.loads(r.read())
+
+    def put(k, obj):
+        data = json.dumps(obj, ensure_ascii=True, separators=(",", ":")).encode()
+        req = urllib.request.Request(f"{base}?k={k}", data=data, method="POST", headers={**headers, "content-type": "text/plain; charset=utf-8"})
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return json.loads(r.read())
+
+    try:
+        stored, hors_stored = get("staff"), get("hors")
+    except Exception as e:
+        notice("warning", f"Détail de l'économie non précalculé : {e}")
+        return
+    try:
+        files = sorted(f for f in sftp.listdir(j(JOURNAL)) if re.fullmatch(r"\d{4}-\d{2}-\d{2}\.jsonl", f))
+    except IOError:
+        return
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    since = max(int(datetime.fromisoformat(OUVERTURE).timestamp() * 1000) - 86_400_000, now_ms - DETAIL_JOURS * 86_400_000)
+    # Relecture complète si rien n'est stocké, si le format a changé, ou une fois par jour pour se réparer
+    full = (not isinstance(stored, dict) or stored.get("cols") != DETAIL_COLS or not isinstance(hors_stored, list)
+            or now_ms - int(stored.get("complet") or 0) > 86_400_000)
+    last = int(stored.get("maxT") or 0) if not full else 0
+    day = (datetime.fromtimestamp(last / 1000, timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d") if last else ""
+    seen, rows, hors, cut = set(), [], [], None
+    for f in files:
+        if f[:10] < day:
+            continue
+        for line in read(sftp, posixpath.join(j(JOURNAL), f)).decode("utf-8", "replace").splitlines():
+            line = line.strip()
+            if not line or line in seen:
+                continue
+            seen.add(line)
+            try:
+                o = json.loads(line)
+                t = int(round(float(o.get("t"))))
+            except (ValueError, TypeError, AttributeError):
+                continue
+            if not o.get("type"):
+                continue
+            cut = t if cut is None else min(cut, t)
+            if t < since:
+                continue
+            if str(o.get("type"))[:40].strip() == "MARCHE_NOIR":
+                hors.append([t, _amt(o.get("amount"))])
+            r = _row(o)
+            if r:
+                rows.append(r)
+    if not full and cut is not None:
+        # on garde l'ancien avant la première ligne relue, le journal relu remplace le reste
+        rows = [r for r in stored["rows"] if since <= r[0] < cut] + rows
+        hors = [h for h in hors_stored if since <= h[0] < cut] + hors
+    elif not full:
+        rows, hors = [r for r in stored["rows"] if r[0] >= since], [h for h in hors_stored if h[0] >= since]
+    rows.sort(key=lambda r: r[0])
+    rows = rows[-DETAIL_MAX:]
+    try:
+        noms = {str(e["uuid"]).lower(): e["name"] for e in json.loads(read(sftp, j("whitelist.json"))) if e.get("uuid") and e.get("name")}
+    except Exception:
+        noms = stored.get("noms", {}) if isinstance(stored, dict) else {}
+    common = {"cols": DETAIL_COLS, "saisonDebut": OUVERTURE, "maj": now_ms, "maxT": max([r[0] for r in rows] + [h[0] for h in hors] + [last]),
+              "complet": now_ms if full else stored.get("complet")}
+    staff = {**common, "rows": rows, "noms": noms, "horsCircuit": {"n": len(hors), "montant": sum(h[1] for h in hors)}}
+    public = {**common, "rows": _anon_rows(rows, noms, eco_path), "noms": {}}
+    try:
+        put("hors", hors)
+        res = put("staff", staff)
+        put("public", public)
+    except Exception as e:
+        notice("warning", f"Détail de l'économie non envoyé : {e}")
+        return
+    log(f"Détail de l'économie : {len(rows)} transactions{' (relecture complète)' if full else ''}, {res.get('size', 0) // 1024} Ko")
