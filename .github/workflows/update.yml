@@ -19,6 +19,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      updated: ${{ steps.donnees.outputs.updated }}
     timeout-minutes: 10      # un passage bloqué ne garde pas une session SFTP ouverte
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +66,9 @@ jobs:
         run: python scripts/icons.py
       - name: Version des scripts (le navigateur prend la nouvelle version tout de suite)
         run: sed -i "s/__BUILD__/${GITHUB_SHA::7}-$(date +%s)/g" site/index.html
+      - name: Date des données construites
+        id: donnees
+        run: echo "updated=$(python3 -c "import json;print(json.load(open('site/data.json')).get('updated',''))")" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
@@ -82,23 +87,25 @@ jobs:
   # (vu le 7 nov. 2026 : 17 h sans mise à jour). Le déploiement réutilise le SHA du dernier commit comme numéro de
   # version ; un nouveau commit (vide) débloque. On vérifie donc que le site en ligne a bien les données du jour.
   verifier:
-    needs: deploy
+    needs: [build, deploy]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Le site en ligne est-il à jour ?
         id: live
+        env:
+          BUILT: ${{ needs.build.outputs.updated }}
         run: |
-          for i in 1 2 3 4 5 6; do
+          # On compare au fichier construit par CE passage (pas à l'heure : si le serveur ne répond pas, les données
+          # restent volontairement anciennes et ce n'est pas un blocage de GitHub Pages)
+          for i in $(seq 1 10); do
             u=$(curl -fsS "https://deedg.github.io/Sumenium/data.json?v=$(date +%s)" | python3 -c "import json,sys;print(json.load(sys.stdin).get('updated',''))" || true)
-            age=$(python3 -c "from datetime import datetime,timezone as t;import sys;s='$u';print(int((datetime.now(t.utc)-datetime.fromisoformat(s)).total_seconds()//60) if s else 9999)")
-            echo "Données en ligne : $u (il y a $age min)"
-            if [ "$age" -lt 25 ]; then echo "fige=0" >> "$GITHUB_OUTPUT"; exit 0; fi
+            if [ -z "$BUILT" ] || [ "$u" \> "$BUILT" ] || [ "$u" = "$BUILT" ]; then echo "En ligne : $u"; echo "fige=0" >> "$GITHUB_OUTPUT"; exit 0; fi
             sleep 30
           done
           echo "fige=1" >> "$GITHUB_OUTPUT"
-          echo "::warning title=Site figé::GitHub Pages sert des données vieilles de $age min malgré le déploiement : commit vide pour débloquer"
+          echo "::warning title=Site figé::GitHub Pages sert encore $u au lieu de $BUILT malgré le déploiement : commit vide pour débloquer"
       - uses: actions/checkout@v4
         if: steps.live.outputs.fige == '1'
       - name: Commit vide (nouveau numéro de version pour GitHub Pages)
