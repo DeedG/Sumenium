@@ -60,6 +60,21 @@ export const COMMANDES_STAFF = {
       ["/tetes pnj · /tetes pnj retirer", "Place le marchand de têtes à ta position, ou retire le plus proche (6 blocs)"],
       ["/tetes · /tetes ouvrir · /tetes maj", "État du catalogue, ouvrir le menu sans PNJ (test), recharger le catalogue tout de suite (sinon une fois par jour)"],
     ], note: "Les PNJ, la boîte aux lettres et le lutrin ne se cassent qu'avec /sumeco bypass. Pour le site : sumenium-data/export/hdv.json (annonces) et bluemap-markers.json (boutiques, FISC et hôtel des ventes au format BlueMap)." },
+    { titre: "Trophées", intro: "Une tête à chaque mort ; réglages tropheesSurvieJours, tropheesMortsMin et tropheesWebhook dans config/sumenium-economy.json (/sumeco recharger).", lignes: [
+      ["/trophee donner <n°>", "Te donne une copie du trophée n° (écrit sur la tête et sur le site), par exemple pour remplacer une tête perdue"],
+    ] },
+    { titre: "Marché noir", intro: "PNJ contrebandier caché : les objets sont vendus à l'identique, l'argent payé est détruit.", lignes: [
+      ["/marchenoir pnj · /marchenoir pnj retirer", "Place le contrebandier à ta position, ou retire le plus proche (6 blocs)"],
+      ["/marchenoir liste", "Objets en vente, avec leur numéro, prix et stock"],
+      ["/marchenoir ajouter <prix> [stock]", "Met en vente l'objet tenu en main (stock illimité si absent)"],
+      ["/marchenoir prix <n°> <prix>", "Change le prix d'un objet"],
+      ["/marchenoir stock <n°> <stock|illimite>", "Change le stock d'un objet"],
+      ["/marchenoir retirer <n°>", "Retire un objet de la vente"],
+      ["/marchenoir defaut", "Ajoute les objets de départ (Brise-Monde, épée du Contrebandier, Fendeuse, élytres)"],
+      ["/marchenoir ventes [page]", "Ventes passées"],
+      ["/marchenoir livre [joueur]", "Donne le carnet de l'énigme (à toi ou au joueur)"],
+      ["/marchenoir ouvrir", "Ouvre le menu sans PNJ, pour tester"],
+    ] },
     { titre: "Mairie : tâches municipales", intro: "Le maire (choisi dans Outils staff › Réglages) écrit les tâches sur le site, Communauté › Mairie. Le serveur relit le livre toutes les 5 minutes.", lignes: [
       ["/mairie lutrin ajouter", "Le lutrin visé affiche le livre des tâches municipales (lisible, mais impossible à prendre)"],
       ["/mairie lutrin retirer", "Le lutrin visé n'affiche plus les tâches (retire le livre à la main)"],
