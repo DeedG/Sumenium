@@ -752,6 +752,42 @@ dialog.hist-dlg::backdrop{background:rgba(0,0,0,.45)}.hist-head{display:flex;jus
 .st-name{display:inline-flex;align-items:center;gap:8px;min-width:0}
 .st-ico{width:22px;height:22px;flex:none;image-rendering:pixelated;object-fit:contain}
 .st-emo{display:inline-grid;place-items:center;width:22px;height:22px;font-size:1rem;flex:none}
+/* Trophées (têtes de joueur à chaque mort) */
+.troph-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:22px}
+@media (max-width:420px){.troph-grid{grid-template-columns:1fr}}
+.troph{position:relative;display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--tc,#8a948a);border-radius:14px;padding:12px 14px;min-width:0}
+.troph .face{border-radius:6px;image-rendering:pixelated}
+.tr-body{min-width:0}
+.tr-top{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;margin:0 3.8rem 4px 0}
+.tr-title{font-weight:800;color:var(--tc)}.tr-title a{color:inherit}
+.tr-tier{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--tc)}
+.tr-msg{margin:0 0 4px;overflow-wrap:anywhere}
+.tr-meta{margin:0;color:var(--muted);font-size:.85rem}
+.tr-why{margin:4px 0 0;font-size:.8rem;font-weight:700;color:var(--muted)}
+.tr-n{position:absolute;top:10px;right:12px;font-size:.75rem;color:var(--muted);font-weight:700}
+.tr-COMMUNE{--tc:#8a948a}.tr-PEU_COMMUNE{--tc:#3fa357}.tr-RARE{--tc:#3d7bf0}.tr-EPIQUE{--tc:#b04fe0}.tr-LEGENDAIRE{--tc:#d9930d}.tr-PRISMATIQUE{--tc:#e0458f}
+.troph.tr-RARE,.troph.tr-EPIQUE,.troph.tr-LEGENDAIRE{box-shadow:0 0 0 1px color-mix(in srgb,var(--tc) 35%,transparent),0 4px 16px color-mix(in srgb,var(--tc) 18%,transparent)}
+.troph.tr-EPIQUE .tr-title,.troph.tr-LEGENDAIRE .tr-title{text-shadow:0 0 10px color-mix(in srgb,var(--tc) 45%,transparent)}
+.troph.tr-PRISMATIQUE{border-left-width:1px;border-color:transparent;background:linear-gradient(var(--surface),var(--surface)) padding-box,linear-gradient(120deg,#ff5555,#ffaa00,#e6d200,#3fcf5a,#2ec4d6,#5b8cff,#a86bff,#ff5fb5) border-box;border-width:3px}
+.troph.tr-PRISMATIQUE .tr-title,.tr-chip.tr-PRISMATIQUE,.troph.tr-PRISMATIQUE .tr-tier{background:linear-gradient(90deg,#ff5555,#ffaa00,#d4b800,#3fcf5a,#2ec4d6,#5b8cff,#a86bff,#ff5fb5);-webkit-background-clip:text;background-clip:text;color:transparent}
+.troph.tr-PRISMATIQUE .tr-title a{color:transparent}
+@media (prefers-reduced-motion:no-preference){.troph.tr-PRISMATIQUE{background-size:auto,300% 300%;animation:trPrism 6s linear infinite}@keyframes trPrism{to{background-position:0 0,300% 0}}}
+.tr-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.tr-chip{display:inline-block;font-size:.78rem;font-weight:800;padding:2px 9px;border-radius:999px;border:1px solid color-mix(in srgb,var(--tc,#8a948a) 50%,transparent);color:var(--tc,#8a948a);background:color-mix(in srgb,var(--tc,#8a948a) 10%,transparent)}
+.tr-chip.tr-PRISMATIQUE{border-color:#e0458f}
+.tr-head{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.tr-head h3{margin:0}
+.tr-live{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:8px 12px;display:grid}
+.tr-live span{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.tr-live small{color:var(--muted)}
+.tr-rank{list-style:none;margin:0;padding:0}
+.tr-rank li{display:grid;grid-template-columns:1.8rem auto 1fr auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)}
+.tr-rank li:last-child{border-bottom:0}
+.tr-rank li.cur{background:var(--sun-soft)}
+.tr-rank .r{font-weight:800;color:var(--muted);text-align:right}
+.tr-rank a{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.boards-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:900px){.boards-3{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -874,7 +910,7 @@ dialog.hist-dlg::backdrop{background:rgba(0,0,0,.45)}.hist-head{display:flex;jus
 
   <section class="panel" id="p-classements" hidden>
     <nav class="subtabs" aria-label="Classements" data-area="classements">
-      <a href="#classements/tableau" data-sub="tableau">Tableau en jeu</a><a href="#classements/richesse" data-sub="richesse">Richesse</a><a href="#classements/stats" data-sub="stats">Statistiques</a>
+      <a href="#classements/tableau" data-sub="tableau">Tableau en jeu</a><a href="#classements/richesse" data-sub="richesse">Richesse</a><a href="#classements/stats" data-sub="stats">Statistiques</a><a href="#classements/trophees" data-sub="trophees">Trophées</a>
     </nav>
     <div class="subpanel" data-sub="tableau">
       <div class="sec-head"><h3>Tableau en jeu</h3><p class="sub2">Les trois compteurs du Tab, les blocs ajoutés à la bordure, puis le total par faction.</p></div>
@@ -883,6 +919,7 @@ dialog.hist-dlg::backdrop{background:rgba(0,0,0,.45)}.hist-head{display:flex;jus
       <div class="tbl-wrap"><table class="tbl" id="teamTable"><thead><tr><th>#</th><th>Faction</th><th>Membres</th><th>Succès</th><th>Premiers succès</th><th>Morts</th><th>Blocs de bordure</th></tr></thead><tbody></tbody></table></div>
     </div>
     <div class="subpanel" data-sub="richesse"><div id="richRoot"></div></div>
+    <div class="subpanel" data-sub="trophees"><div id="trophRoot"></div></div>
     <div class="subpanel" data-sub="stats">
       <div class="sec-head"><h3>Statistiques</h3><p class="sub2">Toutes les statistiques Minecraft des joueurs, avec le classement de chacune. Choisis un joueur pour voir où il est premier, deuxième…</p></div>
       <div class="explorer">
@@ -1075,6 +1112,7 @@ dialog.hist-dlg::backdrop{background:rgba(0,0,0,.45)}.hist-head{display:flex;jus
 <script src="espace.js?v=__BUILD__"></script>
 <script src="economie.js?v=__BUILD__"></script>
 <script src="staff-eco.js?v=__BUILD__"></script>
+<script src="trophees.js?v=__BUILD__"></script>
 <script>
 const TIERS={task:"Tâche",goal:"Objectif",challenge:"Défi",super_challenge:"Super défi",milestone:"Palier",hidden:"Caché",root:"Racine",custom:"Fin de partie"};
 const $=id=>document.getElementById(id);
@@ -1674,7 +1712,7 @@ async function loadStats(){
 // ---------- Onglets ----------
 // Arborescence : onglet/sous-onglet[/détail]. Les anciens liens (#classement, #economie/boutiques…) renvoient au bon endroit.
 const TABS=["accueil","monde","communaute","marche","classements","espace","aide"];
-const SUBS={monde:["carte","succes"],classements:["tableau","richesse","stats"],aide:["rejoindre","guides","commandes"]};
+const SUBS={monde:["carte","succes"],classements:["tableau","richesse","stats","trophees"],aide:["rejoindre","guides","commandes"]};
 const LEGACY={classement:"classements/tableau",succes:"monde/succes",stats:"classements/stats",carte:"monde/carte",
   "economie":"marche","economie/apercu":"marche/economie","economie/boutiques":"marche/boutiques","economie/hdv":"marche/hdv","economie/fisc":"marche/fisc",
   "economie/factions":"communaute/factions","economie/baltop":"classements/richesse","economie/commandes":"aide/commandes",
@@ -1701,6 +1739,7 @@ function route(){
   if(t==="espace"&&window.Espace)window.Espace.show("espace",parts[1]);
   if(t==="marche"&&window.Economie)window.Economie.show("marche",parts[1]);
   if(t==="classements"&&s==="richesse"&&window.Economie)window.Economie.show("richesse");
+  if(t==="classements"&&s==="trophees"&&window.Trophees)window.Trophees.hall($("trophRoot"));
   if(t==="aide"&&s==="commandes"&&window.Economie)window.Economie.show("commandes",parts[2]);
   if(t==="aide"&&s==="guides"&&parts[2])setTimeout(()=>{const g=$("g-"+parts[2]);if(g)g.scrollIntoView({block:"start"})},60);
 }

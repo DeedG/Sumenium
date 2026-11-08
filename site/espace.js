@@ -1085,7 +1085,8 @@ function notFound(what) {
 function mesStats() {
   const p = me();
   if (!p) { view(head("Mes stats", "") + '<p class="empty">Relie d\'abord ton pseudo Minecraft (onglet Ma fiche).</p>'); return; }
-  view(head("Mes stats", "Tes statistiques Minecraft et ta place dans chaque classement du serveur, de la meilleure à la moins bonne.") + '<div class="card" id="pstats"></div>');
+  view(head("Mes stats", "Tes statistiques Minecraft, ta place dans chaque classement du serveur, et tes trophées.") + '<div class="card" id="ptroph"></div><div class="card" id="pstats"></div>');
+  if (window.Trophees) window.Trophees.mount($("ptroph"), p.mc_name);
   if (SD().mountPlayerStats) SD().mountPlayerStats($("pstats"), p.mc_name);
 }
 function joueurPage() {
@@ -1116,18 +1117,19 @@ function joueurPage() {
         ${p && p.metier ? `<p class="metier">${esc(p.metier)}</p>` : `<p class="muted">${p ? "Métier non renseigné" : "Pas encore de fiche RP sur le site"}</p>`}
       </div>
     </section>
-    <nav class="subtabs" aria-label="Fiche du joueur"><a href="#communaute/joueur/${encodeURIComponent(name)}" aria-current="${argTab !== "stats" ? "page" : "false"}">Fiche</a><a href="#communaute/joueur/${encodeURIComponent(name)}/stats" aria-current="${argTab === "stats" ? "page" : "false"}">Statistiques</a></nav>
-    ${argTab === "stats" ? '<div class="card" id="pstats"></div>' : `<div class="stats">
+    <nav class="subtabs" aria-label="Fiche du joueur"><a href="#communaute/joueur/${encodeURIComponent(name)}" aria-current="${argTab !== "stats" && argTab !== "trophees" ? "page" : "false"}">Fiche</a><a href="#communaute/joueur/${encodeURIComponent(name)}/stats" aria-current="${argTab === "stats" ? "page" : "false"}">Statistiques</a><a href="#communaute/joueur/${encodeURIComponent(name)}/trophees" aria-current="${argTab === "trophees" ? "page" : "false"}">Trophées</a></nav>
+    ${argTab === "stats" ? '<div class="card" id="pstats"></div>' : argTab === "trophees" ? '<div class="card" id="ptroph"></div>' : `<div class="stats">
       ${tabs.map(([l, x]) => tile(l, x ? fmt(x.v) : "–", x)).join("")}
       ${tile("Blocs de bordure", border ? "+" + fmt(Math.round(border.v)) : "–", border, "sun")}
       ${tile("Solde", eco ? suE(eco.solde) : "–", rich, "leaf")}
     </div>
     ${p && (p.metier_desc || p.perso_desc) ? `<div class="boards boards-2">${p.metier_desc ? `<div class="board"><h3>Métier</h3>${para(p.metier_desc)}</div>` : ""}${p.perso_desc ? `<div class="board"><h3>Personnage</h3>${para(p.perso_desc)}</div>` : ""}</div>` : ""}
-    <div class="profile-links"><a class="btn small ghost" href="#monde/succes" data-who="${esc(name)}">Voir ses succès</a><a class="btn small ghost" href="#communaute/joueur/${encodeURIComponent(name)}/stats">Ses statistiques</a></div>
+    <div class="profile-links"><a class="btn small ghost" href="#monde/succes" data-who="${esc(name)}">Voir ses succès</a><a class="btn small ghost" href="#communaute/joueur/${encodeURIComponent(name)}/stats">Ses statistiques</a><a class="btn small ghost" href="#communaute/joueur/${encodeURIComponent(name)}/trophees">Ses trophées</a></div>
     <h3 class="sec">Ses boutiques <small>${fmt(shops.length)}</small></h3>${shopRows(shops)}
     ${facShops ? `<h3 class="sec">Boutiques de sa faction <small>${fmt(facShops.length)}</small></h3>${shopRows(facShops, true)}` : ""}
     ${hdv.length ? `<h3 class="sec">À l'hôtel des ventes <small>${fmt(hdv.length)}</small></h3><ul class="now">${hdv.map((a) => `<li><a href="#marche/hdv">${esc(itemFr(a.item, a.nom))}${a.quantite > 1 ? ` × ${fmt(a.quantite)}` : ""}</a> · ${suE(a.offreActuelle || a.prixDepart)}</li>`).join("")}</ul>` : ""}`}`);
   if (argTab === "stats" && SD().mountPlayerStats) SD().mountPlayerStats($("pstats"), name);
+  if (argTab === "trophees" && window.Trophees) window.Trophees.mount($("ptroph"), name);
   document.querySelectorAll("[data-who]").forEach((b) => (b.onclick = () => { try { localStorage.setItem("sumenium-who", b.dataset.who); } catch (e) {} if (window.setWho) window.setWho(b.dataset.who); }));
   bindMap();
 }

@@ -198,6 +198,21 @@ def build(sftp, read, j, log, out_path):
     return f"économie : {len(ok)}/7 fichiers ({', '.join(ok) or 'aucun'})"
 
 
+def trophees(sftp, read, j, log, out_path):
+    """Trophées (tête à chaque mort, mod 2.10.0) → site/trophees.json (public, sans UUID)."""
+    tr = _load(sftp, read, j, "trophees.json", log)
+    if not tr or not isinstance(tr.get("trophees"), list):
+        return "trophées : aucun"
+    keep = ("id", "t", "saison", "jour", "name", "cause", "msgKey", "msgArgs", "msgText", "killer", "survie", "points", "tier", "raisons")
+    out = {"genereLe": datetime.now(timezone.utc).isoformat(),
+           "trophees": [{k: t.get(k) for k in keep if t.get(k) is not None} for t in tr["trophees"]],
+           "survies": tr.get("survies") or {}, "causes": tr.get("causes") or {}, "total": tr.get("total") or 0,
+           "seuils": tr.get("seuils") or []}
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
+    return f"trophées : {len(out['trophees'])}"
+
+
 def items(eco_path):
     """Items présents dans eco.json (pour extraire leurs icônes)."""
     try:

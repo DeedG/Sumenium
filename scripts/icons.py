@@ -80,6 +80,29 @@ def french_names(items):
     print(f"Noms français : {len(names) - 1}/{len(items)} objets")
 
 
+DEATHS_V = 1
+
+
+def death_messages():
+    """Messages de mort et noms des créatures en français (trophées du site) → site/icons/deaths_fr.json."""
+    path = os.path.join(OUT, "deaths_fr.json")
+    if os.path.exists(path):
+        try:
+            if json.load(open(path, encoding="utf-8")).get("_v") == DEATHS_V:
+                return
+        except ValueError:
+            pass
+    index = json.loads(get(version_meta()["assetIndex"]["url"]))
+    h = index["objects"]["minecraft/lang/fr_fr.json"]["hash"]
+    lang = json.loads(get(f"https://resources.download.minecraft.net/{h[:2]}/{h}"))
+    out = {k: v for k, v in lang.items() if k.startswith("death.") or (k.startswith(("entity.minecraft.", "item.minecraft.", "block.minecraft."))
+                                                                          and k.count(".") == 2)}
+    out["_v"] = DEATHS_V
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
+    print(f"Messages de mort : {sum(1 for k in out if k.startswith('death.'))}")
+
+
 def stat_ids():
     """Objets et créatures des statistiques Minecraft (site/stats.json) : noms français et icônes sur le site."""
     try:
@@ -161,6 +184,10 @@ def main():
         french_names(items)
     except Exception as e:
         print(f"::warning title=Noms français::{type(e).__name__}: {e}")
+    try:
+        death_messages()
+    except Exception as e:
+        print(f"::warning title=Messages de mort::{type(e).__name__}: {e}")
     missing = [i for i in items if not os.path.exists(os.path.join(OUT, i + ".png"))]
     if not os.path.exists(os.path.join(OUT, "stat", "heart_broken.png")):
         try:

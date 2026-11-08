@@ -34,8 +34,10 @@ jobs:
           path: |
             site/icons
             work/client.jar
-          key: icons-v2-${{ hashFiles('site/catalog.json') }}
-          restore-keys: icons-v2-
+          key: icons-v3-${{ hashFiles('site/catalog.json') }}
+          restore-keys: |
+            icons-v3-
+            icons-v2-
       - name: Extraction des icônes manquantes
         run: python scripts/icons.py
       - name: Têtes des skins (en cache)

@@ -10,5 +10,6 @@ work/
 import*.json
 site/progress/
 site/eco.json
+site/trophees.json
 homelab/sauvegardes/
 site/heads/

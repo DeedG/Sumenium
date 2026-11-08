@@ -310,6 +310,7 @@ def main():
     try:
         import eco as eco_mod
         eco_summary = eco_mod.build(sftp, read, j, log, os.path.join(SITE, "eco.json"))
+        eco_summary += " · " + eco_mod.trophees(sftp, read, j, log, os.path.join(SITE, "trophees.json"))
     except Exception as e:
         eco_summary = "économie indisponible"
         notice("warning", f"Économie non mise à jour : {type(e).__name__}: {e}")
