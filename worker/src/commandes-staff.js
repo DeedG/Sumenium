@@ -60,8 +60,10 @@ export const COMMANDES_STAFF = {
       ["/tetes pnj · /tetes pnj retirer", "Place le marchand de têtes à ta position, ou retire le plus proche (6 blocs)"],
       ["/tetes · /tetes ouvrir · /tetes maj", "État du catalogue, ouvrir le menu sans PNJ (test), recharger le catalogue tout de suite (sinon une fois par jour)"],
     ], note: "Les PNJ, la boîte aux lettres et le lutrin ne se cassent qu'avec /sumeco bypass. Pour le site : sumenium-data/export/hdv.json (annonces) et bluemap-markers.json (boutiques, FISC et hôtel des ventes au format BlueMap)." },
-    { titre: "Trophées", intro: "Une tête à chaque mort ; réglages tropheesSurvieJours, tropheesMortsMin et tropheesWebhook dans config/sumenium-economy.json (/sumeco recharger).", lignes: [
+    { titre: "Trophées et bestiaire", intro: "Une tête à chaque mort, et une rareté pour les têtes de mobs d'All Mob Heads (réglages tetesMobsPlus1/2/3 et tetesMobsRarete) ; réglages tropheesSurvieJours, tropheesMortsMin et tropheesWebhook dans config/sumenium-economy.json (/sumeco recharger).", lignes: [
       ["/trophee donner <n°>", "Te donne une copie du trophée n° (écrit sur la tête et sur le site), par exemple pour remplacer une tête perdue"],
+      ["/trophee tete <rareté>", "Te donne une tête de mob au hasard, à la rareté voulue, pas comptée au bestiaire (pour préparer un musée ou une annonce)"],
+      ["/trophee bestiaire · /trophee bestiaire recharger", "Nombre de têtes de mobs lues dans les datapacks (All Mob Heads) ; relire après une mise à jour d'All Mob Heads"],
       ["/trophee exemple <rareté>", "Te donne une tête d'exemple de toi (commune … prismatique), ni enregistrée ni numérotée : pour montrer une rareté dans une annonce"],
     ] },
     { titre: "Marché noir", intro: "PNJ contrebandier caché : les objets sont vendus à l'identique, l'argent payé est détruit.", lignes: [

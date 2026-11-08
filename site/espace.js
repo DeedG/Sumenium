@@ -11,7 +11,7 @@ const MORT = { "": "Non renseigné", oui: "Accepte de se faire tuer (frappe-moi)
   sauf1_accord: "Accepte, sauf la 1ère mort et sur accord", accord: "Accepte seulement sur un accord", non: "Refuse de se faire tuer" };
 const MORT_COURT = { oui: "Frappe-moi", sauf1: "Sauf 1ère mort", sauf1_accord: "Sauf 1ère + accord", accord: "Sur accord", non: "Refuse" };
 const ACT = { "": "Non renseigné", tres: "Je vais beaucoup trop jouer", bcp: "Je vais beaucoup jouer", moyen: "Je vais jouer moyennement", peu: "Je vais un peu jouer" };
-const ACT_COURT = { tres: "Très actif", bcp: "Actif", moyen: "Moyen", peu: "Un peu" };
+const ACT_COURT = { tres: "🔥 Ne décroche plus", bcp: "⚡ Très présent", moyen: "🌿 Présence régulière", peu: "🌙 De passage" };
 const LEVEL = { staff: "Staff", sumenien: "Suménien", attente: "En attente de vérification" };
 const ELECTION = { fermee: "Fermée", candidatures: "Candidatures ouvertes", tour1: "Vote : 1er tour", tour2: "Vote : 2nd tour", resultats: "Résultats publiés" };
 const TAILLE_USINE = { grosse: ["Grosses usines", 3], moyenne: ["Moyennes usines", 4], petite: ["Petites usines", 5] };
@@ -614,7 +614,7 @@ function playerCard(p) {
     <header>${face(p.mc_name)}<div><b>${plink(p.mc_name)}</b>${facLabel(p.faction_id)}</div></header>
     ${p.metier ? `<p class="metier">${esc(p.metier)}</p>` : '<p class="metier muted">Métier non renseigné</p>'}
     <div class="tags">${p.mort ? `<span class="chip m-${esc(p.mort)}" title="${esc(MORT[p.mort])}">${esc(MORT_COURT[p.mort])}</span>` : ""}
-      ${p.activite ? `<span class="chip">${esc(ACT_COURT[p.activite])}</span>` : ""}
+      ${p.activite ? `<span class="chip a-${esc(p.activite)}" title="${esc(ACT[p.activite])}">${esc(ACT_COURT[p.activite])}</span>` : ""}
       ${isStaff() && !p.linked ? '<span class="chip muted">Discord non relié</span>' : ""}
       ${isStaff() && D.wlSynced && !p.whitelisted ? '<span class="chip warn">pas whitelisté</span>' : ""}
       ${isStaff() && p.discord_name ? `<span class="chip muted">@${esc(p.discord_name)}</span>` : ""}</div>
@@ -1112,7 +1112,7 @@ function joueurPage() {
         <p class="tags">${f ? flink(f) : eco && eco.faction ? `<span class="chip">${esc(eco.faction)}</span>` : '<span class="chip muted">Solo</span>'}
           ${team && (!f || norm(team) !== norm(f.name)) ? `<span class="chip muted" title="Équipe en jeu">${esc(team)}</span>` : ""}
           ${p && p.mort ? `<span class="chip m-${esc(p.mort)}" title="${esc(MORT[p.mort])}">${esc(MORT_COURT[p.mort])}</span>` : ""}
-          ${p && p.activite ? `<span class="chip">${esc(ACT_COURT[p.activite])}</span>` : ""}
+          ${p && p.activite ? `<span class="chip a-${esc(p.activite)}" title="${esc(ACT[p.activite])}">${esc(ACT_COURT[p.activite])}</span>` : ""}
           ${cand ? '<a class="chip warn" href="#communaute/elections">Candidat à la mairie</a>' : ""}</p>
         ${p && p.metier ? `<p class="metier">${esc(p.metier)}</p>` : `<p class="muted">${p ? "Métier non renseigné" : "Pas encore de fiche RP sur le site"}</p>`}
       </div>

@@ -512,6 +512,8 @@ const SANS_COMMANDE = [
   ["Annuaire", "Le livre sur le lutrin de l'entrée de la zone commerciale liste toutes les boutiques des joueurs, sans le FISC (propriétaire, item, prix, rupture, coordonnées). Il se met à jour tout seul et revient si quelqu'un le prend."],
   ["Marchand de têtes", "Clic droit sur le PNJ : plus de 100 000 têtes décoratives classées par catégorie puis par nom. La boussole lance une recherche (taper un mot dans le chat, souvent en anglais : cat, pumpkin…). Un clic sur une tête l'achète pour 150 Su, avec le compte utilisé (perso ou faction)."],
   ["Trophées (tête à chaque mort)", "À chaque mort, ta tête tombe là où tu es mort, avec la cause, le jour de la saison et ton temps de survie. Plus la mort est rare (tué par un joueur, par un boss, cause rare sur le serveur, longue survie), plus la tête est rare : de Commune à Prismatique. Elle garde le skin porté à la mort : après un changement de skin, se reconnecter avant de mourir. Au sol elle est invulnérable (feu, lave, explosions, cactus) et ne disparaît jamais ; tombée dans le vide, elle revient à celui qui l'a lâchée. Classement dans Classements › Trophées."],
+  ["Bestiaire (têtes de mobs)", "Un mob tué avec une arme Butin (I minimum, II et III donnent plus de chances) peut lâcher sa tête. Elle reçoit une rareté : celle du mob, parfois montée d'un à trois crans par tirage. Les têtes s'empilent par mob et par rareté et sont indestructibles au sol. Collection dans Classements › Bestiaire."],
+  ["Musée", "Accroupi + clic droit, main vide, sur une tête posée : une étiquette flotte au-dessus avec son nom et sa rareté (même geste pour la retirer). En regardant une tête de trophée ou du bestiaire, posée ou dans un cadre, son détail s'affiche au-dessus de la barre d'inventaire."],
   ["AFK", "Sans bouger la caméra, marcher ni écrire dans le chat pendant 2 min 30, le joueur passe [AFK] dans le tab (un autoclicker ne compte pas comme une activité). Les joueurs AFK ne sont pas comptés pour passer la nuit."],
 ];
 const JOUEURS = [
@@ -533,8 +535,9 @@ const JOUEURS = [
     ["/chat faction · /chat global", "Même chose que /cf et /cg", "Tous"],
     ["/r <message>", "Répond au dernier joueur qui t'a écrit en /msg (/r seul dit à qui)", "Tous"],
   ] },
-  { titre: "Trophées et site", lignes: [
-    ["/survie", "Ton temps de survie depuis ta dernière mort (en jours de jeu, sans l'AFK), le prochain palier de trophée et tes têtes par rareté", "Tous"],
+  { titre: "Trophées, bestiaire et site", lignes: [
+    ["/tete convertir", "Fait entrer au bestiaire l'ancienne tête de mob (ou toute la pile) tenue en main, à la rareté de base du mob", "Tous"],
+    ["/survie", "Ton temps de survie depuis ta dernière mort (en jours de jeu, sans l'AFK), le prochain palier de trophée, tes têtes par rareté et ta collection du bestiaire", "Tous"],
     ["/site lier <code>", "Relie ton compte du site à ton pseudo : le code s'affiche sur sumenium.com, dans Ma fiche", "Tous"],
   ] },
   { titre: "Boutiques", intro: "Regarder le coffre (ou le tonneau) de la boutique pour toutes ces commandes.", lignes: [
@@ -596,7 +599,7 @@ function commandes(view) {
   const sans = SANS_COMMANDE.filter((l) => match("en jeu", ...l));
   view.innerHTML = `<div class="bar"><input type="search" id="cq" placeholder="Chercher une commande ou une action (boutique, bon, faction, hdv…)" value="${E_(cq)}" aria-label="Chercher une commande"></div>
     <div class="banner info">Tu débutes ? Les <a href="#aide/guides">guides pas à pas</a> expliquent comment acheter, ouvrir une boutique, vendre un service ou gagner de l'argent.</div>
-    <p class="small muted">Mod Sumenium Economy 2.10.2. Les montants s'écrivent avec un point (3.5). Entre &lt; &gt; : obligatoire ; entre [ ] : facultatif.</p>
+    <p class="small muted">Mod Sumenium Economy 2.11.0. Les montants s'écrivent avec un point (3.5). Entre &lt; &gt; : obligatoire ; entre [ ] : facultatif.</p>
     ${sans.length ? `<section class="board cmd-sec"><h3>En jeu, sans commande</h3><p class="small muted">Acheter, vendre au FISC et ravitailler se fait en cliquant sur les coffres et les PNJ, pas avec des commandes.</p>
       <div class="tbl-wrap"><table class="tbl left cmds"><thead><tr><th>Action</th><th>Comment</th></tr></thead><tbody>
       ${sans.map((l) => `<tr><td><b>${E_(l[0])}</b></td><td>${E_(l[1])}</td></tr>`).join("")}</tbody></table></div></section>` : ""}

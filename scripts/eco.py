@@ -213,6 +213,19 @@ def trophees(sftp, read, j, log, out_path):
     return f"trophées : {len(out['trophees'])}"
 
 
+def bestiaire(sftp, read, j, log, out_path):
+    """Bestiaire (têtes de mobs, mod 2.11.0) → site/bestiaire.json : catalogue et obtentions (pseudo, rareté, date)."""
+    b = _load(sftp, read, j, "bestiaire.json", log)
+    if not b or not isinstance(b.get("catalogue"), list):
+        return "bestiaire : aucun"
+    out = {"genereLe": datetime.now(timezone.utc).isoformat(), "catalogue": b["catalogue"],
+           "obtentions": [{k: o.get(k) for k in ("t", "name", "hash", "tier", "n", "src") if o.get(k) is not None} for o in b.get("obtentions") or []],
+           "tirage": b.get("tirage") or {}}
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
+    return f"bestiaire : {len(out['catalogue'])} têtes, {len(out['obtentions'])} obtentions"
+
+
 def items(eco_path):
     """Items présents dans eco.json (pour extraire leurs icônes)."""
     try:

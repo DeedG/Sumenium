@@ -5,6 +5,9 @@ pendant plusieurs jours. On génère donc nos têtes depuis le skin officiel (AP
 pour chaque joueur. Le site garde mc-heads.net en secours quand une tête manque (joueur jamais connecté, skin par défaut).
 
 Entrée : work/joueurs.json ({uuid: pseudo}, écrit par update.py). Cache : work/heads-meta.json + site/heads/.
+
+Têtes du bestiaire (mod 2.11.0) : site/heads/mob/<hash>.png, depuis la texture de chaque tête de mob de site/bestiaire.json
+(textures.minecraft.net, une seule fois par tête).
 """
 import base64, io, json, os, re, time, urllib.error, urllib.request
 from PIL import Image
@@ -29,7 +32,33 @@ def head(skin_png):
     return face
 
 
+def mobs():
+    """Têtes du bestiaire : une image par texture, faite une seule fois."""
+    try:
+        cat = json.load(open("site/bestiaire.json", encoding="utf-8")).get("catalogue") or []
+    except Exception:
+        return
+    out = os.path.join(OUT, "mob")
+    os.makedirs(out, exist_ok=True)
+    made = fail = 0
+    for e in cat:
+        h = str(e.get("hash") or "")
+        if not re.fullmatch(r"[0-9a-f]{20,80}", h) or os.path.exists(os.path.join(out, h + ".png")):
+            continue
+        if made + fail >= 150:
+            break
+        try:
+            head(get("https://textures.minecraft.net/texture/" + h)).save(os.path.join(out, h + ".png"), optimize=True)
+            made += 1
+        except Exception:
+            fail += 1
+    if made or fail:
+        msg = f"bestiaire : {made} têtes de mobs ajoutées, {fail} en échec, {len(os.listdir(out))} au total"
+        print(f"::notice title=Têtes du bestiaire::{msg}" if os.environ.get("GITHUB_ACTIONS") else msg)
+
+
 def main():
+    mobs()
     try:
         players = json.load(open("work/joueurs.json", encoding="utf-8"))
     except Exception:
