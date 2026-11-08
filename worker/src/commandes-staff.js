@@ -62,6 +62,7 @@ export const COMMANDES_STAFF = {
     ], note: "Les PNJ, la boîte aux lettres et le lutrin ne se cassent qu'avec /sumeco bypass. Pour le site : sumenium-data/export/hdv.json (annonces) et bluemap-markers.json (boutiques, FISC et hôtel des ventes au format BlueMap)." },
     { titre: "Trophées", intro: "Une tête à chaque mort ; réglages tropheesSurvieJours, tropheesMortsMin et tropheesWebhook dans config/sumenium-economy.json (/sumeco recharger).", lignes: [
       ["/trophee donner <n°>", "Te donne une copie du trophée n° (écrit sur la tête et sur le site), par exemple pour remplacer une tête perdue"],
+      ["/trophee exemple <rareté>", "Te donne une tête d'exemple de toi (commune … prismatique), ni enregistrée ni numérotée : pour montrer une rareté dans une annonce"],
     ] },
     { titre: "Marché noir", intro: "PNJ contrebandier caché : les objets sont vendus à l'identique, l'argent payé est détruit.", lignes: [
       ["/marchenoir pnj · /marchenoir pnj retirer", "Place le contrebandier à ta position, ou retire le plus proche (6 blocs)"],

@@ -511,7 +511,7 @@ const SANS_COMMANDE = [
   ["Boîte aux lettres", "Clic droit sur la boîte aux lettres du spawn : chacun y retrouve ses items gagnés aux enchères et ses invendus. On ne peut que retirer, pas déposer."],
   ["Annuaire", "Le livre sur le lutrin de l'entrée de la zone commerciale liste toutes les boutiques des joueurs, sans le FISC (propriétaire, item, prix, rupture, coordonnées). Il se met à jour tout seul et revient si quelqu'un le prend."],
   ["Marchand de têtes", "Clic droit sur le PNJ : plus de 100 000 têtes décoratives classées par catégorie puis par nom. La boussole lance une recherche (taper un mot dans le chat, souvent en anglais : cat, pumpkin…). Un clic sur une tête l'achète pour 150 Su, avec le compte utilisé (perso ou faction)."],
-  ["Trophées (tête à chaque mort)", "À chaque mort, ta tête tombe là où tu es mort, avec la cause, le jour de la saison et ton temps de survie. Plus la mort est rare (tué par un joueur, par un boss, cause rare sur le serveur, longue survie), plus la tête est rare : de Commune à Prismatique. Elle garde le skin porté à la mort : après un changement de skin, se reconnecter avant de mourir. Elle ne brûle pas dans la lave et revient à la réapparition si elle tombe dans le vide. Classement dans Classements › Trophées."],
+  ["Trophées (tête à chaque mort)", "À chaque mort, ta tête tombe là où tu es mort, avec la cause, le jour de la saison et ton temps de survie. Plus la mort est rare (tué par un joueur, par un boss, cause rare sur le serveur, longue survie), plus la tête est rare : de Commune à Prismatique. Elle garde le skin porté à la mort : après un changement de skin, se reconnecter avant de mourir. Au sol elle est invulnérable (feu, lave, explosions, cactus) et ne disparaît jamais ; tombée dans le vide, elle revient à celui qui l'a lâchée. Classement dans Classements › Trophées."],
   ["AFK", "Sans bouger la caméra, marcher ni écrire dans le chat pendant 2 min 30, le joueur passe [AFK] dans le tab (un autoclicker ne compte pas comme une activité). Les joueurs AFK ne sont pas comptés pour passer la nuit."],
 ];
 const JOUEURS = [
@@ -596,7 +596,7 @@ function commandes(view) {
   const sans = SANS_COMMANDE.filter((l) => match("en jeu", ...l));
   view.innerHTML = `<div class="bar"><input type="search" id="cq" placeholder="Chercher une commande ou une action (boutique, bon, faction, hdv…)" value="${E_(cq)}" aria-label="Chercher une commande"></div>
     <div class="banner info">Tu débutes ? Les <a href="#aide/guides">guides pas à pas</a> expliquent comment acheter, ouvrir une boutique, vendre un service ou gagner de l'argent.</div>
-    <p class="small muted">Mod Sumenium Economy 2.10.0. Les montants s'écrivent avec un point (3.5). Entre &lt; &gt; : obligatoire ; entre [ ] : facultatif.</p>
+    <p class="small muted">Mod Sumenium Economy 2.10.2. Les montants s'écrivent avec un point (3.5). Entre &lt; &gt; : obligatoire ; entre [ ] : facultatif.</p>
     ${sans.length ? `<section class="board cmd-sec"><h3>En jeu, sans commande</h3><p class="small muted">Acheter, vendre au FISC et ravitailler se fait en cliquant sur les coffres et les PNJ, pas avec des commandes.</p>
       <div class="tbl-wrap"><table class="tbl left cmds"><thead><tr><th>Action</th><th>Comment</th></tr></thead><tbody>
       ${sans.map((l) => `<tr><td><b>${E_(l[0])}</b></td><td>${E_(l[1])}</td></tr>`).join("")}</tbody></table></div></section>` : ""}
