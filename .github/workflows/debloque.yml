@@ -34,9 +34,9 @@ jobs:
               age=$(( now - $(date -u -d "$created" +%s) ))
               if [ "$age" -gt 1200 ]; then
                 echo "::warning title=Site débloqué::exécution $id ($st depuis $((age/60)) min) annulée"
-                gh api -X POST "repos/$REPO/actions/runs/$id/cancel" || true
+                gh api -X POST "repos/$REPO/actions/runs/$id/cancel" 2>&1 | sed "s/^/::notice title=Annulation $id::/" || true
                 sleep 20
-                gh api -X POST "repos/$REPO/actions/runs/$id/force-cancel" || true
+                gh api -X POST "repos/$REPO/actions/runs/$id/force-cancel" 2>&1 | sed "s/^/::notice title=Annulation forcée $id::/" || true
               fi
             done
           done
