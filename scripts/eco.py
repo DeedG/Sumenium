@@ -310,6 +310,7 @@ def push_journal(sftp, read, j, log, notice):
 # L'état vit dans la base de l'Espace (jamais dans le dépôt public ni dans le cache d'Actions, lisible depuis une fork) :
 # on relit la version stockée, on remplace les derniers jours par le journal relu, et on renvoie.
 
+DETAIL_VERSION = 2       # à changer quand le filtre des lignes change : force une relecture complète
 DETAIL_COLS = ["t", "type", "from", "to", "actor", "item", "amount", "tax", "qty", "shop", "actorName", "fromName", "toName"]
 ECO_HORS = {"MARCHE_NOIR", "CONFIG_MARCHE_NOIR"}
 ECO_SANS = {"IMPORT"} | ECO_HORS
@@ -328,7 +329,8 @@ def _amt(v):
 def _row(o):
     """Ligne du journal → ligne compacte du tableau de bord, ou None (pas d'argent, import, hors circuit)."""
     typ = str(o.get("type"))[:40].strip()
-    if typ in ECO_SANS or _amt(o.get("amount")) + _amt(o.get("tax")) <= 0:
+    # les suppressions de boutique restent même sans argent : le site y repère les boutiques éphémères
+    if typ in ECO_SANS or (typ != "SUPPRESSION_BOUTIQUE" and _amt(o.get("amount")) + _amt(o.get("tax")) <= 0):
         return None
     sc = lambda v: v if v is None or isinstance(v, (int, float, str)) else None
     return [int(round(float(o["t"]))), typ, _acc(o.get("from")), _acc(o.get("to")), _acc(o.get("actor")),
@@ -401,7 +403,8 @@ def push_detail(sftp, read, j, log, notice, eco_path):
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     since = max(int(datetime.fromisoformat(OUVERTURE).timestamp() * 1000) - 86_400_000, now_ms - DETAIL_JOURS * 86_400_000)
     # Relecture complète si rien n'est stocké, si le format a changé, ou une fois par jour pour se réparer
-    full = (not isinstance(stored, dict) or stored.get("cols") != DETAIL_COLS or not isinstance(hors_stored, list)
+    full = (not isinstance(stored, dict) or stored.get("cols") != DETAIL_COLS or stored.get("version") != DETAIL_VERSION
+            or not isinstance(hors_stored, list)
             or now_ms - int(stored.get("complet") or 0) > 86_400_000)
     last = int(stored.get("maxT") or 0) if not full else 0
     day = (datetime.fromtimestamp(last / 1000, timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d") if last else ""
@@ -441,7 +444,7 @@ def push_detail(sftp, read, j, log, notice, eco_path):
         noms = {str(e["uuid"]).lower(): e["name"] for e in json.loads(read(sftp, j("whitelist.json"))) if e.get("uuid") and e.get("name")}
     except Exception:
         noms = stored.get("noms", {}) if isinstance(stored, dict) else {}
-    common = {"cols": DETAIL_COLS, "saisonDebut": OUVERTURE, "maj": now_ms, "maxT": max([r[0] for r in rows] + [h[0] for h in hors] + [last]),
+    common = {"cols": DETAIL_COLS, "version": DETAIL_VERSION, "saisonDebut": OUVERTURE, "maj": now_ms, "maxT": max([r[0] for r in rows] + [h[0] for h in hors] + [last]),
               "complet": now_ms if full else stored.get("complet")}
     staff = {**common, "rows": rows, "noms": noms, "horsCircuit": {"n": len(hors), "montant": sum(h[1] for h in hors)}}
     public = {**common, "rows": _anon_rows(rows, noms, eco_path), "noms": {}}

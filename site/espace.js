@@ -392,7 +392,7 @@ function tailleTxt(sc, applied) {
 
 /* ---------- Historique (journal du mod Sumenium Economy, montants en CENTIMES) ---------- */
 const TX = { ACHAT: "Achat en boutique", ACHAT_SERVICE: "Achat de service", RACHAT_FISC: "Vente au FISC", ACHAT_FISC: "Achat au FISC",
-  FRAIS_BOUTIQUE: "Frais de boutique", REMBOURSEMENT_BOUTIQUE: "Remboursement de boutique", SUPPRESSION_BOUTIQUE: "Suppression de boutique",
+  FRAIS_BOUTIQUE: "Frais de boutique", REMBOURSEMENT_BOUTIQUE: "Remboursement de boutique", SUPPRESSION_BOUTIQUE: "Suppression de boutique", TAXE_CLOTURE: "Taxe de clôture anticipée",
   DEPOT_FACTION: "Dépôt à la faction", RETRAIT_FACTION: "Retrait de la faction", ADMIN: "Opération du staff", IMPORT: "Reprise de Savs",
   BON_UTILISE: "Bon de service utilisé", HDV_OFFRE: "Offre à l'HDV", HDV_REMBOURSEMENT: "Offre HDV rendue", HDV_VENTE: "Vente à l'HDV",
   ACHAT_TETE: "Achat d'une tête", REPRISE_FISC: "Objet rare vendu au FISC", REVENTE_FISC: "Objet rare acheté au FISC", DEMANDE_REPRISE: "Objet rare demandé au FISC", MARCHE_NOIR: "Marché noir" };
@@ -1033,12 +1033,12 @@ function canSeeShop(b) {
   return b.proprietaireType === "joueur" ? norm(b.proprietaire) === norm(p.mc_name) : b.proprietaireType === "faction" && !!myEcoFacId() && b.faction === myEcoFacId();
 }
 const histBtn = (b) => `<button type="button" class="btn small ghost" data-shop-hist="${esc(b.id)}">Historique</button>`;
-const SHOP_TX = { ACHAT: "Vente", ACHAT_SERVICE: "Vente (service)", CONFIG_BOUTIQUE: "Réglage", FRAIS_BOUTIQUE: "Création", REMBOURSEMENT_BOUTIQUE: "Suppression",
+const SHOP_TX = { ACHAT: "Vente", ACHAT_SERVICE: "Vente (service)", CONFIG_BOUTIQUE: "Réglage", FRAIS_BOUTIQUE: "Création", REMBOURSEMENT_BOUTIQUE: "Remboursement", TAXE_CLOTURE: "Taxe de clôture",
   SUPPRESSION_BOUTIQUE: "Suppression", BON_UTILISE: "Bon validé" };
 function shopTxRow(t) {
   const sale = t.type === "ACHAT" || t.type === "ACHAT_SERVICE";
   const amount = t.amount || 0, tax = t.tax || 0;
-  const val = sale ? amount - tax : t.type === "FRAIS_BOUTIQUE" ? -amount : amount;
+  const val = sale ? amount - tax : t.type === "FRAIS_BOUTIQUE" || t.type === "TAXE_CLOTURE" ? -amount : amount;
   const what = t.type === "CONFIG_BOUTIQUE" || t.type === "BON_UTILISE" ? (t.note || "") : sale ? `${t.qty ? t.qty + " × " : ""}${itemLabel(t)}${t.note && /lot/.test(t.note) ? ` (${t.note})` : ""}` : (t.note || "");
   const who = sale ? (t.actorName || t.fromName || "") : t.actorName || "";
   return `<tr><td class="nowrap">${new Date(t.t).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</td><td>${esc(SHOP_TX[t.type] || TX[t.type] || t.type)}</td>

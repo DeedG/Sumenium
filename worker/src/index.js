@@ -1179,7 +1179,7 @@ async function staffEco(env, url) {
   const [rows, hors, wl, cfg] = await Promise.all([
     env.DB.prepare(`SELECT t, type, from_acc, to_acc, actor, item, json_extract(data,'$.amount'), json_extract(data,'$.tax'), json_extract(data,'$.qty'),
         json_extract(data,'$.shop'), json_extract(data,'$.actorName'), json_extract(data,'$.fromName'), json_extract(data,'$.toName')
-      FROM tx WHERE t >= ? AND type NOT IN (${ph(ECO_SANS)}) AND COALESCE(json_extract(data,'$.amount'),0) + COALESCE(json_extract(data,'$.tax'),0) > 0
+      FROM tx WHERE t >= ? AND type NOT IN (${ph(ECO_SANS)}) AND (type = 'SUPPRESSION_BOUTIQUE' OR COALESCE(json_extract(data,'$.amount'),0) + COALESCE(json_extract(data,'$.tax'),0) > 0)
       ORDER BY t LIMIT 60000`).bind(since, ...ECO_SANS).raw(),
     env.DB.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(json_extract(data,'$.amount')),0) AS m FROM tx WHERE t >= ? AND type = ?`).bind(since, ECO_HORS[0]).first(),
     env.DB.prepare("SELECT mc_name, uuid FROM whitelist WHERE uuid IS NOT NULL").all(),

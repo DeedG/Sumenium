@@ -20,7 +20,10 @@ const STAFF = () => !!(RAW && RAW.staff);
 const PERIODES = [[7, "7 j"], [14, "14 j"], [30, "30 j"], [0, "Saison"]];
 // Libellés des sources de création / destruction (type du journal)
 const SRC = { RACHAT_FISC: "Rachats de minerais", REPRISE_FISC: "Reprises d'objets rares", REMBOURSEMENT_BOUTIQUE: "Remboursements de boutique", ADMIN: "Staff",
-  ACHAT_FISC: "Achats au FISC", ACHAT_TETE: "Têtes", REVENTE_FISC: "Reventes d'objets rares", FRAIS_BOUTIQUE: "Frais de boutique", TAXE: "Taxes de vente" };
+  ACHAT_FISC: "Achats au FISC", ACHAT_TETE: "Têtes", REVENTE_FISC: "Reventes d'objets rares", FRAIS_BOUTIQUE: "Frais de boutique", TAXE: "Taxes de vente",
+  TAXE_CLOTURE: "Taxes de clôture anticipée" };
+// Boutique « temporaire » : fermée (ou encore ouverte) moins de 7 jours après sa création ; éphémère = temporaire qui a vendu
+const TEMP_JOURS = 7;
 
 // Usine → items (première version de la spec, modifiable dans Réglages). « * » = n'importe quelle suite de lettres.
 const DEFAUT_USINES = {
@@ -89,7 +92,7 @@ async function load(force) {
 }
 
 // Lignes du journal → événements classés : { t, day, type, kind, m (Su), tax, buyer/seller ou to/from (clés de faction), item, qty, shop, actor }
-let EV = [], NAMES = {}, FAC = new Map(), PLAYER_FAC = new Map();
+let EV = [], NAMES = {}, FAC = new Map(), PLAYER_FAC = new Map(), CLOSED = [];
 const isAcc = (v) => v && (v.startsWith("joueur:") || v.startsWith("faction:") || v.startsWith("solo:"));
 function prep() {
   const ECO = X.ECO || {};
@@ -105,7 +108,23 @@ function prep() {
   FAC = new Map((ECO.factions || []).map((f) => [String(f.id).toLowerCase(), f]));
   PLAYER_FAC = new Map((ECO.joueurs || []).map((j) => [String(j.nom).toLowerCase(), j.faction ? String(j.faction).toLowerCase() : null]));
   EV = [];
+  // Boutiques fermées : création (frais), ventes encaissées, suppression, taxe de clôture, par identifiant de boutique
+  const SH = new Map(), sh = (id) => { if (!SH.has(id)) SH.set(id, { id, ca: 0, taxe: 0, creee: null, fermee: null, owner: null, item: null, par: null }); return SH.get(id); };
   for (const r of rows) {
+    if (!r.shop) continue;
+    const b = sh(r.shop), amt = (Number(r.amount) || 0) / 100;
+    if (r.type === "FRAIS_BOUTIQUE") { b.creee = b.creee === null ? r.t : Math.min(b.creee, r.t); b.owner = b.owner || r.from; }
+    else if (r.type === "ACHAT" || r.type === "ACHAT_SERVICE") b.ca += amt - (Number(r.tax) || 0) / 100;
+    else if (r.type === "SUPPRESSION_BOUTIQUE" || r.type === "REMBOURSEMENT_BOUTIQUE") { b.fermee = b.fermee === null ? r.t : Math.min(b.fermee, r.t); if (r.to) b.owner = r.to; if (r.actorName) b.par = r.actorName; }
+    else if (r.type === "TAXE_CLOTURE") { b.taxe += amt; if (r.from) b.owner = r.from; }
+    if (r.item && !b.item) b.item = idOf(r.item);
+  }
+  CLOSED = [...SH.values()].filter((b) => b.fermee !== null).map((b) => {
+    const age = b.creee === null ? null : (b.fermee - b.creee) / DAY;
+    return { ...b, age, temporaire: age !== null && age < TEMP_JOURS, ephemere: age !== null && age < TEMP_JOURS && b.ca > 0 };
+  });
+  for (const r of rows) {
+    if (r.type === "SUPPRESSION_BOUTIQUE") continue;                               // sans argent : seulement pour CLOSED
     const m = (Number(r.amount) || 0) / 100, tax = (Number(r.tax) || 0) / 100;
     const e = { t: r.t, day: dayOf(r.t), type: r.type, m, tax: 0, item: r.item ? idOf(r.item) : null, qty: Number(r.qty) || 0, shop: r.shop || null, actor: r.actor };
     const commerce = r.type === "ACHAT" || r.type === "ACHAT_SERVICE" || r.type === "HDV_VENTE";
@@ -463,6 +482,31 @@ function boutiques(el, P) {
   const q = st.q.toLowerCase();
   const list = shops.filter((s) => (!st.fac || shopKey(s) === st.fac) && (!q || [s.nom, s.item, s.proprietaire, s.service].join(" ").toLowerCase().includes(q)));
   const unit = (s) => (s.prix || 0) / Math.max(1, s.quantite || 1);
+  const tempo = (s) => s.creeLe && Date.now() - Date.parse(s.creeLe) < TEMP_JOURS * DAY;
+  // Boutiques fermées sur la période, et contrôle du FISC : fermetures éphémères (moins de 7 jours, avec des ventes) par propriétaire
+  const closed = CLOSED.filter((b) => b.fermee >= P.start && b.fermee < P.end && (!st.fac || keyOf(b.owner) === st.fac)).sort((a, b) => b.fermee - a.fermee);
+  const ownerHtml = (acc) => { const k = keyOf(acc), n = STAFF() && k && !k.startsWith("s:") ? nameOf(acc) : null; return (k ? facHtml(k) : "—") + (n ? ` <small class="muted">· ${esc(n)}</small>` : ""); };
+  const ownerTxt = (acc) => { const k = keyOf(acc), n = STAFF() && k && !k.startsWith("s:") ? nameOf(acc) : null; return (k ? facName(k) : "") + (n ? " · " + n : ""); };
+  const perOwner = new Map();
+  for (const b of closed) {
+    if (!b.ephemere) continue;
+    const k = STAFF() ? b.owner : keyOf(b.owner), o = perOwner.get(k) || { acc: b.owner, n: 0, ca: 0, taxe: 0, last: 0 };
+    o.n++; o.ca += b.ca; o.taxe += b.taxe; o.last = Math.max(o.last, b.fermee); perOwner.set(k, o);
+  }
+  const dateCell = (t) => t === null ? "—" : H(new Date(t).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }), new Date(t).toISOString().slice(0, 10));
+  const dureeCell = (d) => d === null ? H("—", "") : H(d < 1 ? Math.max(1, Math.round(d * 24)) + " h" : d.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " j", Math.round(d * 10) / 10);
+  const statut = (b) => b.ephemere ? (b.taxe ? '<span class="chip warn">éphémère · taxée</span>' : '<span class="chip warn">éphémère</span>') : b.temporaire ? '<span class="chip">temporaire</span>' : "";
+  const ferme = `<section class="card"><h3>Boutiques fermées et contrôle du FISC</h3>
+      <p class="muted small">Règle du FISC : la vente régulière se fait dans une boutique installée dans un build de la zone commerciale ; une boutique temporaire est tolérée ${TEMP_JOURS} jours.
+        Depuis le mod 2.10, fermer avant ${TEMP_JOURS} jours une boutique qui a vendu coûte 5 % de son CA, sans remboursement. Éphémère = fermée avant ${TEMP_JOURS} jours après avoir vendu (les fermetures d'avant la taxe comptent aussi).
+        Durée calculée depuis les frais de création ; « — » si la boutique a été créée avant la saison ou il y a plus de 180 jours.</p>
+      ${perOwner.size ? `<h4>Fermetures éphémères par ${STAFF() ? "propriétaire" : "faction"}</h4>${table("ephemeres", [STAFF() ? "Propriétaire" : "Faction", ["Fermetures", "Boutiques fermées avant 7 jours après avoir vendu, sur la période"], "CA", "Taxe payée", "Dernière"],
+        [...perOwner.values()].map((o) => [H(ownerHtml(o.acc) + (o.n >= 3 ? ' <span class="chip warn">fréquent</span>' : ""), ownerTxt(o.acc)), o.n, S(o.ca), S(o.taxe), dateCell(o.last)]).sort((a, b) => b[1] - a[1] || b[2].v - a[2].v))}`
+        : `<p class="muted small">Aucune fermeture éphémère sur la période.</p>`}
+      <h4>Toutes les fermetures (${closed.length})</h4>
+      ${table("fermetures", ["Boutique", "Propriétaire", "Créée", "Fermée", "Durée", ["CA", "Ventes encaissées depuis la création"], "Taxe", "Statut"],
+        closed.map((b) => [H(esc(nomItem(b.item || "") || b.item || "?") + (STAFF() && b.par ? ` <small class="muted">par ${esc(b.par)}</small>` : ""), b.item || ""), H(ownerHtml(b.owner), ownerTxt(b.owner)),
+          dateCell(b.creee), dateCell(b.fermee), dureeCell(b.age), S(b.ca), b.taxe ? S(b.taxe) : "—", H(statut(b), b.ephemere ? "éphémère" : b.temporaire ? "temporaire" : "")]), { max: 300 })}</section>`;
   // Concurrence par item (boutiques d'items, hors lots) : vendeurs, écart de prix, part de marché du premier, HHI
   const items = new Map();
   for (const s of shops) { if (s.type !== "item" || s.lot || !s.item) continue; const [k, v] = variant(s); const it = items.get(k) || { nom: (s.nom || idOf(s.item)) + (v ? " — " + v : ""), id: idOf(s.item), shops: [] }; it.shops.push(s); items.set(k, it); }
@@ -487,7 +531,7 @@ function boutiques(el, P) {
       ${table("boutiques", ["Boutique", "Faction", "Prix / u", "Stock", "Ventes", "CA", ["dont ext.", "Ventes à d'autres factions"], ["CA total", "Depuis la création de la boutique"]],
         list.map((s) => { const b = byShop.get(s.id) || { ca: 0, ext: 0, n: 0 }, nom = s.lot ? `Lot : ${s.lot.map((x) => x.nom || idOf(x.item)).join(" + ")}` : s.service || s.nom || idOf(s.item);
           return [H(`${esc(nom)}${s.proprietaire ? ` <small class="muted">· ${esc(s.proprietaire)}</small>` : ""}`, nom + (s.proprietaire ? " · " + s.proprietaire : "")), H(shopKey(s) ? facHtml(shopKey(s)) : "—", shopKey(s) ? facName(shopKey(s)) : ""), S2(unit(s)),
-            H(s.rupture ? '<span class="chip warn">rupture</span>' : n0(s.stock ?? 0), s.rupture ? "rupture" : s.stock ?? ""), b.n, S(b.ca), S(b.ext), S(s.chiffreAffaires || 0)]; }).sort((a, b) => b[5].v - a[5].v || b[7].v - a[7].v), { max: 400 })}</section>`;
+            H((s.rupture ? '<span class="chip warn">rupture</span>' : n0(s.stock ?? 0)) + (tempo(s) ? ` <span class="chip" title="Moins de ${TEMP_JOURS} jours : la fermer maintenant coûterait ${esc(su((s.chiffreAffaires || 0) * 0.05))} (5 % du CA), sans remboursement">temporaire</span>` : ""), s.rupture ? "rupture" : s.stock ?? ""), b.n, S(b.ca), S(b.ext), S(s.chiffreAffaires || 0)]; }).sort((a, b) => b[5].v - a[5].v || b[7].v - a[7].v), { max: 400 })}</section>${ferme}`;
   const qEl = $("seQ");
   if (qEl) { qEl.oninput = (e) => { st.q = e.target.value; const pos = e.target.selectionStart; boutiques(el, P); bindCsv(el); const n = $("seQ"); n.focus(); n.setSelectionRange(pos, pos); }; }
   if ($("seFac")) $("seFac").onchange = (e) => { st.fac = e.target.value; boutiques(el, P); bindCsv(el); };
