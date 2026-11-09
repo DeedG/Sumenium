@@ -164,8 +164,8 @@
       .then(([, b]) => { BEST = b; return BEST; });
     return bestLoading;
   }
-  const mobName = (e) => (e.e ? tr("entity.minecraft." + e.e) + (e.s || "") : e.en);
-  const groupName = (e) => (e.secret ? "Têtes secrètes" : e.e ? tr("entity.minecraft." + e.e) : e.en);
+  const mobName = (e) => (e.e ? tr("entity.minecraft." + e.e) + (e.s || "") : (e.s || "").trim() || e.en);
+  const groupName = (e) => (e.secret ? "Têtes secrètes" : /^all_mob_heads:(?!baby\/)/.test(e.table || "") ? "Récompenses de collection" : e.e ? tr("entity.minecraft." + e.e) : mobName(e));
   const mobImg = (e, s = 40) => `<img class="mob-ico" src="heads/mob/${esc(e.hash)}.png" alt="" width="${s}" height="${s}" loading="lazy" onerror="this.style.visibility='hidden'">`;
   const pct = (x) => (x * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " %";
 
@@ -209,6 +209,7 @@
           <li><b>Sa rareté</b> part de la rareté de base du mob (une poule est commune, un Enderman rare, le Warden légendaire), puis un tirage peut la monter : <b>${pct(tirage.plus1)}</b> de chances de +1 cran, <b>${pct(tirage.plus2)}</b> de +2, <b>${pct(tirage.plus3)}</b> de +3. Une tête de cochon prismatique, ça existe…</li>
           <li><b>Les têtes s'empilent</b> par mob et par rareté. Elles sont <b>indestructibles</b> au sol (feu, lave, explosions, cactus) et ne disparaissent jamais.</li>
           <li><b>Les têtes secrètes</b> (???) ne tombent que de mobs très particuliers. À vous de chercher.</li>
+          <li><b>Les bébés</b> ont leur propre tête, et terminer une collection d'All Mob Heads rapporte une <b>tête en or</b> (à faire entrer au bestiaire avec <code>/tete convertir</code>).</li>
           <li><b>Tes anciennes têtes</b> de mobs : prends-les en main (une ou toute la pile) et tape <code>/tete convertir</code> pour les faire entrer au bestiaire, à la rareté de base du mob.</li>
           <li><b>Un musée ?</b> Accroupi + clic droit (main vide) sur une tête posée affiche une étiquette avec son nom et sa rareté (même geste pour la retirer). En regardant une tête posée ou dans un cadre, son détail s'affiche au-dessus de ta barre d'inventaire.</li>
         </ul>
