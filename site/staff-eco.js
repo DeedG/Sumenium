@@ -482,7 +482,8 @@ function boutiques(el, P) {
   const q = st.q.toLowerCase();
   const list = shops.filter((s) => (!st.fac || shopKey(s) === st.fac) && (!q || [s.nom, s.item, s.proprietaire, s.service].join(" ").toLowerCase().includes(q)));
   const unit = (s) => (s.prix || 0) / Math.max(1, s.quantite || 1);
-  const tempo = (s) => s.creeLe && Date.now() - Date.parse(s.creeLe) < TEMP_JOURS * DAY;
+  // 7 jours, 14 pour les boutiques d'avant la règle (délai de mise en place)
+  const tempo = (s) => { if (!s.creeLe) return false; const c = Date.parse(s.creeLe); return Date.now() - c < (c < Date.parse("2026-11-10T06:00:00+01:00") ? 2 : 1) * TEMP_JOURS * DAY; };
   // Boutiques fermées sur la période, et contrôle du FISC : fermetures éphémères (moins de 7 jours, avec des ventes) par propriétaire
   const closed = CLOSED.filter((b) => b.fermee >= P.start && b.fermee < P.end && (!st.fac || keyOf(b.owner) === st.fac)).sort((a, b) => b.fermee - a.fermee);
   const ownerHtml = (acc) => { const k = keyOf(acc), n = STAFF() && k && !k.startsWith("s:") ? nameOf(acc) : null; return (k ? facHtml(k) : "—") + (n ? ` <small class="muted">· ${esc(n)}</small>` : ""); };
@@ -498,7 +499,7 @@ function boutiques(el, P) {
   const statut = (b) => b.ephemere ? (b.taxe ? '<span class="chip warn">éphémère · taxée</span>' : '<span class="chip warn">éphémère</span>') : b.temporaire ? '<span class="chip">temporaire</span>' : "";
   const ferme = `<section class="card"><h3>Boutiques fermées${STAFF() ? " et contrôle du FISC" : ""}</h3>
       <p class="muted small">Règle du FISC : la vente régulière se fait dans une boutique installée dans un build de la zone commerciale ; une boutique temporaire est tolérée ${TEMP_JOURS} jours.
-        Depuis le mod 2.12, fermer avant ${TEMP_JOURS} jours une boutique qui a vendu coûte 5 % de son CA, sans remboursement. Éphémère = fermée avant ${TEMP_JOURS} jours après avoir vendu (les fermetures d'avant la taxe comptent aussi).
+        Depuis le mod 2.12, fermer avant ${TEMP_JOURS} jours une boutique qui a vendu coûte 5 % de son CA, sans remboursement (14 jours pour les boutiques créées avant le 10 novembre). Au-delà, une boutique hors build n'est plus temporaire : contrôle fiscal possible (stock saisi, boutique supprimée, amende de 30 % du CA et du stock). Éphémère = fermée avant ${TEMP_JOURS} jours après avoir vendu (les fermetures d'avant la taxe comptent aussi).
         Durée calculée depuis les frais de création ; « — » si la boutique a été créée avant la saison ou il y a plus de 180 jours.</p>
       ${!STAFF() ? "" : perOwner.size ? `<h4>Fermetures éphémères par propriétaire</h4>${table("ephemeres", [STAFF() ? "Propriétaire" : "Faction", ["Fermetures", "Boutiques fermées avant 7 jours après avoir vendu, sur la période"], "CA", "Taxe payée", "Dernière"],
         [...perOwner.values()].map((o) => [H(ownerHtml(o.acc) + (o.n >= 3 ? ' <span class="chip warn">fréquent</span>' : ""), ownerTxt(o.acc)), o.n, S(o.ca), S(o.taxe), dateCell(o.last)]).sort((a, b) => b[1] - a[1] || b[2].v - a[2].v))}`

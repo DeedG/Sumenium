@@ -1053,7 +1053,15 @@ dialog.hist-dlg::backdrop{background:rgba(0,0,0,.45)}.hist-head{display:flex;jus
           <li><b>Remplis le coffre</b> en l'ouvrant normalement. Le stock et le panneau se mettent à jour quand tu le refermes.</li>
         </ol>
         <p>Ta boutique est protégée : personne d'autre ne peut l'ouvrir ni la casser, et les entonnoirs, golems ou explosions n'y touchent pas. Tu es prévenu de chaque vente (même hors ligne, au retour) et quand le stock est vide.</p>
-        <p class="small"><b>Ensuite</b> : <code>/boutique prix &lt;prix&gt; [quantité]</code> change le prix, <code>/boutique info</code> montre les ventes, <code>/boutique liste</code> toutes tes boutiques, <code>/boutique faction</code> la donne à ta faction, <code>/boutique supprimer</code> la ferme (50 % des frais remboursés). <a href="#aide/commandes/boutiques">Toutes les commandes de boutique</a></p></section>
+        <p class="small"><b>Ensuite</b> : <code>/boutique prix &lt;prix&gt; [quantité]</code> change le prix, <code>/boutique info</code> montre les ventes, <code>/boutique liste</code> toutes tes boutiques, <code>/boutique faction</code> la donne à ta faction, <code>/boutique supprimer</code> la ferme (50 % des frais remboursés, sauf clôture anticipée : voir les règles ci-dessous). <a href="#aide/commandes/boutiques">Toutes les commandes de boutique</a></p>
+        <h4 id="g-regles-boutique">📜 Les règles du FISC pour les boutiques</h4>
+        <ul>
+          <li><b>Une boutique = une famille</b> : des objets d'une même famille ou liés à une usine (sauf exception pour le RP, à voir avec le staff). Tout abus est sanctionné d'une fermeture temporaire de la boutique.</li>
+          <li><b>La vente régulière se fait dans un build de la zone commerciale.</b> Un coffre posé sans build est une boutique <b>temporaire</b>, tolérée <b>7 jours</b>.</li>
+          <li><b>Fermer avant 7 jours</b> une boutique qui a déjà vendu : <b>aucun remboursement</b> et une taxe de <b>5 % de son chiffre d'affaires</b> pour le FISC. Il faut confirmer (<code>/boutique supprimer confirmer</code>, ou casser le coffre une deuxième fois dans les 30 s) ; si le compte ne peut pas payer, la boutique ne peut pas être fermée. Sans vente, ou après 7 jours, 50 % des frais sont remboursés comme d'habitude. <code>/boutique info</code> montre la taxe actuelle et la date de fin.</li>
+          <li><b>Après 7 jours</b>, une boutique toujours hors d'un build de la zone commerciale n'est plus temporaire : le FISC peut faire un <b>contrôle fiscal</b>. Le stock est saisi, la boutique supprimée, et une amende de <b>30 % du chiffre d'affaires et de la valeur du stock</b> est prélevée.</li>
+        </ul>
+        <p class="small muted">Le but : des boutiques variées, et une zone commerciale qui se remplit de vrais builds.</p></section>
 
       <section class="card steps" id="g-lot"><h3>📦 Vendre un lot de plusieurs objets</h3>
         <ol>
