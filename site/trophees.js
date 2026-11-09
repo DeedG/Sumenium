@@ -207,7 +207,7 @@
         <ul class="join-list">
           <li><b>Une tête tombe</b> quand tu tues un mob <b>avec une arme Butin</b> (Butin I minimum ; Butin II et III donnent plus de chances). Chaque mob a sa chance, parfois minuscule (l'Enderman !).</li>
           <li><b>Sa rareté</b> part de la rareté de base du mob (une poule est commune, un Enderman rare, le Warden légendaire), puis un tirage peut la monter : <b>${pct(tirage.plus1)}</b> de chances de +1 cran, <b>${pct(tirage.plus2)}</b> de +2, <b>${pct(tirage.plus3)}</b> de +3. Une tête de cochon prismatique, ça existe…</li>
-          <li><b>Les têtes s'empilent</b> par mob et par rareté. Elles sont <b>indestructibles</b> au sol (feu, lave, explosions, cactus) et ne disparaissent jamais.</li>
+          <li><b>Les têtes s'empilent</b> par mob et par rareté. Au sol, les communes et peu communes se comportent comme n'importe quel objet (elles disparaissent au bout de 5 minutes et brûlent), les rares et épiques ne disparaissent pas mais brûlent dans la lave, et les légendaires et prismatiques sont indestructibles (et reviennent si elles tombent dans le vide).</li>
           <li><b>Les têtes secrètes</b> (???) ne tombent que de mobs très particuliers. À vous de chercher.</li>
           <li><b>Les bébés</b> ont leur propre tête, et terminer une collection d'All Mob Heads rapporte une <b>tête en or</b> (à faire entrer au bestiaire avec <code>/tete convertir</code>).</li>
           <li><b>Tes anciennes têtes</b> de mobs : prends-les en main (une ou toute la pile) et tape <code>/tete convertir</code> pour les faire entrer au bestiaire, à la rareté de base du mob.</li>
