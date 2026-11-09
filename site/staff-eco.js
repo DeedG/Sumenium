@@ -496,11 +496,11 @@ function boutiques(el, P) {
   const dateCell = (t) => t === null ? "—" : H(new Date(t).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }), new Date(t).toISOString().slice(0, 10));
   const dureeCell = (d) => d === null ? H("—", "") : H(d < 1 ? Math.max(1, Math.round(d * 24)) + " h" : d.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " j", Math.round(d * 10) / 10);
   const statut = (b) => b.ephemere ? (b.taxe ? '<span class="chip warn">éphémère · taxée</span>' : '<span class="chip warn">éphémère</span>') : b.temporaire ? '<span class="chip">temporaire</span>' : "";
-  const ferme = `<section class="card"><h3>Boutiques fermées et contrôle du FISC</h3>
+  const ferme = `<section class="card"><h3>Boutiques fermées${STAFF() ? " et contrôle du FISC" : ""}</h3>
       <p class="muted small">Règle du FISC : la vente régulière se fait dans une boutique installée dans un build de la zone commerciale ; une boutique temporaire est tolérée ${TEMP_JOURS} jours.
         Depuis le mod 2.12, fermer avant ${TEMP_JOURS} jours une boutique qui a vendu coûte 5 % de son CA, sans remboursement. Éphémère = fermée avant ${TEMP_JOURS} jours après avoir vendu (les fermetures d'avant la taxe comptent aussi).
         Durée calculée depuis les frais de création ; « — » si la boutique a été créée avant la saison ou il y a plus de 180 jours.</p>
-      ${perOwner.size ? `<h4>Fermetures éphémères par ${STAFF() ? "propriétaire" : "faction"}</h4>${table("ephemeres", [STAFF() ? "Propriétaire" : "Faction", ["Fermetures", "Boutiques fermées avant 7 jours après avoir vendu, sur la période"], "CA", "Taxe payée", "Dernière"],
+      ${!STAFF() ? "" : perOwner.size ? `<h4>Fermetures éphémères par propriétaire</h4>${table("ephemeres", [STAFF() ? "Propriétaire" : "Faction", ["Fermetures", "Boutiques fermées avant 7 jours après avoir vendu, sur la période"], "CA", "Taxe payée", "Dernière"],
         [...perOwner.values()].map((o) => [H(ownerHtml(o.acc) + (o.n >= 3 ? ' <span class="chip warn">fréquent</span>' : ""), ownerTxt(o.acc)), o.n, S(o.ca), S(o.taxe), dateCell(o.last)]).sort((a, b) => b[1] - a[1] || b[2].v - a[2].v))}`
         : `<p class="muted small">Aucune fermeture éphémère sur la période.</p>`}
       <h4>Toutes les fermetures (${closed.length})</h4>
