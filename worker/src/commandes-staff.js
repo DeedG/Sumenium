@@ -66,7 +66,7 @@ export const COMMANDES_STAFF = {
       ["/trophee bestiaire · /trophee bestiaire recharger", "Nombre de têtes de mobs lues dans les datapacks (All Mob Heads) ; relire après une mise à jour d'All Mob Heads"],
       ["/trophee exemple <rareté>", "Te donne une tête d'exemple de toi (commune … prismatique), ni enregistrée ni numérotée : pour montrer une rareté dans une annonce"],
     ] },
-    { titre: "Marché noir", intro: "PNJ contrebandier caché : les objets sont vendus à l'identique, l'argent payé est détruit.", lignes: [
+    { titre: "Marché noir", intro: "PNJ contrebandier caché : les objets sont vendus à l'identique, l'argent payé est détruit. Les objets achetés sont impossibles à perdre : incassables, indestructibles au sol, gardés à la mort et rendus à la réapparition, rendus s'ils tombent dans le vide.", lignes: [
       ["/marchenoir pnj · /marchenoir pnj retirer", "Place le contrebandier à ta position, ou retire le plus proche (6 blocs)"],
       ["/marchenoir liste", "Objets en vente, avec leur numéro, prix et stock"],
       ["/marchenoir ajouter <prix> [stock]", "Met en vente l'objet tenu en main (stock illimité si absent)"],
@@ -77,6 +77,7 @@ export const COMMANDES_STAFF = {
       ["/marchenoir ventes [page]", "Ventes passées"],
       ["/marchenoir livre [joueur]", "Donne le carnet de l'énigme (à toi ou au joueur)"],
       ["/marchenoir ouvrir", "Ouvre le menu sans PNJ, pour tester"],
+      ["/marchenoir perdus · /marchenoir perdus recuperer", "Objets du marché noir tombés dans le vide sans propriétaire connu : combien, et te les donner pour les rendre"],
     ] },
     { titre: "Mairie : tâches municipales", intro: "Le maire (choisi dans Outils staff › Réglages) écrit les tâches sur le site, Communauté › Mairie. Le serveur relit le livre toutes les 5 minutes.", lignes: [
       ["/mairie lutrin ajouter", "Le lutrin visé affiche le livre des tâches municipales (lisible, mais impossible à prendre)"],
