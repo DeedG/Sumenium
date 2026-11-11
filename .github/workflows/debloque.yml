@@ -2,7 +2,7 @@ name: Débloquer la mise à jour du site
 
 # Une exécution de « Mise à jour du site » peut rester bloquée (déploiement GitHub Pages « waiting » sans fin) :
 # comme elles partagent le même groupe de concurrence, toutes les suivantes sont annulées et le site ne bouge plus.
-# Ce workflow (autre groupe) annule une exécution bloquée depuis plus de 20 minutes.
+# Ce workflow (autre groupe) annule une exécution bloquée depuis plus de 20 minutes (aussi lancé à chaque modification de ce fichier).
 on:
   schedule:
     - cron: "7,22,37,52 * * * *"
