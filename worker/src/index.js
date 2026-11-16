@@ -439,6 +439,44 @@ async function api(req, env, url, ctx) {
     if (ctx && ctx.waitUntil) ctx.waitUntil(put);
     return out(body);
   }
+  /* ---- export complet de l'économie pour analyse (staff) : un seul fichier JSON, journal en flux ---- */
+  if (p === "/api/staff/eco/export" && m === "GET") {
+    const s = await need(req, env, "staff");
+    await audit(env, s, "export", "economie", "export", null, null);
+    const enc = new TextEncoder(), { readable, writable } = new TransformStream(), w = writable.getWriter();
+    const put = (x) => w.write(enc.encode(x));
+    const run = (async () => {
+      try {
+        const [eco, wl, cfg, detail, nTx] = await Promise.all([
+          ecoData(env), env.DB.prepare("SELECT mc_name, uuid FROM whitelist WHERE uuid IS NOT NULL").all(),
+          setting(env, "eco_staff"), ecoDetailText(env, "staff"), env.DB.prepare("SELECT COUNT(*) AS n, MIN(t) AS a, MAX(t) AS b FROM tx").first(),
+        ]);
+        await put(`{"exporteLe":${JSON.stringify(new Date().toISOString())},"saisonDebut":${JSON.stringify(SAISON_DEBUT)},`
+          + `"lisezMoi":${JSON.stringify(EXPORT_LISEZ_MOI)},`
+          + `"journalInfo":${JSON.stringify({ lignes: (nTx && nTx.n) || 0, du: nTx && nTx.a ? new Date(nTx.a).toISOString() : null, au: nTx && nTx.b ? new Date(nTx.b).toISOString() : null })},`
+          + `"noms":${JSON.stringify(Object.fromEntries(wl.results.map((x) => [String(x.uuid).toLowerCase(), x.mc_name])))},`
+          + `"reglagesDetail":${cfg || "null"},"etat":${JSON.stringify(eco)},"detail":${detail && detail[0] === "{" ? detail : "null"},"journal":[`);
+        let t = -1, id = "", first = true;
+        for (;;) {
+          const r = (await env.DB.prepare("SELECT id, t, data FROM tx WHERE t > ? OR (t = ? AND id > ?) ORDER BY t, id LIMIT 5000").bind(t, t, id).all()).results;
+          if (!r.length) break;
+          let chunk = "";
+          for (const x of r) { chunk += (first ? "" : ",") + x.data; first = false; }
+          await put(chunk);
+          t = r[r.length - 1].t; id = r[r.length - 1].id;
+        }
+        await put("]}");
+      } catch (e) {
+        await put(`],"erreur":${JSON.stringify(String(e && e.message || e))}}`).catch(() => {});
+      } finally {
+        await w.close().catch(() => {});
+      }
+    })();
+    if (ctx && ctx.waitUntil) ctx.waitUntil(run);
+    const day = new Date().toISOString().slice(0, 10);
+    return new Response(readable, { headers: securityHeaders(new Headers({ "content-type": "application/json; charset=utf-8",
+      "content-disposition": `attachment; filename="sumenium-economie-${day}.json"`, "cache-control": "no-store" })) });
+  }
   if (p === "/api/staff/eco/config" && m === "PUT") {
     const s = await need(req, env, "staff");
     const usines = {};
@@ -1324,6 +1362,15 @@ const MC_COLORS = ["black", "dark_blue", "dark_green", "dark_aqua", "dark_red", 
 const USINE_MAX = { grosse: 3, moyenne: 4, petite: 5 };
 // Ouverture de la saison 7 : vendredi 9 octobre 2026 à 21 h
 const SAISON_DEBUT = "2026-10-09T21:00:00+02:00";
+/** Mode d'emploi glissé dans l'export de l'économie (staff). */
+const EXPORT_LISEZ_MOI = [
+  "Export complet de l'économie de Suménium (staff, ne pas diffuser : le journal contient l'historique de chaque joueur).",
+  "journal : toutes les transactions du mod Sumenium Economy depuis le début, dans l'ordre chronologique, telles que le mod les écrit. Montants (amount, tax, price…) en CENTIMES de suménien : diviser par 100. t = horodatage en millisecondes (UTC). from/to : « joueur:<uuid> », « faction:<id> », « fisc » ou vide. Types MARCHE_NOIR et CONFIG_MARCHE_NOIR : marché noir (hors circuit, secret).",
+  "noms : uuid → pseudo Minecraft (whitelist).",
+  "etat : instantané public au moment de l'export (eco.json du site : comptes, factions, boutiques et stocks, hôtel des ventes, prix du FISC, objets rares…). Montants en Su.",
+  "detail : tableau de bord « Détail de l'économie » précalculé (version staff), tel que le site l'affiche.",
+  "reglagesDetail : réglages du tableau de bord (usine → items, seuils).",
+];
 const USINE_TOURS = {
   1: { nom: "1er tour", quand: "avant le lancement de la saison, ouverte le vendredi 9 octobre 2026",
        combos: [["grosse", "moyenne", "petite"], ["moyenne", "moyenne", "petite"], ["petite", "petite", "petite"]] },

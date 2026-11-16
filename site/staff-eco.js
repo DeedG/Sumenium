@@ -281,7 +281,8 @@ function render(el, ctx) {
   const P = period();
   const per = (v, l) => `<button type="button" data-per="${v}" aria-pressed="${!st.du && !st.au && st.per === v}">${l}</button>`;
   el.classList.add("se-root");
-  el.innerHTML = `<div class="sec-head"><h3>Détail de l'économie</h3><p class="sub2">D'où vient l'argent, qui commerce avec qui, à quoi servent les usines. D'après toutes les transactions du serveur (toutes les 5 min), regroupées par faction.</p></div>
+  el.innerHTML = `<div class="sec-head"><h3>Détail de l'économie</h3><p class="sub2">D'où vient l'argent, qui commerce avec qui, à quoi servent les usines. D'après toutes les transactions du serveur (toutes les 5 min), regroupées par faction.</p>
+    ${STAFF() ? `<p class="se-export"><a class="btn small" href="/api/staff/eco/export" download>⬇ Exporter toutes les données (JSON)</a> <small class="muted">Staff : un seul fichier avec tout le journal des transactions, l'état actuel (comptes, boutiques, HDV, FISC) et ce tableau de bord, pour l'analyser ailleurs. Mode d'emploi dans le fichier (« lisezMoi »). Contient l'historique de chaque joueur : à ne pas diffuser.</small></p>` : ""}</div>
     <nav class="subtabs se-pages" aria-label="Pages du détail de l'économie">${PAGES.filter(([k]) => k !== "reglages" || STAFF()).map(([k, l]) => `<a href="#" data-sep="${k}" aria-current="${k === st.page ? "page" : "false"}">${l}</a>`).join("")}</nav>
     ${st.page !== "reglages" && st.page !== "usines" ? `<div class="bar se-bar"><div class="seg" role="group" aria-label="Période">${PERIODES.map(([v, l]) => per(v, l)).join("")}</div>
       <label class="chk">du <input type="date" id="seDu" value="${esc(st.du)}"></label><label class="chk">au <input type="date" id="seAu" value="${esc(st.au)}"></label>
