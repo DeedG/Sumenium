@@ -722,7 +722,7 @@ function bindFac() {
   document.querySelectorAll("[data-fac-edit]").forEach((b) => (b.onclick = () => facEdit(+b.dataset.facEdit)));
   document.querySelectorAll("[data-fac-del]").forEach((b) => (b.onclick = () => {
     const f = fac(+b.dataset.facDel);
-    if (confirm(`Supprimer la faction ${f.name} ? Les joueurs gardent leur fiche.`)) act(() => call("DELETE", `/api/factions/${f.id}`), "Faction supprimée");
+    if (confirm(`Supprimer la faction ${f.name} ? Les joueurs gardent leur fiche. Ses usines (sauf celles des projets communautaires) redeviennent libres pour les prochains tirages, et elle sort de l'ordre du tirage.`)) act(() => call("DELETE", `/api/factions/${f.id}`), "Faction supprimée, usines libérées");
   }));
   document.querySelectorAll("form[data-base-add]").forEach((f) => (f.onsubmit = (e) => {
     e.preventDefault(); act(() => call("POST", "/api/bases", { faction_id: +f.dataset.baseAdd, ...formData(f) }), "Coordonnées ajoutées");

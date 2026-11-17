@@ -601,8 +601,14 @@ async function api(req, env, url, ctx) {
   }
   if ((mm = p.match(/^\/api\/factions\/(\d+)$/)) && m === "DELETE") {
     const s = await need(req, env, "staff");
-    await update(env, s, "factions", Number(mm[1]), { deleted: 1 }, "delete");
-    return json({ ok: true });
+    const fid = Number(mm[1]);
+    await update(env, s, "factions", fid, { deleted: 1 }, "delete");
+    // ses usines redeviennent libres pour les tirages suivants (chaque retrait reste annulable dans l'historique)
+    const freed = (await env.DB.prepare("SELECT usine_id, tour FROM usine_choix WHERE faction_id = ? AND projet_faction_id IS NULL").bind(fid).all()).results;
+    for (const c of freed) await audit(env, s, "usine_choix", `${fid}:${c.usine_id}`, "update", { on: true, tour: c.tour }, { on: false });
+    await env.DB.batch([env.DB.prepare("DELETE FROM usine_choix WHERE faction_id = ? AND projet_faction_id IS NULL").bind(fid),
+      env.DB.prepare("DELETE FROM usine_fini WHERE faction_id = ?").bind(fid)]);
+    return json({ ok: true, usinesLiberees: freed.length });
   }
 
   /* ---- usines ---- */
@@ -625,7 +631,7 @@ async function api(req, env, url, ctx) {
   if (p === "/api/usines/live" && m === "GET") {
     const [st, ch, fi, fs] = await env.DB.batch([
       env.DB.prepare("SELECT key, value FROM settings WHERE key IN ('usine_tour','usines_ouvertes')"),
-      env.DB.prepare("SELECT * FROM usine_choix"),
+      env.DB.prepare("SELECT c.* FROM usine_choix c JOIN factions f ON f.id = c.faction_id AND f.deleted = 0"),
       env.DB.prepare("SELECT faction_id, tour FROM usine_fini"),
       env.DB.prepare("SELECT id, tirage FROM factions WHERE deleted = 0")]);
     const set = Object.fromEntries(st.results.map((r) => [r.key, r.value]));
@@ -1085,7 +1091,7 @@ async function usineDemandee(env, pr, fid, uid) {
   if (!u) fail(400, "Usine introuvable.");
   if (!pr.tailles.split(",").includes(u.taille)) fail(400, `Ce projet débloque une usine ${pr.tailles.replace(",", " ou ")}, pas une ${u.taille}.`);
   if (await env.DB.prepare("SELECT 1 FROM usine_choix WHERE faction_id = ? AND usine_id = ?").bind(fid, uid).first()) fail(400, `Ta faction a déjà « ${u.nom} ».`);
-  const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM usine_choix WHERE usine_id = ?").bind(uid).first();
+  const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM usine_choix c JOIN factions f ON f.id = c.faction_id AND f.deleted = 0 WHERE c.usine_id = ?").bind(uid).first();
   if (n.n >= USINE_MAX[u.taille]) fail(400, `« ${u.nom} » est complète (${USINE_MAX[u.taille]} maximum) : choisis-en une autre.`);
   return uid;
 }
@@ -1148,7 +1154,7 @@ async function addProjet(env, s, b) {
     if (!pr.tailles.split(",").includes(u.taille)) fail(400, `Ce projet débloque une usine ${pr.tailles.replace(",", " ou ")}, pas une ${u.taille}.`);
     const has = await env.DB.prepare("SELECT 1 FROM usine_choix WHERE faction_id = ? AND usine_id = ?").bind(fac.id, u.id).first();
     if (has) fail(400, `${fac.name} a déjà « ${u.nom} ».`);
-    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM usine_choix WHERE usine_id = ?").bind(u.id).first();
+    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM usine_choix c JOIN factions f ON f.id = c.faction_id AND f.deleted = 0 WHERE c.usine_id = ?").bind(u.id).first();
     if (n.n >= USINE_MAX[u.taille]) fail(400, `« ${u.nom} » est complète (${USINE_MAX[u.taille]} maximum sur le serveur) : choisis-en une autre ou renvoie la demande.`);
     usineId = u.id;
   }
@@ -1399,7 +1405,7 @@ async function toggleUsine(env, s, fid, uid, on, ctx) {
     if (!staff) {
       if (!rules) fail(400, "Aucun tour de choix n'est défini pour le moment.");
       const max = USINE_MAX[u.taille];
-      const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM usine_choix WHERE usine_id = ?").bind(uid).first();
+      const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM usine_choix c JOIN factions f ON f.id = c.faction_id AND f.deleted = 0 WHERE c.usine_id = ?").bind(uid).first();
       if (n.n >= max) fail(400, `Plus de place pour « ${u.nom} » (${max} maximum sur le serveur).`);
       const mine = (await env.DB.prepare("SELECT u.taille FROM usine_choix c JOIN usines u ON u.id = c.usine_id WHERE c.faction_id = ? AND c.projet_faction_id IS NULL AND c.tour = ?").bind(fid, tour).all()).results;
       if (!fitsCombo([...mine.map((x) => x.taille), u.taille], rules.combos)) {
@@ -1576,7 +1582,7 @@ async function allData(env, s) {
     Q("SELECT p.*, u.discord_name, (w.mc_name IS NOT NULL) AS wl FROM players p LEFT JOIN users u ON u.discord_id = p.discord_id LEFT JOIN whitelist w ON w.mc_name = p.mc_name WHERE p.deleted = 0 ORDER BY p.mc_name"),
     Q("SELECT * FROM factions WHERE deleted = 0 ORDER BY name"),
     Q("SELECT * FROM usines ORDER BY ordre, id"),
-    Q("SELECT * FROM usine_choix"),
+    Q("SELECT c.* FROM usine_choix c JOIN factions f ON f.id = c.faction_id AND f.deleted = 0"),
     Q("SELECT * FROM projets WHERE deleted = 0 ORDER BY ordre, id"),
     Q("SELECT id, projet_id, faction_id, usine_id, note, ts FROM projet_faction WHERE deleted = 0 ORDER BY ts"),
     Q("SELECT * FROM prix WHERE deleted = 0 ORDER BY ordre, id"),
