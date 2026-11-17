@@ -653,7 +653,7 @@ function bindPlayerEditors() {
 /* ---------- Factions ---------- */
 function factions() {
   const myF = me() && me().faction_id;
-  const list = [...D.factions].sort((a, b) => (b.id === myF) - (a.id === myF) || a.name.localeCompare(b.name));
+  const list = [...D.factions].sort((a, b) => (b.id === myF) - (a.id === myF) || (a.inactive ? 1 : 0) - (b.inactive ? 1 : 0) || a.name.localeCompare(b.name));
   view(head("Factions", "De 3 à 8 joueurs par faction. Les coordonnées des hubs et des bases sont publiques ; celles des usines restent visibles seulement par la faction et le staff.") +
     `${isStaff() ? '<form class="bar inline" id="addFac"><input name="name" required maxlength="40" placeholder="Nom de la faction" aria-label="Nom de la nouvelle faction"><button class="btn small">Créer une faction</button></form>' : ""}
     ${loginHint("Pour modifier ta faction ou ajouter ses coordonnées,")}
@@ -722,7 +722,15 @@ function bindFac() {
   document.querySelectorAll("[data-fac-edit]").forEach((b) => (b.onclick = () => facEdit(+b.dataset.facEdit)));
   document.querySelectorAll("[data-fac-del]").forEach((b) => (b.onclick = () => {
     const f = fac(+b.dataset.facDel);
-    if (confirm(`Supprimer la faction ${f.name} ? Les joueurs gardent leur fiche. Ses usines (sauf celles des projets communautaires) redeviennent libres pour les prochains tirages, et elle sort de l'ordre du tirage.`)) act(() => call("DELETE", `/api/factions/${f.id}`), "Faction supprimée, usines libérées");
+    if (confirm(`Supprimer DÉFINITIVEMENT la faction ${f.name} ?\n\nÀ réserver à une faction créée par erreur : elle disparaît des classements et des statistiques. Pour une faction qui a arrêté de jouer, utilise plutôt « Déclarer inactive ».`)) act(() => call("DELETE", `/api/factions/${f.id}`), "Faction supprimée, usines libérées");
+  }));
+  document.querySelectorAll("[data-fac-inactive]").forEach((b) => (b.onclick = () => {
+    const f = fac(+b.dataset.facInactive), on = b.dataset.on === "1";
+    if (!confirm(on ? `Déclarer ${f.name} inactive ?\n\nElle garde son historique et ses statistiques, mais sort de l'ordre du tirage, et ses usines ne prennent plus de place : d'autres factions peuvent les choisir. Réactivable à tout moment.`
+      : `Réactiver ${f.name} ? Elle revient dans l'ordre du tirage et ses usines reprennent leur place.`)) return;
+    act(async () => { const r = await call("POST", `/api/factions/${f.id}/inactive`, { on });
+      if (r.depassees && r.depassees.length) alert(`Attention, ces usines dépassent maintenant le maximum (reprises entre-temps) : ${r.depassees.join(", ")}.\nRetire une usine à une des factions ou augmente le maximum dans Staff › Réglages.`);
+      return r; }, on ? "Faction déclarée inactive" : "Faction réactivée");
   }));
   document.querySelectorAll("form[data-base-add]").forEach((f) => (f.onsubmit = (e) => {
     e.preventDefault(); act(() => call("POST", "/api/bases", { faction_id: +f.dataset.baseAdd, ...formData(f) }), "Coordonnées ajoutées");
@@ -753,8 +761,8 @@ function facCard(f) {
   const showBases = isStaff() || mine || canEditFac(f.id);  // toutes les coordonnées (usines comprises) : la faction et le staff
   const ef = ecoFac(f);
   const row = (l, v) => (v ? `<dt>${l}</dt><dd>${esc(v)}</dd>` : "");
-  return `<article class="card fac${mine ? " mine" : ""}" id="fac-${f.id}">
-    <header><h3><a class="faclink" href="#communaute/faction/${f.id}"><span class="ftag big"${facStyle(f)}>${esc(f.name)}</span></a>${mine ? ' <span class="chip ok">Ma faction</span>' : ""}</h3><span class="chip ${ok ? "ok" : "warn"}">${ms.length}/8 · ${ok ? "valide" : ms.length < 3 ? "3 minimum" : "trop de joueurs"}</span></header>
+  return `<article class="card fac${mine ? " mine" : ""}${f.inactive ? " inactive" : ""}" id="fac-${f.id}">
+    <header><h3><a class="faclink" href="#communaute/faction/${f.id}"><span class="ftag big"${facStyle(f)}>${esc(f.name)}</span></a>${mine ? ' <span class="chip ok">Ma faction</span>' : ""}${f.inactive ? ' <span class="chip muted" title="A arrêté de jouer : hors tirage, ses usines sont libres">Inactive</span>' : ""}</h3><span class="chip ${ok ? "ok" : "warn"}">${ms.length}/8 · ${ok ? "valide" : ms.length < 3 ? "3 minimum" : "trop de joueurs"}</span></header>
     <p class="members">${ms.map((p) => { const r = ef && (ef.membres.find((m) => norm(m.nom) === norm(p.mc_name)) || {}).role;
       return `<span>${plink(p.mc_name)}${ROLE_MOD[r] ? ` <small class="muted">${ROLE_MOD[r]}</small>` : ""}</span>`; }).join("") || '<span class="muted">Aucun membre</span>'}</p>
     ${ef ? `<p class="fac-bank"><b>${suE(ef.banque)}</b> <span class="muted small">en banque</span></p>` : ""}
@@ -775,7 +783,7 @@ function facCard(f) {
       ${canEditFac(f.id) ? `<form class="inline coords" data-base-add="${f.id}"><select name="type" aria-label="Type"><option value="base">Base</option><option value="hub">Hub</option><option value="usine">Usine</option></select>
         <input name="nom" placeholder="Nom" maxlength="80" aria-label="Nom"><input name="x" type="number" placeholder="X" required aria-label="X"><input name="y" type="number" placeholder="Y" aria-label="Y"><input name="z" type="number" placeholder="Z" required aria-label="Z">
         <button class="btn small">Ajouter</button></form>` : ""}</details>` : ""}
-    ${canManageFac(f.id) ? `<div class="actions"><button class="btn small ghost" data-fac-edit="${f.id}">Modifier</button>${isStaff() ? `<button class="btn small danger" data-fac-del="${f.id}">Supprimer</button>` : ""}</div>`
+    ${canManageFac(f.id) ? `<div class="actions"><button class="btn small ghost" data-fac-edit="${f.id}">Modifier</button>${isStaff() ? `<button class="btn small ghost" data-fac-inactive="${f.id}" data-on="${f.inactive ? 0 : 1}">${f.inactive ? "Réactiver" : "Déclarer inactive"}</button><button class="btn small danger" data-fac-del="${f.id}">Supprimer</button>` : ""}</div>`
       : mine ? '<p class="muted small">Seul le chef de la faction (rôle en jeu) peut modifier cette fiche.</p>' : ""}
   </article>`;
 }
@@ -857,7 +865,7 @@ function projDemCard() {
 function usineOpts(pr, fid, cur, none) {
   const ok = (pr.tailles || "").split(",");
   return (none ? `<option value="">${none}</option>` : '<option value="">— choisir l\'usine —</option>') + D.usines.filter((u) => ok.includes(u.taille)
-    && !D.choix.some((c) => c.faction_id === fid && c.usine_id === u.id)).map((u) => { const n = D.choix.filter((c) => c.usine_id === u.id).length, max = (D.usineMax || {})[u.taille] || TAILLE_USINE[u.taille][1], full = n >= max;
+    && !D.choix.some((c) => c.faction_id === fid && c.usine_id === u.id)).map((u) => { const n = choixActifs().filter((c) => c.usine_id === u.id).length, max = (D.usineMax || {})[u.taille] || TAILLE_USINE[u.taille][1], full = n >= max;
       return `<option value="${u.id}"${u.id === cur ? " selected" : ""}${full ? " disabled" : ""}>${esc(u.nom)} (${u.taille}, ${n}/${max}${full ? " complète" : ""})</option>`; }).join("");
 }
 const usineNom = (id) => (id && usine(id) ? `${usine(id).nom} (${usine(id).taille})` : "");
@@ -898,7 +906,7 @@ function projDemItem(d) {
       ${d.statut === "a_completer" ? '<span class="chip warn">À compléter</span>' : '<span class="chip">En attente du staff</span>'}
       <span class="muted small">demandé par ${plink(d.auteur)} · ${new Date(d.ts * 1000).toLocaleDateString("fr-FR")}</span></div>
     <p class="small">${esc(d.note)}</p>
-    ${d.usine_id ? `<p class="small"><b>Usine demandée :</b> ${esc(usineNom(d.usine_id))}${(() => { const u = usine(d.usine_id), n = D.choix.filter((c) => c.usine_id === d.usine_id).length, max = u && ((D.usineMax || {})[u.taille] || 0);
+    ${d.usine_id ? `<p class="small"><b>Usine demandée :</b> ${esc(usineNom(d.usine_id))}${(() => { const u = usine(d.usine_id), n = choixActifs().filter((c) => c.usine_id === d.usine_id).length, max = u && ((D.usineMax || {})[u.taille] || 0);
       return u && n >= max ? ' <span class="chip warn">complète depuis</span>' : u ? ` <span class="muted">(${n}/${max})</span>` : ""; })()}</p>` : ""}
     ${d.reponse && d.statut === "a_completer" ? `<p class="small"><b>Le staff demande${d.traite_par ? ` (${esc(d.traite_par)}, ${dateFr(d.updated)})` : ""} :</b> ${esc(d.reponse)}</p>` : d.reponse ? `<p class="small muted">Message précédent du staff : ${esc(d.reponse)}</p>` : ""}
     ${(d.images || []).length ? `<div class="pd-imgs">${d.images.map((id) => `<a class="pd-img" href="${pdImg(d, id)}" target="_blank" rel="noopener" title="Voir en grand"><img src="${pdImg(d, id)}" alt="Image jointe" loading="lazy"></a>`).join("")}</div>` : ""}
@@ -1167,9 +1175,29 @@ const TAILLE_TXT = { grosse: "grosse", moyenne: "moyenne", petite: "petite" };
 const comboTxt = (c) => { const n = {}; c.forEach((t) => (n[t] = (n[t] || 0) + 1));
   return Object.entries(n).map(([t, k]) => `${k} ${TAILLE_TXT[t]}${k > 1 ? "s" : ""}`).join(" + "); };
 const fitsCombo = (sizes, combos) => combos.some((c) => { const left = [...c]; return sizes.every((t) => { const i = left.indexOf(t); if (i < 0) return false; left.splice(i, 1); return true; }); });
+// Factions inactives (arrêtées) : gardées pour l'historique, mais hors tirage et leurs usines ne prennent plus de place
+const actif = (fid) => { const f = fac(fid); return !!f && !f.inactive; };
+const choixActifs = () => D.choix.filter((c) => actif(c.faction_id));
+// Même calcul que le Worker : choix complet ? sinon, ce qu'il reste à choisir (combinaisons encore possibles)
+function tourEtat(fid, tour, rules, MAX) {
+  const ch = choixActifs();
+  const sizes = D.choix.filter((c) => c.faction_id === fid && !c.projet_faction_id && (c.tour || 1) === tour).map((c) => (usine(c.usine_id) || {}).taille);
+  const avail = { grosse: 0, moyenne: 0, petite: 0 };
+  D.usines.forEach((u) => { const ts = ch.filter((c) => c.usine_id === u.id);
+    if (!ts.some((c) => c.faction_id === fid) && ts.length < (MAX[u.taille] || 0) && !(rules.exclusif && ts.length)) avail[u.taille]++; });
+  const complete = rules.combos.some((c) => c.length === sizes.length && fitsCombo(sizes, [c]));
+  const restes = [];
+  if (!complete) rules.combos.forEach((c) => {
+    if (!fitsCombo(sizes, [c])) return;
+    const left = [...c]; sizes.forEach((t) => left.splice(left.indexOf(t), 1));
+    const need = {}; left.forEach((t) => (need[t] = (need[t] || 0) + 1));
+    if (Object.entries(need).every(([t, k]) => avail[t] >= k)) restes.push(left);
+  });
+  return { complete, restes };
+}
 // Ordre de passage : factions par rang au tirage (sans rang à la fin) ; la première qui n'a pas validé a la main
 function turnState(tour) {
-  const order = [...D.factions].sort((a, b) => (a.tirage == null) - (b.tirage == null) || (a.tirage ?? 0) - (b.tirage ?? 0) || a.name.localeCompare(b.name));
+  const order = D.factions.filter((f) => !f.inactive).sort((a, b) => (a.tirage == null) - (b.tirage == null) || (a.tirage ?? 0) - (b.tirage ?? 0) || a.name.localeCompare(b.name));
   const done = new Set((D.usineFini || []).filter((x) => x.tour === tour).map((x) => x.faction_id));
   const cur = order.find((f) => !done.has(f.id)) || null;
   return { order, done, cur, next: cur ? order.slice(order.indexOf(cur) + 1).find((f) => !done.has(f.id)) : null };
@@ -1188,7 +1216,8 @@ function usines() {
   view(head("Usines", "Résultats du tirage, règles du tour en cours et places restantes. ★ = usine débloquée par un projet communautaire.") + (open ? loginHint("Pour choisir les usines de ta faction,") : "") + `<div class="card rules">
       <h3>Règles</h3>
       <ul class="rules-list">${Object.entries(TOURS).map(([k, r]) => `<li class="${+k === tour ? "cur" : ""}"><b>${esc(r.nom)}</b> (${esc(r.quand)})${+k === tour ? ' <span class="chip ok">tour en cours</span>' : ""} :
-        ${r.combos.map(comboTxt).join(", ou ")}, dans l'ordre du tirage.</li>`).join("")}</ul>
+        ${r.combos.map(comboTxt).join(", ou ")}, dans l'ordre du tirage${r.exclusif ? " ; <b>pas d'usine déjà prise</b> par une autre faction" : ""}.</li>`).join("")}</ul>
+      <p class="muted small">On ne peut valider qu'une fois une combinaison complète (sauf s'il n'y a plus d'usine libre pour la compléter).</p>
       <p class="muted small">Chaque faction choisit à son tour : quand elle a validé ses choix, la main passe à la suivante. La page se met à jour toute seule.</p>
       <p>Chaque usine du même type est limitée sur le serveur : grosses ${MAX.grosse}, moyennes ${MAX.moyenne}, petites ${MAX.petite}.
         Des usines supplémentaires sont disponibles en accomplissant des <a href="#communaute/projets">projets communautaires</a>.</p>
@@ -1199,7 +1228,7 @@ function usines() {
     ${open && rules ? liveCard(T, myFid, myTurn, rules, realFid) : ""}
     ${tirageTable(myFid, open && rules ? T : null)}
     ${isStaff() ? `<div class="card staff-tirage"><h3>Ordre du tirage (staff)</h3>
-      <p class="muted small">À faire une seule fois en début de saison : l'ordre est tiré au hasard parmi les factions existantes. Pour corriger un rang à la main : « Modifier » sur la fiche de la faction.</p>
+      <p class="muted small">L'ordre est tiré au hasard parmi les factions actives (les inactives en sont exclues). À un nouveau tour, garde l'ordre actuel ou coche « refaire le tirage » avant d'ouvrir les choix. Pour corriger un rang : les flèches ci-dessous.</p>
       <div class="actions"><button class="btn small" id="tirageGo">Tirer l'ordre au sort</button>
         <label class="chk"><input type="checkbox" id="tirageForce"> refaire le tirage (remplace l'ordre actuel)</label></div>
       <details><summary>Corriger l'ordre à la main</summary><ol class="order-list">${T.order.map((f, i) => `<li>${flink(f)}
@@ -1208,23 +1237,24 @@ function usines() {
     <details class="all-usines"${open || isStaff() ? " open" : ""}><summary>Toutes les usines et places restantes</summary>
     ${Object.entries(TAILLE_USINE).map(([t, [label]]) => `<h3 class="sec">${label} <small>${MAX[t]} max par usine sur le serveur</small></h3>
       <div class="usines">${D.usines.filter((u) => u.taille === t).map((u) => {
-        const takers = D.choix.filter((c) => c.usine_id === u.id);
+        const takers = choixActifs().filter((c) => c.usine_id === u.id);
         const mineC = myFid && takers.find((c) => c.faction_id === myFid);
-        const full = takers.length >= MAX[t];
+        const full = takers.length >= MAX[t], prise = !!(rules && rules.exclusif && takers.length);
         const oldTour = mineC && (mineC.tour || 1) !== tour;
         const can = myFid && canEditFac(myFid) && (open || isStaff()) && !(mineC && mineC.projet_faction_id) && !(oldTour && !isStaff()) && (isStaff() || myTurn);
-        const blocked = !mineC && !isStaff() && (full || !canAdd(t));
+        const blocked = !mineC && !isStaff() && (full || prise || !canAdd(t));
         return `<div class="usine${mineC ? " has" : ""}${full ? " full" : ""}"><div><b>${esc(u.nom)}</b>
           <span class="muted small">${takers.length}/${MAX[t]}</span></div>
           <div class="takers">${takers.map((c) => { const f = fac(c.faction_id); return f ? `<a class="chip" href="#communaute/faction/${f.id}">${c.projet_faction_id ? "★ " : ""}${esc(f.name)}${(c.tour || 1) > 1 ? ` <small>T${c.tour}</small>` : ""}</a>` : ""; }).join("")}</div>
-          ${can ? `<button class="btn small ${mineC ? "ghost" : ""}" data-us="${u.id}" data-on="${mineC ? 0 : 1}"${blocked ? ` disabled title="${full ? "Plus de place sur le serveur" : "Pas possible avec les règles du tour"}"` : ""}>${mineC ? "Retirer" : "Choisir"}</button>` : mineC && oldTour && !mineC.projet_faction_id ? `<span class="muted small">Choisie au ${(mineC.tour || 1) === 1 ? "1er" : mineC.tour + "e"} tour</span>` : ""}</div>`;
+          ${can ? `<button class="btn small ${mineC ? "ghost" : ""}" data-us="${u.id}" data-on="${mineC ? 0 : 1}"${blocked ? ` disabled title="${full ? "Plus de place sur le serveur" : prise ? "Déjà prise : ce tour interdit les usines déjà prises" : "Pas possible avec les règles du tour"}"` : ""}>${mineC ? "Retirer" : "Choisir"}</button>` : mineC && oldTour && !mineC.projet_faction_id ? `<span class="muted small">Choisie au ${(mineC.tour || 1) === 1 ? "1er" : mineC.tour + "e"} tour</span>` : ""}</div>`;
       }).join("")}</div>`).join("")}</details>`);
   if (isStaff()) $("usFac").onchange = (e) => { staffFaction = e.target.value ? +e.target.value : null; usines(); };
   document.querySelectorAll("[data-us]").forEach((b) => (b.onclick = () =>
     act(() => call("POST", `/api/factions/${myFid}/usines`, { usine_id: +b.dataset.us, on: b.dataset.on === "1" }), b.dataset.on === "1" ? "Usine choisie" : "Usine retirée")));
   document.querySelectorAll("[data-fini]").forEach((b) => (b.onclick = () => {
     const fid = +b.dataset.fini, on = b.dataset.on !== "0", f = fac(fid);
-    const msg = on ? (isStaff() && fid !== realFid ? `Valider le tour de ${f.name} et passer la main à la faction suivante ?` : "Valider les choix de ta faction ? Tu ne pourras plus les changer, la main passe à la faction suivante.")
+    const R = (D.usineTours || {})[tour], e = on && R ? tourEtat(fid, tour, R, D.usineMax || {}) : null;
+    const msg = on ? (isStaff() && fid !== realFid ? `Valider le tour de ${f.name} et passer la main à la faction suivante ?${e && !e.complete && e.restes.length ? `\n\nAttention : son choix est incomplet (il lui reste ${e.restes.map(comboTxt).join(", ou ")}).` : ""}` : "Valider les choix de ta faction ? Tu ne pourras plus les changer, la main passe à la faction suivante.")
       : `Rendre la main à ${f.name} ? Elle pourra de nouveau choisir.`;
     if (confirm(msg)) act(() => call("POST", `/api/factions/${fid}/usines/fini`, { tour, on }), on ? "Choix validés" : "Main rendue");
   }));
@@ -1241,12 +1271,16 @@ function usines() {
 // Carte « en direct » : qui a la main, qui suit, bouton pour valider
 function liveCard(T, myFid, myTurn, rules, realFid) {
   if (!T.cur) return `<div class="card live done"><h3>${esc(rules.nom)} terminé</h3><p>Toutes les factions ont validé leurs choix.</p></div>`;
-  const mineNow = myFid ? D.choix.filter((c) => c.faction_id === myFid && !c.projet_faction_id && (c.tour || 1) === (+D.settings.usine_tour || 1)) : [];
+  const tour = +D.settings.usine_tour || 1;
+  const mineNow = myFid ? D.choix.filter((c) => c.faction_id === myFid && !c.projet_faction_id && (c.tour || 1) === tour) : [];
+  const E = tourEtat(T.cur.id, tour, rules, D.usineMax || {}), manque = !E.complete && E.restes.length;
+  const forStaff = isStaff() && T.cur.id !== realFid;
   return `<div class="card live${myTurn && !isStaff() ? " me" : ""}">
     <div class="live-head"><span class="live-dot" aria-hidden="true"></span><span class="muted small">En direct · ${esc(rules.nom)}</span></div>
     <p class="live-now">${myTurn && !isStaff() ? "<b>C'est à ta faction de choisir !</b>" : `Au tour de ${flink(T.cur)}`}${T.next ? ` <span class="muted small">· ensuite ${flink(T.next)}</span>` : ""}</p>
     ${myTurn && !isStaff() ? `<p class="small">Choisis tes usines plus bas (${esc(rules.combos.map(comboTxt).join(", ou "))}), puis valide pour passer la main.</p>` : ""}
-    <div class="actions">${(myTurn && canEditFac(myFid)) || isStaff() ? `<button class="btn small" data-fini="${T.cur.id}">${isStaff() && T.cur.id !== realFid ? `Valider le tour de ${esc(T.cur.name)}` : `Valider mes choix${mineNow.length ? ` (${mineNow.length})` : ""}`}</button>` : ""}</div></div>`;
+    ${manque ? `<p class="small">${forStaff || !myTurn ? esc(T.cur.name) + " doit encore choisir" : "Il te reste à choisir"} : <b>${esc(E.restes.map(comboTxt).join(", ou "))}</b>.</p>` : ""}
+    <div class="actions">${(myTurn && canEditFac(myFid)) || isStaff() ? `<button class="btn small" data-fini="${T.cur.id}"${manque && !isStaff() ? ' disabled title="Termine d\'abord une combinaison du tour"' : ""}>${forStaff ? `Valider le tour de ${esc(T.cur.name)}${manque ? " (incomplet)" : ""}` : `Valider mes choix${mineNow.length ? ` (${mineNow.length})` : ""}`}</button>` : ""}</div></div>`;
 }
 // Mise à jour en direct de la page Usines (toutes les 4 s quand elle est affichée)
 let liveTimer = null, liveSig = "";
@@ -1262,13 +1296,13 @@ function startLive() {
       const first = !liveSig; liveSig = sig;
       D.choix = L.choix; D.usineFini = L.usineFini;
       D.settings.usine_tour = L.usine_tour; D.settings.usines_ouvertes = L.usines_ouvertes;
-      L.tirage.forEach((t) => { const f = fac(t.id); if (f) f.tirage = t.tirage; });
+      L.tirage.forEach((t) => { const f = fac(t.id); if (f) { f.tirage = t.tirage; f.inactive = t.inactive; } });
       if (!first && !document.querySelector("#espView :focus")) usines();
     } catch (e) {}
   }, 4000);
 }
 function tirageTable(myFid, T) {
-  const fs = [...D.factions].sort((a, b) => (a.tirage ?? 999) - (b.tirage ?? 999) || a.name.localeCompare(b.name));
+  const fs = D.factions.filter((f) => !f.inactive).sort((a, b) => (a.tirage ?? 999) - (b.tirage ?? 999) || a.name.localeCompare(b.name));
   const state = (f) => !T ? "" : T.done.has(f.id) ? `<td class="st"><span class="chip ok">✓ validé</span>${isStaff() ? ` <button class="x" data-fini="${f.id}" data-on="0" title="Rendre la main à ${esc(f.name)}" aria-label="Rendre la main">↺</button>` : ""}</td>`
     : T.cur && T.cur.id === f.id ? '<td class="st"><span class="chip warn">▶ choisit</span></td>' : '<td class="st"><span class="muted small">en attente</span></td>';
   const cell = (fid, t) => D.choix.filter((c) => c.faction_id === fid && (usine(c.usine_id) || {}).taille === t).map(usineChip).join(" ") || '<span class="muted">—</span>';
@@ -1276,6 +1310,31 @@ function tirageTable(myFid, T) {
     <div class="tbl-wrap"><table class="tbl left tirage"><thead><tr><th>Ordre</th><th>Faction</th>${T ? "<th>Tour en cours</th>" : ""}<th>Grosse</th><th>Moyenne</th><th>Petite</th></tr></thead><tbody>
     ${fs.map((f) => `<tr class="${f.id === myFid ? "mine" : ""}${T && T.cur && T.cur.id === f.id ? " turn" : ""}"><td>${f.tirage ? f.tirage + "ᵉ" : "–"}</td><td><b>${flink(f)}</b></td>${state(f)}
       <td data-l="Grosse">${cell(f.id, "grosse")}</td><td data-l="Moyenne">${cell(f.id, "moyenne")}</td><td data-l="Petite">${cell(f.id, "petite")}</td></tr>`).join("")}</tbody></table></div></div>`;
+}
+
+// Éditeur des règles des tours (staff)
+const tourRow = (k, r) => `<div class="form compact tour-row" data-tour="${k}"><b>Tour ${k}</b>
+  <label>Nom<input data-k="nom" maxlength="40" value="${esc(r.nom || "")}"></label>
+  <label>Quand<input data-k="quand" maxlength="120" value="${esc(r.quand || "")}"></label>
+  <label class="wide">Combinaisons<input data-k="combos" value="${esc((r.combos || []).map(comboTxt).join(" / "))}"></label>
+  <label class="chk"><input type="checkbox" data-k="exclusif"${r.exclusif ? " checked" : ""}> exclusif</label>
+  <button class="x" data-tour-del="${k}" title="Retirer ce tour" aria-label="Retirer le tour ${k}">✕</button></div>`;
+function bindTourRows() {
+  document.querySelectorAll("[data-tour-del]").forEach((b) => (b.onclick = () => b.closest("[data-tour]").remove()));
+}
+// « grosse / moyenne + petite / 2 petites » → [["grosse"], ["moyenne", "petite"], ["petite", "petite"]] (null si illisible)
+function parseCombos(txt) {
+  const out = [];
+  for (const part of String(txt).split("/").map((x) => x.trim()).filter(Boolean)) {
+    const c = [];
+    for (const it of part.split("+").map((x) => x.trim().toLowerCase()).filter(Boolean)) {
+      const m = it.match(/^(\d+)?\s*(grosse|moyenne|petite)s?$/);
+      if (!m) return null;
+      for (let i = 0; i < (+m[1] || 1); i++) c.push(m[2]);
+    }
+    if (c.length) out.push(c);
+  }
+  return out.length ? out : null;
 }
 
 /* ---------- Élections ---------- */
@@ -1405,7 +1464,7 @@ function staff() {
   const fDem = (D.factionDemandes || []).filter((d) => d.statut === "attente"), pDem = (D.projetDemandes || []).filter((d) => PD_OPEN.includes(d.statut));
   const absentes = D.factions.filter((f) => ECO && !ecoFac(f));
   const ctN = (D.contacts || []).filter((c) => !c.traite).length;
-  const nav = [["st-dem", `Demandes (${fDem.length + pDem.filter((d) => d.statut === "attente").length})`], ["st-ct", `Messages (${ctN})`], ["st-wl", `À whitelister (${aWl.filter(ficheOk).length})`], ["st-taille", `Tailles RP (${todo.length})`], ["st-bordure", "Bordure"], ["st-hist", "Historique d'un joueur"], ["st-reglages", "Réglages"], ["st-import", "Import"], ["st-histo", "Historique"]];
+  const nav = [["st-dem", `Demandes (${fDem.length + pDem.filter((d) => d.statut === "attente").length})`], ["st-ct", `Messages (${ctN})`], ["st-wl", `À whitelister (${aWl.filter(ficheOk).length})`], ["st-taille", `Tailles RP (${todo.length})`], ["st-bordure", "Bordure"], ["st-hist", "Historique d'un joueur"], ["st-reglages", "Réglages"], ["st-tours", "Tours d'usines"], ["st-import", "Import"], ["st-histo", "Historique"]];
   view(head("Outils staff", "Whitelist, tailles RP, bordure, réglages et historique de toutes les modifications.") +
     `<nav class="anchors">${nav.map(([id, l]) => `<a href="#" data-jump="${id}">${l}</a>`).join("")}</nav>
     <section class="card" id="st-dem"><h3>Demandes des joueurs</h3>
@@ -1472,6 +1531,14 @@ function staff() {
       <label>Tâches municipales<select id="setMairie"><option value="0"${s.mairie_ouverte !== "1" ? " selected" : ""}>Masquées aux joueurs</option><option value="1"${s.mairie_ouverte === "1" ? " selected" : ""}>Visibles (Communauté › Mairie et lutrins)</option></select></label>
       <label>Maire (écrit les tâches municipales)<select id="setMaire"><option value="">— pas de maire —</option>${D.players.map((p) => `<option value="${p.id}"${String(s.maire_id || "") === String(p.id) ? " selected" : ""}>${esc(p.mc_name)}</option>`).join("")}</select></label>
       <div class="wide actions"><button class="btn small" id="saveSettings">Enregistrer les réglages</button></div></section>
+    <section class="card" id="st-tours"><h3>Règles des tours d'usines</h3>
+      <p class="muted small">Combinaisons séparées par « / », usines d'une combinaison par « + » (ex. <code>grosse / moyenne + petite / 2 petites</code>).
+        « Exclusif » : impossible de prendre une usine déjà prise par une autre faction. Le tour en cours se choisit dans les réglages ci-dessus.</p>
+      <div id="toursEd">${Object.entries(D.usineTours || {}).map(([k, r]) => tourRow(k, r)).join("")}</div>
+      <div class="form compact"><label>Maximum par grosse usine<input type="number" min="1" max="50" id="maxG" value="${(D.usineMax || {}).grosse || 3}"></label>
+        <label>par moyenne<input type="number" min="1" max="50" id="maxM" value="${(D.usineMax || {}).moyenne || 4}"></label>
+        <label>par petite<input type="number" min="1" max="50" id="maxP" value="${(D.usineMax || {}).petite || 5}"></label></div>
+      <div class="actions"><button class="btn small ghost" id="tourAdd">Ajouter un tour</button><button class="btn small" id="toursSave">Enregistrer les règles</button></div></section>
     <section class="card" id="st-import"><h3>Importer le Google Sheet</h3>
       <p class="muted small">Fichier JSON produit par <code>tools/import_sheet.py</code>. L'import ajoute ce qui manque et complète les champs vides, sans rien écraser.</p>
       <input type="file" id="importFile" accept="application/json,.json"></section>
@@ -1483,6 +1550,19 @@ function staff() {
   document.querySelectorAll("[data-lien-no]").forEach((b) => (b.onclick = () => act(() => call("DELETE", `/api/admin/liens/${b.dataset.lienNo}`), "Demande refusée")));
   document.querySelectorAll("[data-ct-ok]").forEach((b) => (b.onclick = () => act(() => call("PUT", `/api/admin/contact/${b.dataset.ctOk}`, { traite: b.dataset.v === "1" }), b.dataset.v === "1" ? "Marqué traité" : "Rouvert")));
   document.querySelectorAll("[data-ct-del]").forEach((b) => (b.onclick = () => confirm("Supprimer ce message définitivement ?") && act(() => call("DELETE", `/api/admin/contact/${b.dataset.ctDel}`), "Message supprimé")));
+  $("tourAdd").onclick = () => { const rows = [...document.querySelectorAll("#toursEd [data-tour]")], last = rows[rows.length - 1];
+    const n = rows.length ? Math.max(...rows.map((r) => +r.dataset.tour)) + 1 : 1;
+    $("toursEd").insertAdjacentHTML("beforeend", tourRow(n, { nom: `${n}e tour`, quand: "", combos: last ? parseCombos(last.querySelector("[data-k=combos]").value) || [] : [], exclusif: false })); bindTourRows(); };
+  bindTourRows();
+  $("toursSave").onclick = () => {
+    const tours = {};
+    for (const r of document.querySelectorAll("#toursEd [data-tour]")) {
+      const v = (k) => r.querySelector(`[data-k=${k}]`), combos = parseCombos(v("combos").value);
+      if (!combos) return toast(`Tour ${r.dataset.tour} : combinaisons illisibles (grosse, moyenne, petite, séparées par + et /).`, true);
+      tours[r.dataset.tour] = { nom: v("nom").value.trim(), quand: v("quand").value.trim(), combos, exclusif: v("exclusif").checked };
+    }
+    act(() => call("PUT", "/api/admin/usine-regles", { tours, max: { grosse: +$("maxG").value, moyenne: +$("maxM").value, petite: +$("maxP").value } }), "Règles des tours enregistrées");
+  };
   $("saveSettings").onclick = () => act(() => call("PUT", "/api/admin/settings",
     { election: $("setElection").value, usines_ouvertes: $("setUsOpen").value, usine_tour: $("setUsTour").value, factions_ouvertes: $("setFacOpen").value, maire_id: $("setMaire").value, mairie_ouverte: $("setMairie").value }), "Réglages enregistrés");
   bindFacDem(); bindProjDem();
