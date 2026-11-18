@@ -537,6 +537,7 @@ const JOUEURS = [
   ] },
   { titre: "Trophées, bestiaire et site", lignes: [
     ["/tete convertir", "Fait entrer au bestiaire l'ancienne tête de mob (ou toute la pile) tenue en main, à la rareté de base du mob", "Tous"],
+    ["/carte masquer", "Ne plus apparaître en direct sur la carte du site (dans l'Overworld, ta position y est affichée toutes les quelques secondes). /carte afficher pour réapparaître", "Tous"],
     ["/survie", "Ton temps de survie depuis ta dernière mort (en jours de jeu, sans l'AFK), le prochain palier de trophée, tes têtes par rareté et ta collection du bestiaire", "Tous"],
     ["/site lier <code>", "Relie ton compte du site à ton pseudo : le code s'affiche sur sumenium.com, dans Ma fiche", "Tous"],
   ] },
