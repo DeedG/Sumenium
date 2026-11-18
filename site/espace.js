@@ -1623,6 +1623,7 @@ async function loadAudit() {
   } catch (e) { toast(e.message, true); }
   const list = $("auditList"); if (!list) return;
   const name = (a) => {
+    if (a.label) return a.label;
     if (a.entity === "players") return (D.players.find((p) => p.id === +a.entity_id) || {}).mc_name || `joueur #${a.entity_id}`;
     if (a.entity === "factions") return facName(+a.entity_id) || `faction #${a.entity_id}`;
     if (a.entity === "usine_choix") { const [f, u] = a.entity_id.split(":").map(Number); return `${facName(f)} · ${(usine(u) || {}).nom || "usine"}`; }

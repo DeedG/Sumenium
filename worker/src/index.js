@@ -1023,6 +1023,19 @@ async function api(req, env, url, ctx) {
     await need(req, env, "staff");
     const before = int(url.searchParams.get("before")) || 2 ** 31;
     const rows = (await env.DB.prepare("SELECT * FROM audit WHERE id < ? ORDER BY id DESC LIMIT 100").bind(before).all()).results;
+    // Noms lisibles, y compris pour ce qui a été supprimé depuis (le site ne connaît plus ces lignes)
+    const ids = (ent) => [...new Set(rows.filter((r) => r.entity === ent).map((r) => int(r.entity_id)).filter(Boolean))];
+    const q = async (sql, list) => (list.length ? (await env.DB.prepare(sql.replace("?", list.map(() => "?").join(","))).bind(...list).all()).results : []);
+    const [pf, pj, fa] = await Promise.all([
+      q(`SELECT pf.id, pf.deleted, p.nom, f.name AS faction, u.nom AS usine FROM projet_faction pf LEFT JOIN projets p ON p.id = pf.projet_id
+         LEFT JOIN factions f ON f.id = pf.faction_id LEFT JOIN usines u ON u.id = pf.usine_id WHERE pf.id IN (?)`, ids("projet_faction")),
+      q("SELECT id, nom, deleted FROM projets WHERE id IN (?)", ids("projets")),
+      q("SELECT id, name, deleted, inactive FROM factions WHERE id IN (?)", ids("factions"))]);
+    const lab = {};
+    pf.forEach((x) => (lab["projet_faction:" + x.id] = `projet réalisé « ${x.nom || "?"} » · ${x.faction || "?"}${x.usine ? " · " + x.usine : ""}${x.deleted ? " (supprimé)" : ""}`));
+    pj.forEach((x) => (lab["projets:" + x.id] = `liste des projets · « ${x.nom} »${x.deleted ? " (supprimé)" : ""}`));
+    fa.forEach((x) => (lab["factions:" + x.id] = `faction ${x.name}${x.deleted ? " (supprimée)" : x.inactive ? " (inactive)" : ""}`));
+    rows.forEach((r) => { const l = lab[r.entity + ":" + int(r.entity_id)]; if (l) r.label = l; });
     return json({ rows });
   }
   if ((mm = p.match(/^\/api\/admin\/audit\/(\d+)\/revert$/)) && m === "POST") {
