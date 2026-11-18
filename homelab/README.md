@@ -61,6 +61,10 @@ Après une modification : `docker compose up -d`.
 
 Par défaut la carte n'est redessinée qu'une fois par nuit, de 3 h à 6 h (`RENDER_WINDOW=3-6` dans `.env`, heure de `TZ`) : le rendu fait chauffer le processeur. S'il n'a pas fini à 6 h, il s'arrête proprement et reprend la nuit suivante. Les boutiques sur la carte restent mises à jour toutes les 5 minutes, jour et nuit (c'est léger). `RENDER_WINDOW=` (vide) revient à un passage toutes les `INTERVAL_MINUTES`.
 
+## Couleurs des biomes (Terralith)
+
+Les biomes de Terralith viennent d'un mod : sans lui, BlueMap ne connaît pas leurs couleurs d'herbe, de feuillage et d'eau et met des couleurs par défaut. Le rendu copie donc `mods/Terralith*.jar` et les datapacks du monde (`world/datapacks/*.zip`) dans le dossier de packs de BlueMap. Autres mods à prendre en compte : `MAP_PACKS=Terralith*.jar,autre-mod*.jar` dans `.env`. Quand ces fichiers changent, toute la carte est redessinée petit à petit, sans l'effacer : les anciennes tuiles restent visibles jusqu'à leur remplacement, sur plusieurs nuits si besoin.
+
 ## Anti-spoil
 
 La bordure est tracée en jaune et mise à jour à chaque passage. Tout ce qui est au-delà est recouvert par un calque « Masquer hors bordure ». Sur le site, la case **« Voir toute la carte (spoil) »** l'enlève ; dans la carte en plein écran, c'est dans le menu des marqueurs. Ce calque évite de se spoiler sans le vouloir, il ne protège pas un joueur qui veut vraiment voir.

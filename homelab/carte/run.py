@@ -11,7 +11,7 @@ fusionnés dans les marqueurs de la carte (seuls les ensembles « sumenium-* » 
 
 Tout se règle dans le fichier .env (voir .env.example).
 """
-import base64, contextlib, hashlib, io, json, math, os, posixpath, re, shutil, socket, stat, subprocess, sys, tempfile, threading, time
+import base64, contextlib, fnmatch, hashlib, io, json, math, os, posixpath, re, shutil, socket, stat, subprocess, sys, tempfile, threading, time
 from datetime import datetime
 
 import nbtlib
@@ -42,6 +42,10 @@ MC_VERSION = E("BLUEMAP_MC_VERSION", "26.3")
 FOG = E("FOG_COLOR", "18,30,22")
 MARKERS_EVERY = int(E("MARKERS_MINUTES", "5")) * 60
 ECO_MARKERS = "sumenium-data/export/bluemap-markers.json"
+# Mods dont BlueMap doit connaître les biomes, blocs et couleurs (motifs séparés par des virgules, dans mods/ du serveur).
+# Terralith : ses biomes ont leurs propres couleurs d'herbe, de feuillage et d'eau ; sans lui, BlueMap met des couleurs par défaut.
+MAP_PACKS = [x.strip() for x in (E("MAP_PACKS") or "Terralith*.jar").split(",") if x.strip()]
+PACKS = f"{BM}/config/packs"
 LIVE_MARKERS = f"{WEB}/maps/overworld/live/markers.json"
 _eco_sets = {}
 MARKERS_MAX_DISTANCE = int(E("MARKERS_MAX_DISTANCE") or 100000)  # distance de caméra au-delà de laquelle un marqueur de boutique disparaît
@@ -160,6 +164,8 @@ def _sync(sftp):
     with open(os.path.join(WORLD, "level.dat"), "wb") as f:
         f.write(read(sftp, w("level.dat")))
 
+    sync_packs(sftp, j, w)
+
     if RADIUS is None and border:
         cx, cz, r = border[0], border[1], max(MIN_RADIUS, border[2] / 2 + 512)
     else:
@@ -185,6 +191,43 @@ def _sync(sftp):
         if i % 50 == 0:
             log(f"  {i}/{len(todo)}")
     return border, (x0, x1, z0, z1)
+
+
+def sync_packs(sftp, j, w):
+    """Mods (MAP_PACKS) et datapacks du monde copiés pour BlueMap. S'ils changent, toute la carte est redessinée
+    peu à peu (les anciennes tuiles restent affichées jusqu'à leur remplacement, le rendu reprend d'une nuit à l'autre)."""
+    sig = []
+    for remote_dir, local_dir, pats in ((j("mods"), PACKS, MAP_PACKS), (w("datapacks"), os.path.join(WORLD, "datapacks"), ["*.zip"])):
+        os.makedirs(local_dir, exist_ok=True)
+        try:
+            files = {a.filename: a for a in sftp.listdir_attr(remote_dir) if stat.S_ISREG(a.st_mode)
+                     and any(fnmatch.fnmatch(a.filename.lower(), p.lower()) for p in pats)}
+        except IOError:
+            files = {}
+        for name in os.listdir(local_dir):
+            if name not in files and not name.endswith(".part"):
+                os.remove(os.path.join(local_dir, name))
+        for name, a in sorted(files.items()):
+            dst = os.path.join(local_dir, name)
+            sig.append(f"{name}:{a.st_size}")
+            if os.path.exists(dst) and os.stat(dst).st_size == a.st_size and int(os.stat(dst).st_mtime) == int(a.st_mtime):
+                continue
+            log("Pack pour la carte :", name)
+            sftp.get(posixpath.join(remote_dir, name), dst + ".part")
+            os.replace(dst + ".part", dst)
+            os.utime(dst, (a.st_atime, a.st_mtime))
+    sig = "\n".join(sig)
+    marker = f"{BM}/packs-signature"
+    try:
+        old = open(marker).read()
+    except OSError:
+        old = None
+    if old != sig:
+        if old is not None or os.path.isdir(f"{WEB}/maps/overworld"):
+            log("Mods ou datapacks changés : toute la carte va être redessinée (sans l'effacer)")
+            shutil.rmtree(f"{WEB}/maps/overworld/rstate", ignore_errors=True)
+        with open(marker, "w") as f:
+            f.write(sig)
 
 
 def write_config(border, box):
