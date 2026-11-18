@@ -11,7 +11,7 @@ fusionnés dans les marqueurs de la carte (seuls les ensembles « sumenium-* » 
 
 Tout se règle dans le fichier .env (voir .env.example).
 """
-import base64, contextlib, fnmatch, hashlib, io, json, math, os, posixpath, re, shutil, socket, stat, subprocess, sys, tempfile, threading, time
+import base64, contextlib, fnmatch, urllib.request, hashlib, io, json, math, os, posixpath, re, shutil, socket, stat, subprocess, sys, tempfile, threading, time
 from datetime import datetime
 
 import nbtlib
@@ -47,6 +47,12 @@ ECO_MARKERS = "sumenium-data/export/bluemap-markers.json"
 MAP_PACKS = [x.strip() for x in (E("MAP_PACKS") or "Terralith*.jar").split(",") if x.strip()]
 PACKS = f"{BM}/config/packs"
 LIVE_MARKERS = f"{WEB}/maps/overworld/live/markers.json"
+# Joueurs en direct (export du mod toutes les 3 s) : relus toutes les LIVE_SECONDS, affichés comme les joueurs de BlueMap
+LIVE_PLAYERS = (E("LIVE_PLAYERS") or "1").strip() not in ("0", "non", "false")
+LIVE_SECONDS = max(2, int(E("LIVE_SECONDS") or 3))
+ECO_PLAYERS = "sumenium-data/export/joueurs-carte.json"
+PLAYERS_JSON = f"{WEB}/maps/overworld/live/players.json"
+HEADS = f"{WEB}/maps/overworld/assets/playerheads"
 _eco_sets = {}
 MARKERS_MAX_DISTANCE = int(E("MARKERS_MAX_DISTANCE") or 100000)  # distance de caméra au-delà de laquelle un marqueur de boutique disparaît
 
@@ -86,22 +92,47 @@ def connect():
     return sftp
 
 
+def _close(sftp):
+    """sftp.close() seul ferme le canal mais laisse la session SSH ouverte : on ferme aussi le transport."""
+    try:
+        sftp.close()
+    except Exception:
+        pass
+    try:
+        sftp.get_channel().get_transport().close()
+    except Exception:
+        pass
+
+
 @contextlib.contextmanager
-def session():
-    """Une session SFTP fermée à coup sûr. sftp.close() seul ferme le canal mais laisse la session SSH
-    ouverte tant que le programme tourne : MineStrator limite les sessions et bloque les nouvelles."""
-    with _sftp_lock:  # jamais deux sessions en même temps (rendu et marqueurs)
-        sftp = connect()
+def session(wait=True):
+    """Une seule session SFTP pour tout le programme (MineStrator limite les sessions et bloque les nouvelles),
+    gardée ouverte entre deux usages (les joueurs en direct la relisent toutes les quelques secondes) et rouverte
+    si elle a été coupée. wait=False : None tout de suite si elle est occupée (copie des régions en cours)."""
+    if not _sftp_lock.acquire(blocking=wait):
+        yield None
+        return
+    global _sftp
+    try:
+        if _sftp is not None and not _sftp.get_channel().get_transport().is_active():
+            _close(_sftp)
+            _sftp = None
+        if _sftp is None:
+            _sftp = connect()
         try:
-            yield sftp
-        finally:
-            try:
-                sftp.close()
-            finally:
-                sftp.get_channel().get_transport().close()
+            yield _sftp
+        except (OSError, EOFError, paramiko.SSHException) as e:
+            # fichier absent : la session est saine ; coupure : on la referme, elle sera rouverte au prochain usage
+            if not isinstance(e, FileNotFoundError):
+                _close(_sftp)
+                _sftp = None
+            raise
+    finally:
+        _sftp_lock.release()
 
 
 _sftp_lock = threading.Lock()
+_sftp = None
 
 
 def read(sftp, path):
@@ -427,7 +458,7 @@ def markers_loop():
         time.sleep(MARKERS_EVERY)
 
 
-# À changer quand le correctif BlueMap évolue : la carte est alors entièrement redessinée une fois.
+# À changer seulement si la carte doit être effacée puis redessinée entièrement (pas besoin pour une simple mise à jour de BlueMap).
 RENDER_VERSION = "bluemap-dev-a61e143"
 
 
@@ -497,10 +528,82 @@ def render(deadline=None):
     log(f"BlueMap terminé (code {res.returncode}) en {int((time.time() - t) / 60)} min")
 
 
+def write_players(players):
+    out = {"players": [{"uuid": p["uuid"], "name": p["name"] + (" (AFK)" if p.get("afk") else ""), "foreign": False,
+                        "position": {"x": p["x"], "y": p["y"], "z": p["z"]},
+                        "rotation": {"pitch": p.get("pitch", 0), "yaw": p.get("yaw", 0), "roll": 0}} for p in players]}
+    os.makedirs(os.path.dirname(PLAYERS_JSON), exist_ok=True)
+    tmp = PLAYERS_JSON + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, PLAYERS_JSON)
+
+
+_heads = {}
+
+
+def update_head(p):
+    """Tête du joueur (visage + calque du chapeau) à partir de son skin, refaite quand il change de skin."""
+    tex = p.get("tex")
+    if not tex or _heads.get(p["uuid"]) == tex:
+        return
+    _heads[p["uuid"]] = tex
+    try:
+        from PIL import Image
+        url = json.loads(base64.b64decode(tex))["textures"]["SKIN"]["url"]
+        if not re.match(r"^https?://textures\.minecraft\.net/texture/[0-9a-f]+$", url):
+            return
+        with urllib.request.urlopen(url.replace("http://", "https://"), timeout=10) as r:
+            skin = Image.open(io.BytesIO(r.read(2_000_000))).convert("RGBA")
+        face = skin.crop((8, 8, 16, 16))
+        face.alpha_composite(skin.crop((40, 8, 48, 16)))
+        os.makedirs(HEADS, exist_ok=True)
+        dst = os.path.join(HEADS, p["uuid"] + ".png")
+        face.resize((32, 32), Image.NEAREST).save(dst + ".tmp", "PNG")
+        os.chmod(dst + ".tmp", 0o644)
+        os.replace(dst + ".tmp", dst)
+    except Exception as e:
+        log("Tête de", p.get("name"), ":", type(e).__name__, e)
+
+
+def players_loop():
+    """Toutes les LIVE_SECONDS : positions des joueurs exportées par le mod → players.json de la carte.
+    Pendant la copie des régions (session occupée), les joueurs restent figés quelques minutes."""
+    path = posixpath.join(E("SFTP_ROOT") or ".", ECO_PLAYERS)
+    shown, errors = None, 0
+    while True:
+        try:
+            with session(wait=False) as sftp:
+                if sftp is not None:
+                    data = json.loads(read(sftp, path))
+                    age = time.time() - datetime.fromisoformat(data["genereLe"].replace("Z", "+00:00")).timestamp()
+                    players = [p for p in data.get("joueurs", []) if isinstance(p, dict) and "uuid" in p and "x" in p] if age < 60 else []
+                    write_players(players)
+                    for p in players:
+                        update_head(p)
+                    names = sorted(p["name"] for p in players)
+                    if names != shown:
+                        shown = names
+                    errors = 0
+        except FileNotFoundError:
+            write_players([])  # mod pas encore à jour, ou serveur arrêté
+        except Exception as e:
+            errors += 1
+            if errors in (1, 20) or errors % 200 == 0:
+                log("Joueurs en direct :", type(e).__name__, e)
+            if errors >= 3:
+                write_players([])
+            time.sleep(min(60, errors * 5))
+        time.sleep(LIVE_SECONDS)
+
+
 def main():
     if not E("SFTP_HOST"):
         sys.exit("SFTP_HOST manquant dans .env")
     threading.Thread(target=markers_loop, daemon=True).start()  # boutiques sur la carte : toute la journée (léger)
+    if LIVE_PLAYERS:
+        threading.Thread(target=players_loop, daemon=True).start()
     if WINDOW:
         log(f"Rendu de la carte une fois par jour, de {WINDOW[0]} h à {WINDOW[1]} h")
     while True:

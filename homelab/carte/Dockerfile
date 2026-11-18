@@ -1,25 +1,19 @@
-# Rendu de la carte : synchronisation SFTP (Overworld uniquement) + BlueMap
-
-# 1) BlueMap compilé depuis son code source : la version publiée (5.23) ne gère pas
-#    encore Minecraft 26.3, la version en développement oui (couleurs, blocs par défaut…).
-#    Quand une version officielle compatible sortira, ce bloc pourra redevenir un simple téléchargement.
-FROM eclipse-temurin:25-jdk AS bluemap
-ARG BLUEMAP_COMMIT=a61e143fe1e069c536159e0bc79410d5b6da3885
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
-WORKDIR /src
-RUN git clone https://github.com/BlueMap-Minecraft/BlueMap.git . \
- && git checkout "$BLUEMAP_COMMIT" \
- && git submodule update --init --recursive
-RUN ./gradlew --no-daemon :cli:release \
- && cp build/release/bluemap-*-cli.jar /bluemap-cli.jar
-
-# 2) Image finale
+# Rendu de la carte : synchronisation SFTP (Overworld uniquement) + BlueMap + joueurs en direct
 FROM eclipse-temurin:25-jre
+
+# BlueMap officiel (la 5.29 gère Minecraft 26.3) ; empreinte vérifiée au téléchargement.
+# Pour changer de version : BLUEMAP_VERSION et BLUEMAP_SHA256 (sha256sum du bluemap-X-cli.jar de la page des versions).
+ARG BLUEMAP_VERSION=5.29
+ARG BLUEMAP_SHA256=e830767fa6364b52b9310fb598508ebde7eec5ebe8360a989e240d991af89a3a
+
 RUN apt-get update \
- && apt-get install -y --no-install-recommends python3 python3-pip ca-certificates tzdata \
- && pip3 install --no-cache-dir --break-system-packages "paramiko>=3.4" "nbtlib==2.0.4" \
+ && apt-get install -y --no-install-recommends python3 python3-pip ca-certificates tzdata curl \
+ && pip3 install --no-cache-dir --break-system-packages "paramiko>=3.4" "nbtlib==2.0.4" "pillow>=10" \
+ && curl -fsSL -o /opt/bluemap-cli.jar \
+      "https://github.com/BlueMap-Minecraft/BlueMap/releases/download/v${BLUEMAP_VERSION}/bluemap-${BLUEMAP_VERSION}-cli.jar" \
+ && echo "${BLUEMAP_SHA256}  /opt/bluemap-cli.jar" | sha256sum -c - \
+ && apt-get purge -y curl && apt-get autoremove -y \
  && rm -rf /var/lib/apt/lists/*
-COPY --from=bluemap /bluemap-cli.jar /opt/bluemap-cli.jar
 COPY run.py anti-spoil.js /app/
 
 # Utilisateur sans droits particuliers

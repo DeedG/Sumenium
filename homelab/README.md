@@ -65,13 +65,19 @@ Par défaut la carte n'est redessinée qu'une fois par nuit, de 3 h à 6 h (`REN
 
 Les biomes de Terralith viennent d'un mod : sans lui, BlueMap ne connaît pas leurs couleurs d'herbe, de feuillage et d'eau et met des couleurs par défaut. Le rendu copie donc `mods/Terralith*.jar` et les datapacks du monde (`world/datapacks/*.zip`) dans le dossier de packs de BlueMap. Autres mods à prendre en compte : `MAP_PACKS=Terralith*.jar,autre-mod*.jar` dans `.env`. Quand ces fichiers changent, toute la carte est redessinée petit à petit, sans l'effacer : les anciennes tuiles restent visibles jusqu'à leur remplacement, sur plusieurs nuits si besoin.
 
+## Joueurs en direct
+
+Le mod Sumenium Economy (2.13.0 et plus) écrit la position des joueurs de l'Overworld toutes les 3 secondes (`sumenium-data/export/joueurs-carte.json`). Le conteneur le relit toutes les `LIVE_SECONDS` (3 par défaut) et l'affiche sur la carte, avec la tête de chaque joueur. Il n'affiche jamais les spectateurs, les joueurs en vanish ou sous potion d'invisibilité, ni ceux qui ont tapé `/carte masquer` en jeu. `LIVE_PLAYERS=0` dans `.env` désactive l'affichage.
+
+Une seule session SFTP sert à tout et reste ouverte (MineStrator limite le nombre de sessions). Pendant la copie des régions, les joueurs restent figés quelques minutes.
+
 ## Anti-spoil
 
 La bordure est tracée en jaune et mise à jour à chaque passage. Tout ce qui est au-delà est recouvert par un calque « Masquer hors bordure ». Sur le site, la case **« Voir toute la carte (spoil) »** l'enlève ; dans la carte en plein écran, c'est dans le menu des marqueurs. Ce calque évite de se spoiler sans le vouloir, il ne protège pas un joueur qui veut vraiment voir.
 
 ## Compatibilité Minecraft 26.3
 
-La dernière version publiée de BlueMap (5.23) ne gère pas le format de la 26.3. Sa version en développement oui : l'image la compile depuis le code source (commit fixé par `BLUEMAP_COMMIT` dans `carte/Dockerfile`). La première construction prend quelques minutes. Quand une version officielle compatible sortira, on pourra revenir à un simple téléchargement.
+L'image télécharge BlueMap 5.29, la première version officielle qui gère la 26.3 (empreinte vérifiée). Pour changer de version : `BLUEMAP_VERSION` et `BLUEMAP_SHA256` dans `carte/Dockerfile`, puis `docker compose up -d --build`.
 
 ## Sauvegarde de la base du site
 
