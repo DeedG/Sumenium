@@ -180,7 +180,13 @@ a.stat:hover{transform:translateY(-2px)}
 .join-grid a,.join-list a,.join-end a{color:var(--crystal);font-weight:700}
 .join-grid+.card{margin-top:14px}
 .join-list{margin:0;padding-left:20px;display:grid;gap:6px}
-#join-how{scroll-margin-top:70px}
+.rules{margin-bottom:14px}.rules h3{margin-bottom:8px}
+.rule-list{margin:0;padding-left:20px;display:grid;gap:9px;line-height:1.55}.rule-list.compact{gap:5px}
+.rule-list a,.rules p a{color:var(--crystal);font-weight:700}
+.rule-note{display:block;color:var(--muted);font-size:.9rem;margin-top:3px}
+.sanctions{margin:6px 0 10px;padding-left:22px;display:grid;gap:4px;font-weight:600}
+[data-sub="reglement"] .anchors{margin:12px 0 0}
+#join-how,.rules{scroll-margin-top:70px}
 [data-sub="guides"] .card+.card{margin-top:14px}
 [data-sub="guides"] a{color:var(--crystal);font-weight:700}
 [data-sub="guides"] .anchors{margin:12px 0 0}
@@ -675,6 +681,22 @@ dialog.hist-dlg::backdrop{background:rgba(0,0,0,.45)}.hist-head{display:flex;jus
 .tbl.cmds td:first-child{min-width:240px}
 .cmd-c{font:.86rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg);padding:2px 6px;border-radius:6px;overflow-wrap:anywhere}
 .cmd-c i{font-style:normal;color:var(--purple)}
+.cmd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:14px;align-items:start}
+.cmd-grid .cmd-sec{margin:0}
+.cmd-rows{display:grid}
+.cmd-row{display:grid;grid-template-columns:minmax(0,42%) 1fr;gap:4px 14px;padding:9px 0;border-top:1px solid var(--line);align-items:baseline}
+.cmd-row:first-child{border-top:0}
+.cmd-k{display:flex;align-items:flex-start;gap:4px;min-width:0}
+.cmd-k .copy{flex:none;opacity:.55}.cmd-k .copy:hover{opacity:1}
+.cmd-v{font-size:.92rem;line-height:1.5}
+.cmd-who{font-size:.72rem;padding:1px 7px;margin-left:4px;vertical-align:1px}
+.cmd-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:8px}
+.cmd-card{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
+.cmd-card summary{cursor:pointer;font-weight:700}
+.cmd-card p{margin:6px 0 2px;line-height:1.5}
+.cmd-hero .bar{margin:10px 0 0}.cmd-hero .anchors{margin:10px 0 0}
+h3.sec[id^="cmdg-"]{scroll-margin-top:70px}.cmd-sec{scroll-margin-top:70px}
+@media (max-width:640px){.cmd-row{grid-template-columns:1fr}}
 @media (max-width:640px){.tbl.cmds thead{display:none}.tbl.cmds,.tbl.cmds tbody,.tbl.cmds tr,.tbl.cmds td{display:block}.tbl.cmds tr{padding:10px 12px;border-bottom:1px solid var(--line)}.tbl.cmds td{border:0;padding:2px 0}.tbl.cmds td:first-child{min-width:0}}
 .tbl.hist td{white-space:normal}.tbl.hist td.nowrap{white-space:nowrap}
 .tbl td.num,.tbl th.num{text-align:right!important;white-space:nowrap}
@@ -971,7 +993,7 @@ dialog.hist-dlg::backdrop{background:rgba(0,0,0,.45)}.hist-head{display:flex;jus
 
   <section class="panel" id="p-aide" hidden>
     <nav class="subtabs" aria-label="Aide" data-area="aide">
-      <a href="#aide/rejoindre" data-sub="rejoindre">Rejoindre le serveur</a><a href="#aide/guides" data-sub="guides">Guides</a><a href="#aide/commandes" data-sub="commandes">Commandes</a><a href="confidentialite.html">Confidentialité</a><a href="contact.html">Contact</a>
+      <a href="#aide/rejoindre" data-sub="rejoindre">Rejoindre le serveur</a><a href="#aide/reglement" data-sub="reglement">Règlement</a><a href="#aide/guides" data-sub="guides">Guides</a><a href="#aide/commandes" data-sub="commandes">Commandes</a><a href="confidentialite.html">Confidentialité</a><a href="contact.html">Contact</a>
     </nav>
     <div class="subpanel" data-sub="rejoindre">
       <section class="card join-hero">
@@ -1013,11 +1035,99 @@ dialog.hist-dlg::backdrop{background:rgba(0,0,0,.45)}.hist-head{display:flex;jus
       <section class="card steps" id="join-how"><h3>Comment nous rejoindre ?</h3><ol>
         <li><b>Rejoins le Discord Suménium</b><span id="joinDiscordTxt"></span> : tu arrives « en attente de vérification ». Présente-toi brièvement (ou pas) dans le salon prévu et on viendra te trouver.</li>
         <li><b>Connecte-toi ici avec Discord</b> (bouton en haut à droite), puis relie ton pseudo Minecraft Java dans <a href="#espace/fiche">Ma fiche</a> et remplis-la (métier, faction ou solo…).</li>
+        <li><b>Lis <a href="#aide/reglement">le règlement</a></b> : PvP facultatif, usines limitées, commerce au spawn… il tient en quelques minutes.</li>
         <li><b>Le staff t'ajoute à la liste blanche</b> une fois ta candidature validée.</li>
         <li><b>En jeu</b> : Multijoueur → Ajouter un serveur → adresse <code>play.sumenium.com</code>, version <span id="joinVer">Java 26.3</span>. Si le site te le demande, tape le code de <a href="#espace/fiche">Ma fiche</a> en jeu (<code>/site lier &lt;code&gt;</code>) pour prouver que le compte est à toi.</li>
       </ol>
       <p class="muted small">On préfère des joueurs de 18 ans et plus, vu les sujets qui peuvent être abordés, mais on n'est pas fermés : quelques joueurs de moins de 18 ans sont déjà là, alors venez !</p></section>
       <section class="card join-end"><p><b>Voilà !</b> Si vous cherchez un serveur organisé, propre, qui est là pour durer et avec des règles innovantes… venez nous trouver !</p><p class="muted small">— Le staff de Suménium</p></section>
+    </div>
+    <div class="subpanel" data-sub="reglement">
+      <section class="card join-hero">
+        <h3>📜 Le règlement</h3>
+        <p>Quelques règles pour que la saison reste agréable pour tout le monde. En cas de doute, demande au staff sur Discord avant d'agir : on préfère une question à une sanction.</p>
+        <nav class="anchors" aria-label="Règlement">
+          <a href="#aide/reglement" data-jump="r-citoyennete">🤝 Citoyenneté</a><a href="#aide/reglement" data-jump="r-paysage">🌲 Paysage</a><a href="#aide/reglement" data-jump="r-commerce">🛒 Zone commerciale</a><a href="#aide/reglement" data-jump="r-factions">🏰 Factions et usines</a><a href="#aide/reglement" data-jump="r-jeu">⚔️ PvP, events et monde</a><a href="#aide/reglement" data-jump="r-mods">🧩 Mods autorisés</a><a href="#aide/reglement" data-jump="r-divers">📌 Divers</a><a href="#aide/reglement" data-jump="r-sanctions">⚖️ Sanctions</a>
+        </nav>
+      </section>
+
+      <section class="card rules" id="r-citoyennete"><h3>🤝 La citoyenneté</h3>
+        <ul class="rule-list">
+          <li><b>Pas de grief.</b> Il est interdit de détruire les créations des autres. Tout grief volontaire est puni selon sa gravité. Est du grief toute destruction visible d'une construction d'un autre joueur sans son accord.
+            <span class="rule-note">Ce n'est pas du grief : casser des blocs posés d'aspect naturel (terre, pierre), ou casser puis reconstruire à l'identique (modification non visible).</span></li>
+          <li><b>Pas de vol.</b> Coffres et leur contenu, équipement, animaux, villageois : on ne prend rien à quelqu'un sans son accord.</li>
+          <li><b>Lieux publics</b>, obligatoirement : le portail du Nether en 0/0, le Hub, les <a href="#communaute/projets">projets communautaires</a>, tous les portails d'accès à l'End sans exception, les biomes de farm et l'île principale de l'End. Il est interdit de bloquer ou de cacher l'accès à un portail public.</li>
+          <li><b>Réserver une zone (claim).</b> Déclare ses limites et signale-la par un panneau, ou commence à y construire. Pour une base cachée, une mine, etc., tu peux aussi donner les coordonnées dans le salon Discord « assurance claim » pour que personne ne s'installe chez toi. Les coordonnées des bases et des usines d'une faction se notent aussi sur sa <a href="#communaute/factions">fiche de faction</a> (celles des usines restent visibles seulement par la faction et le staff).</li>
+          <li><b>Amabilité.</b> C'est ce qui garde une bonne ambiance. Pas de langage SMS : écris le plus clairement possible (les fautes d'orthographe ne dérangent personne).</li>
+          <li><b>Pas de flood</b> (majuscules, insultes, messages d'un caractère…) : kick, puis mute, prison ou ban en cas de récidive. Les déconnexions/reconnexions à répétition sont tolérées tant qu'elles n'inondent pas le chat.</li>
+          <li><b>Constructions choquantes interdites</b> : tout ce qui dénigre une religion, une opinion politique, les femmes, les hommes, les enfants, peut choquer des plus jeunes ou blesser quelqu'un, ainsi que tout ce qui est interdit par la loi, est sévèrement puni.</li>
+        </ul></section>
+
+      <section class="card rules" id="r-paysage"><h3>🌲 Le paysage</h3>
+        <ul class="rule-list">
+          <li><b>Un arbre commencé se coupe en entier</b> : pas d'arbres volants.</li>
+          <li><b>Respecte le paysage</b> en dehors des biomes de farm : la dégradation ne doit pas se voir (pas de tour de 256 blocs, par exemple).</li>
+          <li><b>Machines volantes</b> autorisées si leur déplacement est limité. Si l'une t'échappe, tu dois la rattraper et la détruire.</li>
+          <li><b>Duplication</b> autorisée <b>seulement</b> pour les rails et les tapis.</li>
+          <li><b>Entity cramming</b> : interdit de contourner la limite (avec un panneau, par exemple).</li>
+          <li><b>Portails du Nether</b> : à la couche 110 dans le Nether, et bien reliés à leur portail de l'Overworld.</li>
+        </ul></section>
+
+      <section class="card rules" id="r-commerce"><h3>🛒 La zone commerciale (le spawn)</h3>
+        <p class="small">Le spawn est la zone commerciale de tous les joueurs, délimitée par les montagnes. C'est le cœur du RP de la saison : respecte-le. Les boutiques se gèrent avec le mod de Suménium : voir <a href="#aide/guides" data-jump="g-boutique">Ouvrir ma boutique</a>.</p>
+        <ul class="rule-list">
+          <li><b>La monnaie est le suménien (Su).</b> On en gagne en vendant ses minerais aux coffres du FISC et ses objets rares d'exploration au PNJ du FISC, puis en commerçant. Prix à jour : <a href="#marche/fisc">Marché › FISC</a>. Le FISC est géré par Stillexer (Roger).</li>
+          <li><b>Les ventes se font dans la zone commerciale</b>, dans une boutique (sauf marchand itinérant joué en RP). Vendre des objets hors des boutiques est <b>interdit et puni</b>. Ailleurs, seuls le troc et les dons sont tolérés, mais à éviter : si quelqu'un a une demande, il n'est sûrement pas le seul, alors ouvre plutôt une boutique.</li>
+          <li><b>Ouvrir une boutique</b> : <code>/boutique creer</code> en regardant le coffre prélève les frais tout seul (150 Su, 50 Su si tu as déjà une boutique de la même famille (laines, bois…), 300 Su pour un service ou un lot). La boutique apparaît d'elle-même dans l'annuaire du spawn, sur le site et sur la carte. Fais aussi sa pub dans le salon Discord « zone commerciale ».</li>
+          <li><b>Un thème par boutique</b>, avec des objets ou services en lien.</li>
+          <li><b>5 blocs d'écart</b> entre les parcelles de boutiques de propriétaires différents, pour laisser place aux chemins.</li>
+          <li><b>3 boutiques maximum</b> pour un même objet ou service. Au-delà, des ventes éphémères (1 semaine maximum) sont possibles. La concurrence sur un même produit est autorisée.</li>
+          <li><b>Pas de monopole</b> : limite ton nombre de boutiques (par joueur et par faction) pour laisser de la place aux autres, tout le monde n'a pas le même temps de jeu.</li>
+          <li><b>Fermer une boutique</b> rembourse la moitié des frais. Avant 7 jours, si elle a déjà vendu : rien n'est remboursé et 5 % de son chiffre d'affaires va au FISC. Une boutique abandonnée ou dont le propriétaire a quitté le serveur peut être saisie par le FISC, qui redistribue son contenu.</li>
+          <li><b>Le bâtiment du FISC</b> ne doit pas être dégradé (prank toléré si tu nettoies ensuite).</li>
+          <li><b>Pas de base ni d'usine</b> dans la zone commerciale.</li>
+          <li><b>Vente d'élytres interdite.</b></li>
+          <li>Le FISC peut mettre des taxes, des intérêts, des amendes ou fermer une boutique si les règles ne sont pas respectées. Et pour le bien du commerce : achetez et vendez !</li>
+        </ul></section>
+
+      <section class="card rules" id="r-factions"><h3>🏰 Factions et usines</h3>
+        <ul class="rule-list">
+          <li><b>Chaque joueur rejoint une faction de 3 à 8 joueurs</b> (ou joue seul). Les factions facilitent l'entente et la construction des usines. Seules les usines doivent obligatoirement être construites avec sa faction. <a href="#communaute/factions">Les factions</a></li>
+          <li><b>Une usine, c'est tout aménagement qui facilite le farm.</b> Leur nombre est limité sur le serveur : 3 de chaque grosse usine, 4 de chaque moyenne, 5 de chaque petite.</li>
+          <li><b>Les usines se choisissent par tours</b>, dans l'ordre d'un tirage au sort, sur le site : <a href="#communaute/usines">Communauté › Usines</a>. Les règles de chaque tour (combinaisons possibles) y sont affichées. Les projets communautaires peuvent aussi donner des usines.</li>
+          <li><b>Construire une usine de la liste sans l'avoir choisie est interdit.</b></li>
+        </ul></section>
+
+      <section class="card rules" id="r-jeu"><h3>⚔️ PvP, events et monde</h3>
+        <ul class="rule-list">
+          <li><b>Le PvP est facultatif.</b> Il est interdit de tuer un joueur qui ne le souhaite pas : chacun indique son choix « mourir ou survivre » dans <a href="#espace/fiche">Ma fiche</a>, visible par tous dans <a href="#communaute/joueurs">Communauté › Joueurs</a>.</li>
+          <li><b>Semi-RP</b> : choisis un métier lié à ton activité sur le serveur ou à une histoire, et note-le dans <a href="#espace/fiche">Ma fiche</a>.</li>
+          <li><b>L'Ender Dragon est un event collectif</b> : interdit de tuer le premier en solo, ou d'aller dans l'End avant l'event du premier dragon.</li>
+          <li><b>Events</b> : organisés régulièrement, le week-end. La participation n'est pas obligatoire, mais elle fait vivre la communauté.</li>
+          <li><b>Pranks</b> autorisés. S'ils sont massifs, aide la victime à nettoyer (ou fais appel à un service prévu pour ça).</li>
+        </ul></section>
+
+      <section class="card rules" id="r-mods"><h3>🧩 Mods et logiciels</h3>
+        <p class="small"><b>Interdit</b> : tout logiciel ou mod qui donne un avantage (détection de blocs ou de minerais, x-ray, flyhack, speedhack, freecam, easyplace, printer, placement rapide de blocs…). Sanction : <b>ban immédiat, sans préavis et définitif</b>. Contourner les protections du serveur (anti-xray, ban, anti-vol…) est aussi sévèrement sanctionné.</p>
+        <p class="small"><b>Autorisés</b> (et leurs dérivés) :</p>
+        <ul class="rule-list compact">
+          <li>Une minicarte : <b>JourneyMap</b> (le serveur règle lui-même ce qu'elle peut afficher) ou <b>Xaero's Minimap en version Fair-Play</b> uniquement.</li>
+          <li><b>Litematica</b> pour tes schématics (sans easyplace ni printer) et <b>Tweakeroo</b> pour ses aspects pratiques legit.</li>
+          <li>L'<b>autoclic</b> pour l'AFK d'usine, et l'<b>AutoSelectBloc</b> (choisir le bon bloc de l'inventaire en construisant).</li>
+          <li><b>Simple Voice Chat</b>, <b>Distant Horizons</b>, <b>ReplayMod</b> pour les timelapses. Pour des screenshots, demande le mode spectateur au staff.</li>
+        </ul></section>
+
+      <section class="card rules" id="r-divers"><h3>📌 Divers</h3>
+        <ul class="rule-list">
+          <li><b>Pas de pub</b> pour un autre serveur sans accord. Tu peux jouer ailleurs, mais pas en faire la publicité.</li>
+          <li><b>Comptes secondaires</b> autorisés, sans abus et toujours après un compte principal (pas de commerce de compte secondaire). Le staff peut suspendre un compte secondaire.</li>
+          <li>Ce règlement peut évoluer selon ce qui se passe sur le Discord et sur le serveur.</li>
+        </ul></section>
+
+      <section class="card rules" id="r-sanctions"><h3>⚖️ Les sanctions</h3>
+        <p class="small">Selon la gravité, et de plus en plus sévères en cas de récidive :</p>
+        <ol class="sanctions"><li>Rappel à l'ordre</li><li>Amende en jeu</li><li>Avertissement (suivi par le bot Discord)</li><li>Ban temporaire</li><li>Ban définitif</li></ol>
+        <p class="muted small">Merci de ta lecture, et bon jeu sur Suménium !</p></section>
     </div>
     <div class="subpanel" data-sub="guides">
       <section class="card join-hero">
@@ -1816,7 +1926,7 @@ async function loadStats(){
 // ---------- Onglets ----------
 // Arborescence : onglet/sous-onglet[/détail]. Les anciens liens (#classement, #economie/boutiques…) renvoient au bon endroit.
 const TABS=["accueil","monde","communaute","marche","classements","espace","aide"];
-const SUBS={monde:["carte","succes"],classements:["tableau","richesse","stats","trophees","bestiaire"],aide:["rejoindre","guides","commandes"]};
+const SUBS={monde:["carte","succes"],classements:["tableau","richesse","stats","trophees","bestiaire"],aide:["rejoindre","reglement","guides","commandes"]};
 const LEGACY={classement:"classements/tableau",succes:"monde/succes",stats:"classements/stats",carte:"monde/carte",
   "economie":"marche","economie/apercu":"marche/economie","economie/boutiques":"marche/boutiques","economie/hdv":"marche/hdv","economie/fisc":"marche/fisc",
   "economie/factions":"communaute/factions","economie/baltop":"classements/richesse","economie/commandes":"aide/commandes",
@@ -1846,6 +1956,7 @@ function route(){
   if(t==="classements"&&s==="trophees"&&window.Trophees)window.Trophees.hall($("trophRoot"));
   if(t==="classements"&&s==="bestiaire"&&window.Trophees)window.Trophees.bestiaire($("bestRoot"),decodeURIComponent(parts[2]||""));
   if(t==="aide"&&s==="commandes"&&window.Economie)window.Economie.show("commandes",parts[2]);
+  if(t==="aide"&&s==="reglement"&&parts[2])setTimeout(()=>{const g=$("r-"+parts[2]);if(g)g.scrollIntoView({block:"start"})},60);
   if(t==="aide"&&s==="guides"&&parts[2])setTimeout(()=>{const g=$("g-"+parts[2]);if(g)g.scrollIntoView({block:"start"})},60);
 }
 let lastTab=null;

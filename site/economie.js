@@ -91,7 +91,7 @@ function render() {
   const root = $(ROOTS[mode]);
   if (!root) return;
   Object.values(ROOTS).forEach((id) => { if (id !== ROOTS[mode] && $(id)) $(id).innerHTML = ""; });  // un seul #ecoView à la fois
-  if (mode === "commandes") { root.innerHTML = head("Commandes du mod", "Tout ce qui se fait en jeu avec le mod Sumenium Economy : boutiques, factions, hôtel des ventes.") + '<div id="ecoView"></div>'; commandes($("ecoView")); return; }
+  if (mode === "commandes") { root.innerHTML = '<div id="ecoView"></div>'; commandes($("ecoView")); return; }
   if (!loaded) { root.innerHTML = '<p class="empty">Chargement…</p>'; return; }
   const when = E && E.genereLe ? (typeof ago === "function" ? ago(E.genereLe) : "") : "";
   const stamp = E ? `<p class="muted small eco-when">Données du serveur ${E_(when)} · synchronisées toutes les 5 minutes</p>` : "";
@@ -495,8 +495,9 @@ function baltop(view) {
   </div>`;
 }
 
-/* ---------------- Commandes (doc « Commandes Suménium Economy », v2.6.3) ---------------- */
-const SANS_COMMANDE = [
+/* ---------------- Commandes ---------------- */
+// Ce qui se fait en cliquant, sans commande : [titre, texte, catégorie]
+const SANS_COMMANDE_ECO = [
   ["Acheter dans une boutique", "Clic droit sur le coffre ou son panneau. Le chat affiche l'item (survolable), le prix et le stock. Taper ensuite la quantité dans le chat : un nombre, « tout » ou « annuler » (30 s pour répondre, invisible pour les autres)."],
   ["Acheter un lot", "Pareil qu'une boutique normale, mais on tape un nombre de lots. Le chat et le panneau montrent le contenu du lot (chaque item est survolable). Si un seul item du lot manque dans le coffre, la boutique est en rupture : on ne paie jamais un lot incomplet."],
   ["Vendre des minerais au FISC", "Clic droit sur le coffre du FISC, puis taper la quantité à vendre ou « tout ». Les minerais rachetés sont détruits."],
@@ -516,7 +517,17 @@ const SANS_COMMANDE = [
   ["Musée", "Accroupi + clic droit, main vide, sur une tête posée : une étiquette flotte au-dessus avec son nom et sa rareté (même geste pour la retirer). En regardant une tête de trophée ou du bestiaire, posée ou dans un cadre, son détail s'affiche au-dessus de la barre d'inventaire."],
   ["AFK", "Sans bouger la caméra, marcher ni écrire dans le chat pendant 2 min 30, le joueur passe [AFK] dans le tab (un autoclicker ne compte pas comme une activité). Les joueurs AFK ne sont pas comptés pour passer la nuit."],
 ];
-const JOUEURS = [
+const SANS_COMMANDE_AUTRES = [
+  ["Hoppers filtrants", "Trois hoppers spéciaux, proposés par le FISC : « filtrant » (ne laisse passer que les objets du filtre), « bloquant » (tout sauf eux) et « aspirant » (ramasse les objets de son chunk jusqu'à 16 blocs au-dessus). Accroupi + clic droit sur le hopper posé pour régler son filtre."],
+  ["Statues (Armor Statues)", "Poser, régler et habiller les supports d'armure : /trigger as_help ouvre le menu (bras, poses, petite taille, invisibilité…). /trigger as_help set 2 donne le livre de commandes."],
+  ["Cadres", "Les cadres ont une zone de clic réduite et peuvent être rendus invisibles : pratique pour les vitrines et les musées."],
+  ["Tailleur de pierre pour le bois", "Le tailleur de pierre découpe aussi les bûches et planches (planches, escaliers, dalles, barrières, étagères…), sans perte."],
+  ["Redstone en ardoise des abîmes", "Répéteurs, comparateurs, pistons, observateurs, distributeurs, droppers et leviers se fabriquent aussi avec de la deepslate (pierre des abîmes) à la place de la pierre."],
+  ["Endermen", "Les endermen ne prennent plus de blocs : pas de trous dans les constructions."],
+  ["Marchand ambulant", "Il vend en plus des mini-blocs décoratifs."],
+  ["Chat vocal de proximité", "Avec le mod Simple Voice Chat installé de ton côté (facultatif) : touche V par défaut pour les réglages, on entend les joueurs proches. Voir les commandes « Voix » pour les groupes."],
+];
+const JOUEURS_ECO = [
   { titre: "Compte", lignes: [
     ["/compte", "Solde perso, banque de faction, compte utilisé", "Tous"],
     ["/compte perso", "Acheter et créer des boutiques avec son compte perso", "Tous"],
@@ -579,44 +590,94 @@ const JOUEURS = [
     ["/hdv", "Rappel du fonctionnement", "Tous"],
   ] },
 ];
+// Autres mods et datapacks du serveur (commandes ouvertes à tous)
+const JOUEURS_AUTRES = [
+  { titre: "Voix (Simple Voice Chat)", source: "mod", intro: "Avec le mod installé de ton côté. Un groupe permet de parler à distance avec ses membres.", lignes: [
+    ["/voicechat invite <joueur>", "Invite un joueur dans ton groupe vocal", "Tous"],
+    ["/voicechat join <groupe> [mot de passe]", "Rejoint un groupe (aussi possible depuis le menu du mod, touche G)", "Tous"],
+    ["/voicechat leave", "Quitte le groupe", "Tous"],
+    ["/voicechat help", "Toutes les commandes du chat vocal", "Tous"],
+  ] },
+  { titre: "Musique (Audio Player)", source: "mod", intro: "Mettre sa propre musique sur un disque, une corne de chèvre ou une tête de note. Les autres l'entendent avec Simple Voice Chat.", lignes: [
+    ["/audioplayer upload", "Donne un lien pour envoyer ton fichier MP3 ou WAV ; le chat donne ensuite son identifiant", "Tous"],
+    ["/audioplayer url <lien>", "Envoie un son depuis un lien direct vers un MP3 ou un WAV", "Tous"],
+    ["/audioplayer apply <identifiant> [nom]", "Grave le son sur l'objet tenu en main (disque, corne de chèvre…)", "Tous"],
+    ["/audioplayer clear", "Efface le son personnalisé de l'objet en main", "Tous"],
+    ["/audioplayer id", "Donne l'identifiant du son de l'objet en main", "Tous"],
+  ] },
+  { titre: "Statistiques (Player Statistics)", source: "mod", intro: "Les statistiques Minecraft de tous les joueurs, même hors ligne. L'autocomplétion propose les statistiques (blocs minés, mobs tués, distance…).", lignes: [
+    ["/stats leaderboard <statistique>", "Classement de tous les joueurs pour une statistique", "Tous"],
+    ["/stats top [joueur]", "Les statistiques où toi (ou un joueur) es le mieux classé", "Tous"],
+    ["/stats total <statistique>", "Le total de tout le serveur, et ta part", "Tous"],
+    ["Bouton « Partager »", "Sous chaque résultat : l'affiche dans le chat pour tout le monde", "Tous"],
+  ] },
+  { titre: "Succès et bordure (BlazeandCave)", source: "datapack", intro: "Chaque succès agrandit la bordure du monde. Suivi sur le site : Monde › Succès.", lignes: [
+    ["/trigger wb_world_size", "Taille actuelle de la bordure du monde", "Tous"],
+    ["/trigger bac_progress", "Ta progression dans les succès", "Tous"],
+    ["/trigger bac_statistics", "Statistiques liées aux succès", "Tous"],
+    ["/trigger bac_timers", "Temps de jeu et chronomètres des succès", "Tous"],
+    ["/trigger bac_apple_a_day · bac_perfect_run · bac_dragon", "Où tu en es pour les succès-défis correspondants", "Tous"],
+    ["/trigger bacaped_mob_universe · bacaped_baby_zoo · bacaped_egapple_a_day", "Les mobs (ou bébés) proches qui comptent pour ces succès, et le défi de la pomme dorée enchantée", "Tous"],
+  ] },
+  { titre: "Vanilla", source: "minecraft", lignes: [
+    ["/msg <joueur> <message>", "Message privé (aussi /tell, /w). Réponse avec /r", "Tous"],
+    ["/trigger <nom>", "Déclenche une action des datapacks (voir ci-dessus)", "Tous"],
+    ["/list", "Joueurs connectés", "Tous"],
+  ] },
+];
+// Regroupement de la page (ordre d'affichage)
+const SRC = { mod: "Mod", datapack: "Datapack", minecraft: "Minecraft", sumenium: "Mod Suménium" };
+const GROUPES = () => [
+  { id: "eco", titre: "💰 Économie", sections: JOUEURS_ECO.filter((x) => ["Compte", "Boutiques", "Bons de service", "Hôtel des ventes"].includes(x.titre)) },
+  { id: "communaute", titre: "🏰 Factions, chat, trophées et site", sections: JOUEURS_ECO.filter((x) => !["Compte", "Boutiques", "Bons de service", "Hôtel des ventes"].includes(x.titre)) },
+  { id: "mods", titre: "🧩 Autres mods et datapacks", sections: JOUEURS_AUTRES },
+];
 let cq = "", STAFF_CMD = null, staffTried = false;
+const secId = (t) => "cmd-" + fold(t).replace(/\(.*\)/, "").trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 // La commande : surligne les <arguments>, bouton pour copier la partie avant le premier argument
-const cmdHtml = (c) => { const first = c.split(/ [<[(]/)[0];
-  return `<code class="cmd-c">${E_(c).replace(/(&lt;[^&]*&gt;|\[[^\]]*\])/g, '<i>$1</i>')}</code> <button class="x copy" data-copy="${E_(first)}" aria-label="Copier ${E_(first)}" title="Copier">⧉</button>`; };
-const match = (...t) => !cq || t.join(" ").toLowerCase().includes(cq);
-function cmdTable(sec, withWho) {
+const cmdHtml = (c) => { if (!c.startsWith("/")) return `<b>${E_(c)}</b>`; const first = c.split(/ [<[(·]/)[0];
+  return `<code class="cmd-c">${E_(c).replace(/(&lt;[^&]*&gt;|\[[^\]]*\])/g, '<i>$1</i>')}</code><button class="x copy" data-copy="${E_(first)}" aria-label="Copier ${E_(first)}" title="Copier">⧉</button>`; };
+const match = (...t) => !cq || fold(t.join(" ")).includes(fold(cq));
+function cmdSection(sec, withWho) {
   const rows = sec.lignes.filter((l) => match(sec.titre, ...l));
   if (!rows.length) return "";
-  return `<section class="board cmd-sec" id="cmd-${E_(fold(sec.titre).replace(/[^a-z0-9]+/g, "-"))}"><h3>${E_(sec.titre)}</h3>${sec.intro ? `<p class="small muted">${E_(sec.intro)}</p>` : ""}
-    <div class="tbl-wrap"><table class="tbl left cmds"><thead><tr><th>Commande</th><th>Usage</th>${withWho ? "<th>Qui</th>" : ""}</tr></thead><tbody>
-    ${rows.map((l) => `<tr><td>${cmdHtml(l[0])}</td><td>${E_(l[1])}</td>${withWho ? `<td class="muted small">${E_(l[2])}</td>` : ""}</tr>`).join("")}</tbody></table></div>
+  const src = sec.source ? SRC[sec.source] : (withWho ? SRC.sumenium : "");
+  const paren = sec.titre.match(/ \((.*)\)$/), tag = [paren && paren[1], src].filter(Boolean).join(" · ");
+  return `<section class="board cmd-sec" id="${secId(sec.titre)}"><h3>${E_(sec.titre.replace(/ \(.*\)$/, ""))}${tag ? ` <small>${E_(tag)}</small>` : ""}</h3>
+    ${sec.intro ? `<p class="small muted">${E_(sec.intro)}</p>` : ""}
+    <div class="cmd-rows">${rows.map((l) => `<div class="cmd-row"><div class="cmd-k">${cmdHtml(l[0])}</div><div class="cmd-v">${E_(l[1])}${withWho && l[2] && l[2] !== "Tous" ? ` <span class="chip cmd-who">${E_(l[2])}</span>` : ""}</div></div>`).join("")}</div>
     ${sec.note ? `<p class="small muted">${E_(sec.note)}</p>` : ""}</section>`;
 }
+const sansCards = (list, titre, id) => { const l = list.filter((x) => match(titre, "en jeu", ...x)); if (!l.length) return "";
+  return `<section class="board cmd-sec" id="${id}"><h3>${E_(titre)}</h3><div class="cmd-cards">${l.map((x) => `<details class="cmd-card"><summary>${E_(x[0])}</summary><p class="small">${E_(x[1])}</p></details>`).join("")}</div></section>`; };
 function commandes(view) {
   const live = /(^|\.)sumenium\.com$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
   if (live && !staffTried) {
     staffTried = true;  // réservé au staff : le Worker ne renvoie la liste qu'aux comptes Discord staff
     fetch("/api/admin/commandes", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).then((d) => { STAFF_CMD = d; if (mode === "commandes") render(); }).catch(() => {});
   }
-  const sans = SANS_COMMANDE.filter((l) => match("en jeu", ...l));
-  view.innerHTML = `<div class="bar"><input type="search" id="cq" placeholder="Chercher une commande ou une action (boutique, bon, faction, hdv…)" value="${E_(cq)}" aria-label="Chercher une commande"></div>
-    <div class="banner info">Tu débutes ? Les <a href="#aide/guides">guides pas à pas</a> expliquent comment acheter, ouvrir une boutique, vendre un service ou gagner de l'argent.</div>
-    <p class="small muted">Mod Sumenium Economy 2.11.0. Les montants s'écrivent avec un point (3.5). Entre &lt; &gt; : obligatoire ; entre [ ] : facultatif.</p>
-    ${sans.length ? `<section class="board cmd-sec"><h3>En jeu, sans commande</h3><p class="small muted">Acheter, vendre au FISC et ravitailler se fait en cliquant sur les coffres et les PNJ, pas avec des commandes.</p>
-      <div class="tbl-wrap"><table class="tbl left cmds"><thead><tr><th>Action</th><th>Comment</th></tr></thead><tbody>
-      ${sans.map((l) => `<tr><td><b>${E_(l[0])}</b></td><td>${E_(l[1])}</td></tr>`).join("")}</tbody></table></div></section>` : ""}
-    <h3 class="sec">Commandes des joueurs <small>accessibles à tous ; certaines sont réservées au chef ou aux trésoriers</small></h3>
-    ${JOUEURS.map((s) => cmdTable(s, true)).join("")}
-    ${STAFF_CMD ? `<h3 class="sec">Commandes des admins <span class="chip lvl-staff">Staff</span> <small>${E_(STAFF_CMD.intro)}</small></h3>${STAFF_CMD.sections.map((s) => cmdTable(s, false)).join("")}` : ""}
+  const G = GROUPES();
+  const groups = G.map((g) => { const html = g.sections.map((x) => cmdSection(x, true)).join(""); return html ? `<h3 class="sec" id="cmdg-${g.id}">${E_(g.titre)}</h3><div class="cmd-grid">${html}</div>` : ""; }).join("");
+  const sans = sansCards(SANS_COMMANDE_ECO, "Boutiques, FISC, enchères et têtes", "cmd-sans-eco") + sansCards(SANS_COMMANDE_AUTRES, "Hoppers, statues, cadres et petits plus", "cmd-sans-autres");
+  const staff = STAFF_CMD ? STAFF_CMD.sections.map((x) => cmdSection(x, false)).join("") : "";
+  const chips = [["cmdg-eco", "💰 Économie"], ["cmdg-communaute", "🏰 Factions, chat, site"], ["cmdg-mods", "🧩 Autres mods"], ["cmdg-sans", "🖱️ Sans commande"], ...(STAFF_CMD ? [["cmdg-staff", "🛡️ Staff"]] : [])];
+  view.innerHTML = `<section class="card join-hero cmd-hero"><h3>⌨️ Les commandes</h3>
+      <p class="small">Presque tout se fait en <b>cliquant</b> sur les coffres et les PNJ du spawn ; les commandes servent au reste. Entre <code>&lt; &gt;</code> : obligatoire, entre <code>[ ]</code> : facultatif. Les montants s'écrivent avec un point (3.5). Tu débutes ? Les <a href="#aide/guides">guides pas à pas</a> expliquent tout.</p>
+      <div class="bar"><input type="search" id="cq" placeholder="Chercher une commande ou une action (boutique, faction, musique, stats…)" value="${E_(cq)}" aria-label="Chercher une commande"></div>
+      <nav class="anchors" aria-label="Sections">${chips.map(([id, t]) => `<a href="#aide/commandes" data-jump="${id}">${t}</a>`).join("")}</nav></section>
+    ${groups}
+    ${sans ? `<h3 class="sec" id="cmdg-sans">🖱️ En jeu, sans commande <small>clique sur une action pour l'explication</small></h3>${sans}` : ""}
+    ${staff ? `<h3 class="sec" id="cmdg-staff">🛡️ Commandes du staff <span class="chip lvl-staff">Staff</span> <small>${E_(STAFF_CMD.intro)}</small></h3><div class="cmd-grid">${staff}</div>` : ""}
     <p class="empty" id="cmdNone" hidden>Aucune commande ne correspond.</p>`;
   if (!view.querySelector(".cmd-sec")) $("cmdNone").hidden = false;
-  $("cq").oninput = (e) => { cq = e.target.value.toLowerCase(); const pos = e.target.selectionStart; render(); const el = $("cq"); el.focus(); el.setSelectionRange(pos, pos); };
+  if (cq) view.querySelectorAll(".cmd-card").forEach((d) => (d.open = true));
+  $("cq").oninput = (e) => { cq = e.target.value; const pos = e.target.selectionStart; render(); const el = $("cq"); el.focus(); el.setSelectionRange(pos, pos); };
   view.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = () => navigator.clipboard.writeText(b.dataset.copy).then(() => { b.textContent = "✓"; setTimeout(() => (b.textContent = "⧉"), 1200); })));
   // Lien direct vers une section : #aide/commandes/hdv, /boutiques, /factions…
   // (la page peut se redessiner juste après, quand la liste staff arrive : on garde l'ancre 2 s)
   if (cmdAnchor && Date.now() < cmdAnchor.until) {
     const id = "cmd-" + ({ hdv: "hotel-des-ventes", boutique: "boutiques", faction: "factions", bons: "bons-de-service" }[cmdAnchor.k] || cmdAnchor.k);
-    setTimeout(() => { const el = $(id); if (el) el.scrollIntoView({ block: "start" }); }, 60);
+    setTimeout(() => { const el = $(id) || $("cmdg-" + cmdAnchor.k); if (el) el.scrollIntoView({ block: "start" }); }, 60);
   }
 }
 let cmdAnchor = null;

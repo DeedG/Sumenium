@@ -1,4 +1,4 @@
-// Commandes réservées au staff (mod Sumenium Economy 2.7.0) : servies seulement aux comptes Discord staff.
+// Commandes réservées au staff (mod Sumenium Economy et autres mods du serveur) : servies seulement aux comptes Discord staff.
 export const COMMANDES_STAFF = {
   intro: "Réservées aux opérateurs. Sans /sumeco bypass, un admin utilise les boutiques comme un joueur.",
   sections: [
@@ -86,5 +86,35 @@ export const COMMANDES_STAFF = {
       ["/mairie maj", "Relit le livre sur le site tout de suite (sinon toutes les 5 minutes)"],
       ["/mairie livre", "Te donne une copie du livre pour vérifier la mise en page"],
     ], note: "Le lutrin ne se casse qu'avec /sumeco bypass. Adresse lue par le serveur : mairieUrl dans la config (https://sumenium.com/api/mairie/livre)." },
+    { titre: "Modération (Vanish, Ledger)", intro: "Ledger enregistre chaque bloc posé ou cassé, chaque objet pris ou mis dans un coffre. Paramètres : range:<blocs> time:<durée, ex. 2h, 3d> source:<pseudo> action:<block-break, block-place, item-remove…> object:<bloc ou objet>.", lignes: [
+      ["/vanish", "Devient invisible pour les joueurs (et absent du tab, des messages de connexion et de la carte du site). Même commande pour réapparaître"],
+      ["/lg i", "Mode inspection : clic sur un bloc ou un coffre pour voir qui l'a modifié (même commande pour l'arrêter)"],
+      ["/lg search <paramètres>", "Cherche dans l'historique (ex. /lg search source:Pseudo range:20 time:1d)"],
+      ["/lg preview rollback <paramètres>", "Montre ce qu'un retour en arrière changerait, sans rien toucher"],
+      ["/lg rollback <paramètres>", "Annule les actions trouvées (grief, vol dans un coffre…)"],
+      ["/lg restore <paramètres>", "Refait ce qu'un rollback a annulé"],
+    ] },
+    { titre: "Serveur et performances (spark, ServerCore, Chunky)", lignes: [
+      ["/spark tps", "TPS et MSPT du serveur (lag)"],
+      ["/spark health", "Santé du serveur : TPS, mémoire, processeur, disque"],
+      ["/spark profiler start", "Lance un profilage pour trouver ce qui fait laguer ; /spark profiler stop donne le lien du rapport"],
+      ["/servercore status", "État du serveur vu par ServerCore (distance de vue, mobcaps dynamiques…)"],
+      ["/mobcaps", "Nombre de mobs par catégorie autour de toi par rapport aux limites"],
+      ["/chunky radius <blocs>", "Rayon de la prégénération (avec /chunky center <x> <z> et /chunky world <monde>)"],
+      ["/chunky start", "Lance la prégénération ; /chunky pause, /chunky continue, /chunky cancel ; /chunky progress pour l'avancement"],
+    ] },
+    { titre: "Construction (WorldEdit)", intro: "À utiliser avec précaution sur la survie. //undo annule la dernière opération.", lignes: [
+      ["//wand", "Donne la hache de sélection (clic gauche et droit pour les deux coins)"],
+      ["//set <bloc>", "Remplit la sélection"],
+      ["//replace <bloc> <nouveau bloc>", "Remplace un bloc par un autre dans la sélection"],
+      ["//copy · //paste", "Copie la sélection et la colle là où tu es"],
+      ["//undo", "Annule la dernière modification WorldEdit"],
+    ] },
+    { titre: "Mods et datapacks du serveur", lignes: [
+      ["/function filterhopper:filtrant", "Te donne un hopper filtrant (aussi filterhopper:bloquant, filterhopper:aspirant, filterhopper:tous). Pour un joueur : /execute as <pseudo> run function filterhopper:filtrant. La fabrication est désactivée (craftEnabled dans config/filterhopper.json)"],
+      ["/function bacap_wb_addon:config", "Réglages de la bordure qui grandit avec les succès (paliers, récompenses, affichage du score)"],
+      ["/itemframesplus invisibleItemFrames <true|false>", "Active ou non les cadres invisibles d'ItemFrames+"],
+      ["/voicechat test <joueur>", "Vérifie la connexion au chat vocal d'un joueur"],
+    ] },
   ],
 };
