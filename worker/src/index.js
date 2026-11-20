@@ -642,7 +642,17 @@ async function api(req, env, url, ctx) {
       const combos = Array.isArray(r.combos) ? r.combos.filter((c) => Array.isArray(c) && c.length) : [];
       if (!combos.length || combos.length > 10) fail(400, `Tour ${n} : il faut entre 1 et 10 combinaisons.`);
       for (const c of combos) if (c.length > 8 || c.some((t) => !TAILLES.includes(t))) fail(400, `Tour ${n} : combinaison invalide (grosse, moyenne ou petite, 8 usines au plus).`);
-      tours[n] = { nom: str(r.nom, 40) || `${n}e tour`, quand: str(r.quand, 120), combos, exclusif: !!r.exclusif };
+      // deja[taille] : nombre maximum d'AUTRES factions qui peuvent déjà avoir l'usine pour qu'on puisse la prendre
+      // (0 = seulement les usines libres ; absent = sans limite, à part le maximum par usine)
+      const deja = {};
+      for (const t of TAILLES) {
+        const v = r.deja && r.deja[t];
+        if (v === "" || v == null) continue;
+        const k = int(v);
+        if (k == null || k < 0 || k > 50) fail(400, `Tour ${n} : limite « déjà prises » invalide pour les ${t}s.`);
+        deja[t] = k;
+      }
+      tours[n] = { nom: str(r.nom, 40) || `${n}e tour`, quand: str(r.quand, 120), combos, deja };
     }
     if (!Object.keys(tours).length) fail(400, "Il faut au moins un tour.");
     const cur = Number(await setting(env, "usine_tour")) || 1;
@@ -1462,8 +1472,12 @@ async function usineRules(env) {
 }
 const tailleTxt = (c) => { const n = {}; c.forEach((t) => (n[t] = (n[t] || 0) + 1)); return Object.entries(n).map(([t, k]) => `${k} ${t}${k > 1 ? "s" : ""}`).join(" + "); };
 const combosTxt = (rules) => rules.combos.map(tailleTxt).join(", ou ");
+// Limite « déjà prises » d'une taille pour un tour (null = sans limite) ; l'ancien mode exclusif = 0 partout
+const dejaMax = (rules, t) => { const d = rules && rules.deja; if (d && d[t] != null) return d[t]; return rules && rules.exclusif ? 0 : null; };
+const dejaTxt = (rules) => TAILLES.filter((t) => dejaMax(rules, t) != null).map((t) => { const k = dejaMax(rules, t);
+  return k === 0 ? `${t}s : seulement les libres` : `${t}s : déjà prises par ${k} faction${k > 1 ? "s" : ""} au plus`; }).join(" ; ");
 // Où en est une faction dans le tour : choix complet ? sinon, quelles combinaisons peut-elle encore compléter
-// (usines de la bonne taille pas pleines, pas déjà à elle, et en mode exclusif pas prises par une autre faction) ?
+// (usines de la bonne taille pas pleines, pas déjà à elle, et pas prises par plus d'autres factions que la limite du tour) ?
 async function tourEtat(env, fid, tour, rules, max) {
   const [mineR, usR, chR] = await env.DB.batch([
     env.DB.prepare("SELECT u.taille FROM usine_choix c JOIN usines u ON u.id = c.usine_id WHERE c.faction_id = ? AND c.projet_faction_id IS NULL AND c.tour = ?").bind(fid, tour),
@@ -1473,7 +1487,7 @@ async function tourEtat(env, fid, tour, rules, max) {
   const avail = { grosse: 0, moyenne: 0, petite: 0 };
   for (const u of usR.results) {
     const ts = chR.results.filter((c) => c.usine_id === u.id);
-    if (ts.some((c) => c.faction_id === fid) || ts.length >= (max[u.taille] || 0) || (rules.exclusif && ts.length)) continue;
+    if (ts.some((c) => c.faction_id === fid) || ts.length >= (max[u.taille] || 0) || (dejaMax(rules, u.taille) != null && ts.length > dejaMax(rules, u.taille))) continue;
     avail[u.taille] = (avail[u.taille] || 0) + 1;
   }
   const complete = rules.combos.some((c) => c.length === sizes.length && fitsCombo(sizes, [c]));
@@ -1510,7 +1524,9 @@ async function toggleUsine(env, s, fid, uid, on, ctx) {
       const max = R.max[u.taille];
       const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM usine_choix c JOIN factions f ON f.id = c.faction_id AND f.deleted = 0 AND f.inactive = 0 WHERE c.usine_id = ?").bind(uid).first();
       if (n.n >= max) fail(400, `Plus de place pour « ${u.nom} » (${max} maximum sur le serveur).`);
-      if (rules.exclusif && n.n > 0) fail(400, `${rules.nom} : on ne peut pas prendre une usine déjà prise par une autre faction, et « ${u.nom} » l'est déjà.`);
+      const lim = dejaMax(rules, u.taille);
+      if (lim != null && n.n > lim) fail(400, lim === 0 ? `${rules.nom} : seulement des ${u.taille}s libres, et « ${u.nom} » est déjà prise par une autre faction.`
+        : `${rules.nom} : les ${u.taille}s déjà prises par plus de ${lim} faction${lim > 1 ? "s" : ""} sont exclues, et « ${u.nom} » l'est par ${n.n}.`);
       const mine = (await env.DB.prepare("SELECT u.taille FROM usine_choix c JOIN usines u ON u.id = c.usine_id WHERE c.faction_id = ? AND c.projet_faction_id IS NULL AND c.tour = ?").bind(fid, tour).all()).results;
       if (!fitsCombo([...mine.map((x) => x.taille), u.taille], rules.combos)) {
         fail(400, `${rules.nom} : combinaisons possibles ${combosTxt(rules)}.`);
@@ -1546,7 +1562,7 @@ async function announceTour(env, ctx, tour) {
   if (!rules) return;
   const t = await usineTurn(env, tour);
   const fs = (await env.DB.prepare("SELECT id, name FROM factions WHERE deleted = 0 AND inactive = 0 ORDER BY tirage IS NULL, tirage, name COLLATE NOCASE").all()).results;
-  announce(env, ctx, `📣 **Choix des usines : ${rules.nom}** — ${combosTxt(rules)}.${rules.exclusif ? " Pas d'usine déjà prise par une autre faction." : ""}\n`
+  announce(env, ctx, `📣 **Choix des usines : ${rules.nom}** — ${combosTxt(rules)}.${dejaTxt(rules) ? ` Usines déjà prises : ${dejaTxt(rules)}.` : ""}\n`
     + `Ordre : ${fs.map((f, i) => `${i + 1}. ${f.name}${t.done.has(f.id) ? " ✓" : ""}`).join(" · ")}\n`
     + (t.current ? `➡️ Au tour de **${t.currentName}** !` : "🏁 Toutes les factions ont déjà validé.") + `\nEn direct : <${SITE_USINES}>`);
 }

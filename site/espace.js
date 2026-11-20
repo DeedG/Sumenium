@@ -1175,6 +1175,10 @@ const TAILLE_TXT = { grosse: "grosse", moyenne: "moyenne", petite: "petite" };
 const comboTxt = (c) => { const n = {}; c.forEach((t) => (n[t] = (n[t] || 0) + 1));
   return Object.entries(n).map(([t, k]) => `${k} ${TAILLE_TXT[t]}${k > 1 ? "s" : ""}`).join(" + "); };
 const fitsCombo = (sizes, combos) => combos.some((c) => { const left = [...c]; return sizes.every((t) => { const i = left.indexOf(t); if (i < 0) return false; left.splice(i, 1); return true; }); });
+// Limite « déjà prises » d'une taille pour un tour (null = sans limite ; ancien mode exclusif = 0)
+const dejaMax = (rules, t) => { const d = rules && rules.deja; if (d && d[t] != null) return d[t]; return rules && rules.exclusif ? 0 : null; };
+const dejaTxt = (rules) => ["grosse", "moyenne", "petite"].filter((t) => dejaMax(rules, t) != null).map((t) => { const k = dejaMax(rules, t);
+  return k === 0 ? `${t}s : seulement les libres` : `${t}s : déjà prises par ${k} faction${k > 1 ? "s" : ""} au plus`; }).join(" ; ");
 // Factions inactives (arrêtées) : gardées pour l'historique, mais hors tirage et leurs usines ne prennent plus de place
 const actif = (fid) => { const f = fac(fid); return !!f && !f.inactive; };
 const choixActifs = () => D.choix.filter((c) => actif(c.faction_id));
@@ -1184,7 +1188,7 @@ function tourEtat(fid, tour, rules, MAX) {
   const sizes = D.choix.filter((c) => c.faction_id === fid && !c.projet_faction_id && (c.tour || 1) === tour).map((c) => (usine(c.usine_id) || {}).taille);
   const avail = { grosse: 0, moyenne: 0, petite: 0 };
   D.usines.forEach((u) => { const ts = ch.filter((c) => c.usine_id === u.id);
-    if (!ts.some((c) => c.faction_id === fid) && ts.length < (MAX[u.taille] || 0) && !(rules.exclusif && ts.length)) avail[u.taille]++; });
+    if (!ts.some((c) => c.faction_id === fid) && ts.length < (MAX[u.taille] || 0) && !(dejaMax(rules, u.taille) != null && ts.length > dejaMax(rules, u.taille))) avail[u.taille]++; });
   const complete = rules.combos.some((c) => c.length === sizes.length && fitsCombo(sizes, [c]));
   const restes = [];
   if (!complete) rules.combos.forEach((c) => {
@@ -1215,8 +1219,8 @@ function usines() {
   const canAdd = (t) => !!rules && fitsCombo([...sizesNow, t], rules.combos);
   view(head("Usines", "Résultats du tirage, règles du tour en cours et places restantes. ★ = usine débloquée par un projet communautaire.") + (open ? loginHint("Pour choisir les usines de ta faction,") : "") + `<div class="card rules">
       <h3>Règles</h3>
-      <ul class="rules-list">${Object.entries(TOURS).map(([k, r]) => `<li class="${+k === tour ? "cur" : ""}"><b>${esc(r.nom)}</b> (${esc(r.quand)})${+k === tour ? ' <span class="chip ok">tour en cours</span>' : ""} :
-        ${r.combos.map(comboTxt).join(", ou ")}, dans l'ordre du tirage${r.exclusif ? " ; <b>pas d'usine déjà prise</b> par une autre faction" : ""}.</li>`).join("")}</ul>
+      <ul class="rules-list">${Object.entries(TOURS).map(([k, r]) => `<li class="${+k === tour ? "cur" : ""}"><b>${esc(r.nom)}</b>${r.quand ? ` (${esc(r.quand)})` : ""}${+k === tour ? ' <span class="chip ok">tour en cours</span>' : ""} :
+        ${r.combos.map(comboTxt).join(", ou ")}, dans l'ordre du tirage${dejaTxt(r) ? ` ; usines déjà prises par d'autres factions : <b>${dejaTxt(r)}</b>` : ""}.</li>`).join("")}</ul>
       <p class="muted small">On ne peut valider qu'une fois une combinaison complète (sauf s'il n'y a plus d'usine libre pour la compléter).</p>
       <p class="muted small">Chaque faction choisit à son tour : quand elle a validé ses choix, la main passe à la suivante. La page se met à jour toute seule.</p>
       <p>Chaque usine du même type est limitée sur le serveur : grosses ${MAX.grosse}, moyennes ${MAX.moyenne}, petites ${MAX.petite}.
@@ -1239,14 +1243,14 @@ function usines() {
       <div class="usines">${D.usines.filter((u) => u.taille === t).map((u) => {
         const takers = choixActifs().filter((c) => c.usine_id === u.id);
         const mineC = myFid && takers.find((c) => c.faction_id === myFid);
-        const full = takers.length >= MAX[t], prise = !!(rules && rules.exclusif && takers.length);
+        const full = takers.length >= MAX[t], prise = !!(rules && dejaMax(rules, t) != null && takers.length > dejaMax(rules, t));
         const oldTour = mineC && (mineC.tour || 1) !== tour;
         const can = myFid && canEditFac(myFid) && (open || isStaff()) && !(mineC && mineC.projet_faction_id) && !(oldTour && !isStaff()) && (isStaff() || myTurn);
         const blocked = !mineC && !isStaff() && (full || prise || !canAdd(t));
         return `<div class="usine${mineC ? " has" : ""}${full ? " full" : ""}"><div><b>${esc(u.nom)}</b>
           <span class="muted small">${takers.length}/${MAX[t]}</span></div>
           <div class="takers">${takers.map((c) => { const f = fac(c.faction_id); return f ? `<a class="chip" href="#communaute/faction/${f.id}">${c.projet_faction_id ? "★ " : ""}${esc(f.name)}${(c.tour || 1) > 1 ? ` <small>T${c.tour}</small>` : ""}</a>` : ""; }).join("")}</div>
-          ${can ? `<button class="btn small ${mineC ? "ghost" : ""}" data-us="${u.id}" data-on="${mineC ? 0 : 1}"${blocked ? ` disabled title="${full ? "Plus de place sur le serveur" : prise ? "Déjà prise : ce tour interdit les usines déjà prises" : "Pas possible avec les règles du tour"}"` : ""}>${mineC ? "Retirer" : "Choisir"}</button>` : mineC && oldTour && !mineC.projet_faction_id ? `<span class="muted small">Choisie au ${(mineC.tour || 1) === 1 ? "1er" : mineC.tour + "e"} tour</span>` : ""}</div>`;
+          ${can ? `<button class="btn small ${mineC ? "ghost" : ""}" data-us="${u.id}" data-on="${mineC ? 0 : 1}"${blocked ? ` disabled title="${full ? "Plus de place sur le serveur" : prise ? `Déjà prise par ${takers.length} faction(s) : ce tour l'interdit` : "Pas possible avec les règles du tour"}"` : ""}>${mineC ? "Retirer" : "Choisir"}</button>` : mineC && oldTour && !mineC.projet_faction_id ? `<span class="muted small">Choisie au ${(mineC.tour || 1) === 1 ? "1er" : mineC.tour + "e"} tour</span>` : ""}</div>`;
       }).join("")}</div>`).join("")}</details>`);
   if (isStaff()) $("usFac").onchange = (e) => { staffFaction = e.target.value ? +e.target.value : null; usines(); };
   document.querySelectorAll("[data-us]").forEach((b) => (b.onclick = () =>
@@ -1317,7 +1321,8 @@ const tourRow = (k, r) => `<div class="form compact tour-row" data-tour="${k}"><
   <label>Nom<input data-k="nom" maxlength="40" value="${esc(r.nom || "")}"></label>
   <label>Quand<input data-k="quand" maxlength="120" value="${esc(r.quand || "")}"></label>
   <label class="wide">Combinaisons<input data-k="combos" value="${esc((r.combos || []).map(comboTxt).join(" / "))}"></label>
-  <label class="chk"><input type="checkbox" data-k="exclusif"${r.exclusif ? " checked" : ""}> exclusif</label>
+  ${["grosse", "moyenne", "petite"].map((t) => { const v = dejaMax(r, t);
+    return `<label>${t[0].toUpperCase() + t.slice(1)}s déjà prises<select data-deja="${t}"><option value=""${v == null ? " selected" : ""}>sans limite</option>${[0, 1, 2, 3, 4].map((k) => `<option value="${k}"${v === k ? " selected" : ""}>${k === 0 ? "libres seulement" : `par ${k} faction${k > 1 ? "s" : ""} max`}</option>`).join("")}</select></label>`; }).join("")}
   <button class="x" data-tour-del="${k}" title="Retirer ce tour" aria-label="Retirer le tour ${k}">✕</button></div>`;
 function bindTourRows() {
   document.querySelectorAll("[data-tour-del]").forEach((b) => (b.onclick = () => b.closest("[data-tour]").remove()));
@@ -1533,7 +1538,7 @@ function staff() {
       <div class="wide actions"><button class="btn small" id="saveSettings">Enregistrer les réglages</button></div></section>
     <section class="card" id="st-tours"><h3>Règles des tours d'usines</h3>
       <p class="muted small">Combinaisons séparées par « / », usines d'une combinaison par « + » (ex. <code>grosse / moyenne + petite / 2 petites</code>).
-        « Exclusif » : impossible de prendre une usine déjà prise par une autre faction. Le tour en cours se choisit dans les réglages ci-dessus.</p>
+        « Déjà prises » : par taille, combien d'autres factions peuvent déjà avoir une usine pour qu'on puisse encore la prendre (« libres seulement » = aucune). Le tour en cours se choisit dans les réglages ci-dessus.</p>
       <div id="toursEd">${Object.entries(D.usineTours || {}).map(([k, r]) => tourRow(k, r)).join("")}</div>
       <div class="form compact"><label>Maximum par grosse usine<input type="number" min="1" max="50" id="maxG" value="${(D.usineMax || {}).grosse || 3}"></label>
         <label>par moyenne<input type="number" min="1" max="50" id="maxM" value="${(D.usineMax || {}).moyenne || 4}"></label>
@@ -1552,14 +1557,14 @@ function staff() {
   document.querySelectorAll("[data-ct-del]").forEach((b) => (b.onclick = () => confirm("Supprimer ce message définitivement ?") && act(() => call("DELETE", `/api/admin/contact/${b.dataset.ctDel}`), "Message supprimé")));
   $("tourAdd").onclick = () => { const rows = [...document.querySelectorAll("#toursEd [data-tour]")], last = rows[rows.length - 1];
     const n = rows.length ? Math.max(...rows.map((r) => +r.dataset.tour)) + 1 : 1;
-    $("toursEd").insertAdjacentHTML("beforeend", tourRow(n, { nom: `${n}e tour`, quand: "", combos: last ? parseCombos(last.querySelector("[data-k=combos]").value) || [] : [], exclusif: false })); bindTourRows(); };
+    $("toursEd").insertAdjacentHTML("beforeend", tourRow(n, { nom: `${n}e tour`, quand: "", combos: last ? parseCombos(last.querySelector("[data-k=combos]").value) || [] : [], deja: {} })); bindTourRows(); };
   bindTourRows();
   $("toursSave").onclick = () => {
     const tours = {};
     for (const r of document.querySelectorAll("#toursEd [data-tour]")) {
       const v = (k) => r.querySelector(`[data-k=${k}]`), combos = parseCombos(v("combos").value);
       if (!combos) return toast(`Tour ${r.dataset.tour} : combinaisons illisibles (grosse, moyenne, petite, séparées par + et /).`, true);
-      tours[r.dataset.tour] = { nom: v("nom").value.trim(), quand: v("quand").value.trim(), combos, exclusif: v("exclusif").checked };
+      tours[r.dataset.tour] = { nom: v("nom").value.trim(), quand: v("quand").value.trim(), combos, deja: Object.fromEntries([...r.querySelectorAll("[data-deja]")].filter((x) => x.value !== "").map((x) => [x.dataset.deja, +x.value])) };
     }
     act(() => call("PUT", "/api/admin/usine-regles", { tours, max: { grosse: +$("maxG").value, moyenne: +$("maxM").value, petite: +$("maxP").value } }), "Règles des tours enregistrées");
   };
